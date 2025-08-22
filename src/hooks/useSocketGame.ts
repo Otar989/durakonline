@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { io, Socket } from 'socket.io-client';
+import { supabase } from '@/lib/supabaseClient';
 import { GameState } from '@/lib/durak-engine';
 
 export interface RemoteRoomPayload {
@@ -29,9 +30,19 @@ export function useSocketGame(opts: UseSocketGameOptions){
   const [hand,setHand] = useState<PrivateHandPayload | null>(null);
   const [selfId,setSelfId] = useState<string | null>(null);
 
-  const connect = useCallback(()=>{
+  const connect = useCallback(async ()=>{
     if(socketRef.current) return;
-    const s = io(url, { transports:['websocket'], autoConnect:true });
+    let token: string | undefined;
+    try {
+      const { data } = await supabase.auth.getSession();
+      token = data.session?.access_token;
+      if(!token){
+        // silent anonymous sign-in
+        const anon = await supabase.auth.signInAnonymously();
+        token = anon.data.session?.access_token;
+      }
+    } catch(e){ /* ignore */ }
+    const s = io(url, { transports:['websocket'], autoConnect:true, auth: { token } });
     socketRef.current = s;
   s.on('connect', ()=> { setConnected(true); setSelfId(s.id || null); });
     s.on('disconnect', ()=> setConnected(false));

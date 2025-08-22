@@ -15,6 +15,19 @@
 - `NEXT_PUBLIC_SOCKET_URL=https://durak-socket.up.railway.app`
 Сделайте повторный деплой фронта.
 
+### Добавление Supabase на Vercel
+1. Создайте проект в Supabase, получите `Project URL` и `anon public key`.
+2. В Settings → API возьмите `anon` и (для сервера) `service_role` (не кладём service key в браузер!).
+3. На вкладке Vercel Project → Settings → Environment Variables добавьте:
+   - `NEXT_PUBLIC_SUPABASE_URL` = https://<project-ref>.supabase.co
+   - `NEXT_PUBLIC_SUPABASE_ANON_KEY` = (anon key)
+4. В Socket-сервисе (Railway/Render) добавьте:
+   - `SUPABASE_URL`
+   - `SUPABASE_ANON_KEY`
+   - `SUPABASE_SERVICE_ROLE_KEY`
+   - `SUPABASE_SAVE_GAME_URL` (если будете использовать edge function сохранения игры)
+5. Пересоберите и протестируйте: открытие сайта должно создать анонимную сессию (см. Network → auth/v1). WebSocket должен посылать auth.token в handshake.
+
 ## Проверка
 ```
 GET https://durak-socket.up.railway.app/health  -> ok

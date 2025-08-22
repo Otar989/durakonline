@@ -18,7 +18,8 @@
   "socket.io": "4.7.5",
   "socket.io-client": "4.7.5",
   "clsx": "2.1.1",
-  "zod": "3.23.8"
+  "zod": "3.23.8",
+  "@supabase/supabase-js": "2.45.2"
   },
   "devDependencies": {
     "typescript": "^5",
@@ -30,7 +31,6 @@
     "eslint": "^9",
     "eslint-config-next": "15.5.0",
   "@eslint/eslintrc": "^3",
-  "@types/socket.io": "3.0.2",
   "concurrently": "8.2.2"
   }
 }
