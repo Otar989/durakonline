@@ -13,8 +13,14 @@ export default function Home(){
   const [copied,setCopied] = useState(false);
   const [defendTarget,setDefendTarget] = useState<Card | null>(null);
   const [stats,setStats] = useState<{ games: number; wins: number } | null>(null);
-  const { room, connected, startGame: startRemoteGame, sendAction, addBot, updateSettings, restart, toasts, removeToast, selfId, selfHand, error: socketError, socketUrl } = useSocketGame({ nickname: nickname||'Игрок', roomId: mode==='online'? roomId : null, debug: true });
+  const { room, connected, startGame: startRemoteGame, sendAction, addBot, updateSettings, restart, toasts, removeToast, selfId, selfHand, error: socketError, socketUrl, socket } = useSocketGame({ nickname: nickname||'Игрок', roomId: mode==='online'? roomId : null, debug: true });
   const sortedHand = [...selfHand].sort(cardClientSorter(room?.state.trump?.s) as any); // приведение типов
+
+  // Локальные настройки для старта комнаты (в т.ч. при её создании)
+  const [localSettings, setLocalSettings] = useState<{ allowTranslation: boolean; maxPlayers: number; deckSize: 24|36|52; speed: 'slow'|'normal'|'fast'; private: boolean }>({ allowTranslation: true, maxPlayers: 6, deckSize: 36, speed: 'normal', private: false });
+  // Список комнат
+  const [rooms,setRooms] = useState<{ id: string; phase: string; players: number; maxPlayers: number; private: boolean; deckSize: number; speed: string }[]>([]);
+
   useEffect(()=>{
     if(typeof window==='undefined') return;
     const saved = localStorage.getItem('durak_nick');
@@ -52,25 +58,36 @@ export default function Home(){
       } catch(_){ /* ignore */ }
     })();
   },[mode]);
+
+  // Rooms polling
+  useEffect(()=>{
+    if(!socket || mode!=='online') return;
+    const handleList = (lst:any)=> setRooms(lst||[]);
+    socket.on('rooms:list', handleList);
+    socket.emit('rooms:list');
+    const t = setInterval(()=> socket.emit('rooms:list'), 5000);
+    return ()=>{ clearInterval(t); socket.off('rooms:list', handleList); };
+  },[socket, mode]);
+
   const shareLink = typeof window!=='undefined'? `${window.location.origin}/?room=${roomId}` : '';
   const copyShare = async ()=>{ try { await navigator.clipboard.writeText(shareLink); setCopied(true); setTimeout(()=>setCopied(false),1500);} catch(_){} };
 
   const ensurePlayer = () => { if(!state.players[playerId]) addLocalPlayer(playerId, nickname||'Игрок'); };
   const handleStart = () => { ensurePlayer(); startLocal(); setMode('local'); };
   return (
-    <div className="w-full min-h-dvh px-6 py-10 flex flex-col items-center gap-10">
-      <h1 className="text-4xl font-semibold bg-clip-text text-transparent bg-gradient-to-r from-sky-400 via-cyan-300 to-blue-500 drop-shadow-[0_2px_8px_rgba(0,150,255,0.35)]">Durak Online</h1>
+    <div className="w-full min-h-dvh px-4 sm:px-6 py-6 sm:py-10 flex flex-col items-center gap-6 sm:gap-10">
+      <h1 className="text-3xl sm:text-4xl font-semibold bg-clip-text text-transparent bg-gradient-to-r from-sky-400 via-cyan-300 to-blue-500 drop-shadow-[0_2px_8px_rgba(0,150,255,0.35)]">Durak Online</h1>
       {mode==='menu' && (
-        <div className="glass-panel max-w-xl w-full p-8 flex flex-col gap-6">
+        <div className="glass-panel max-w-xl w-full p-5 sm:p-8 flex flex-col gap-5 sm:gap-6">
           <div className="flex flex-col gap-2">
             <label className="text-sm opacity-80">Никнейм</label>
             <input value={nickname} onChange={e=>setNickname(e.target.value)} placeholder="Введите ник" className="bg-white/5 border border-white/15 rounded-lg px-4 py-2 outline-none focus:ring-2 focus:ring-sky-400/60"/>
           </div>
-          <div className="grid sm:grid-cols-2 gap-4 mt-2">
+          <div className="grid grid-cols-2 gap-3 sm:gap-4 mt-2">
             <button className="btn" onClick={handleStart}>Локальная игра</button>
             <button className="btn" onClick={()=>{ if(!nickname) setNickname('Гость'); setMode('online'); }}>Онлайн</button>
           </div>
-          <p className="text-xs leading-relaxed opacity-70">Выберите режим. Онлайн матчмейкинг, комнаты, переводной & подкидной варианты и расширенные правила будут добавлены в следующих шагах.</p>
+          <p className="text-xs leading-relaxed opacity-70">Режимы и интерфейс приближены к приложению. Мобильная верстка включена.</p>
           {stats && <div className="text-xs opacity-70">Ваши партии: {stats.games} · Побед: {stats.wins}</div>}
         </div>) }
       {mode==='local' && (
@@ -85,13 +102,13 @@ export default function Home(){
           </div>
           <div className="glass-panel p-6 flex flex-col gap-4">
             <h2 className="text-lg font-medium">Стол</h2>
-                <div className="flex flex-wrap gap-3 min-h-[120px]">
-                  {state.table.map((pair, i: number)=> (
-                    <div key={i} className="relative" style={{ perspective:'1000px' }}>
-                      <div className="animate-card-in"><MiniCard card={pair.attack} trumpSuit={state.trump?.s} /></div>
-                      {pair.defend && <div className="absolute left-6 top-4 rotate-12 animate-defend-in"><MiniCard card={pair.defend} trumpSuit={state.trump?.s} /></div>}
-                    </div>
-                  ))}
+            <div className="flex flex-wrap gap-3 min-h-[120px]">
+              {state.table.map((pair, i: number)=> (
+                <div key={i} className="relative" style={{ perspective:'1000px' }}>
+                  <div className="animate-card-in"><MiniCard card={pair.attack} trumpSuit={state.trump?.s} /></div>
+                  {pair.defend && <div className="absolute left-6 top-4 rotate-12 animate-defend-in"><MiniCard card={pair.defend} trumpSuit={state.trump?.s} /></div>}
+                </div>
+              ))}
               {state.table.length===0 && <p className="text-sm opacity-50">Нет карт</p>}
             </div>
           </div>
@@ -105,39 +122,53 @@ export default function Home(){
       )}
       {mode==='online' && (
         <div className="flex flex-col gap-6 w-full max-w-6xl">
-          <div className="glass-panel p-6 flex flex-col gap-4">
+          <div className="glass-panel p-4 sm:p-6 flex flex-col gap-4">
             <h2 className="text-lg font-medium">Онлайн комната</h2>
-            <div className="flex flex-wrap gap-4 items-end">
-              <div className="flex flex-col gap-2">
+            <div className="flex flex-wrap gap-3 sm:gap-4 items-end">
+              <div className="flex flex-col gap-2 min-w-[160px]">
                 <label className="text-xs opacity-70">Room ID</label>
-                    <input value={roomId} onChange={e=>setRoomId(e.target.value)} className="bg-white/5 border border-white/15 rounded-lg px-4 py-2 outline-none focus:ring-2 focus:ring-sky-400/60" />
-                    <p className="text-[10px] opacity-50 break-all leading-snug max-w-[160px]">{shareLink}</p>
+                <input value={roomId} onChange={e=>setRoomId(e.target.value)} className="bg-white/5 border border-white/15 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-sky-400/60" />
+                <p className="text-[10px] opacity-50 break-all leading-snug max-w-[180px] hidden sm:block">{shareLink}</p>
               </div>
               <div className="flex flex-col gap-2">
                 <label className="text-xs opacity-70">Ник</label>
-                <input value={nickname} onChange={e=>setNickname(e.target.value)} className="bg-white/5 border border-white/15 rounded-lg px-4 py-2 outline-none focus:ring-2 focus:ring-sky-400/60" />
+                <input value={nickname} onChange={e=>setNickname(e.target.value)} className="bg-white/5 border border-white/15 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-sky-400/60" />
               </div>
-                  <button className="btn" disabled={room?.state.phase!=='lobby'} onClick={()=>startRemoteGame({})}>Старт</button>
-                  <button className="btn" onClick={()=>setMode('menu')}>Назад</button>
-                  <button className="btn" disabled={room?.state.phase!=='lobby'} onClick={()=>addBot()}>+ Бот</button>
-                  <button className="btn" onClick={copyShare}>Ссылка{copied && ' ✓'}</button>
+              <button className="btn" disabled={room?.state.phase!=='lobby'} onClick={()=>startRemoteGame(localSettings)}>Старт</button>
+              <button className="btn" onClick={()=>setMode('menu')}>Назад</button>
+              <button className="btn" disabled={room?.state.phase!=='lobby'} onClick={()=>addBot()}>+ Бот</button>
+              <button className="btn" onClick={copyShare}>Ссылка{copied && ' ✓'}</button>
             </div>
             <div className="text-xs opacity-70">{connected? 'Подключено' : 'Ожидание соединения...'} <span className="opacity-50">({socketUrl})</span>{socketError && <span className="text-red-400 ml-2">{socketError}</span>}</div>
             <div className="glass-divider" />
-    {room?.state.phase==='lobby' && room.settings && (
+            {room?.state.phase==='lobby' && (
               <div className="flex flex-wrap gap-4 items-center text-xs">
                 <label className="flex items-center gap-2">Переводной
-      <input type="checkbox" className="accent-sky-400" defaultChecked={(room.settings as {allowTranslation?:boolean}).allowTranslation ?? false} onChange={e=>updateSettings({ allowTranslation: e.target.checked })} />
+                  <input type="checkbox" className="accent-sky-400" checked={(room.settings as any)?.allowTranslation ?? localSettings.allowTranslation} onChange={e=>{ setLocalSettings(s=>({...s, allowTranslation: e.target.checked})); updateSettings({ allowTranslation: e.target.checked }); }} />
                 </label>
                 <label className="flex items-center gap-2">Макс игроков
-      <select defaultValue={(room.settings as {maxPlayers?:number}).maxPlayers ?? 6} onChange={e=>updateSettings({ maxPlayers: Number(e.target.value) })} className="bg-white/5 border border-white/15 rounded-md px-2 py-1">
+                  <select value={(room.settings as any)?.maxPlayers ?? localSettings.maxPlayers} onChange={e=>{ const v=Number(e.target.value); setLocalSettings(s=>({...s, maxPlayers:v})); updateSettings({ maxPlayers: v }); }} className="bg-white/5 border border-white/15 rounded-md px-2 py-1">
                     {[2,3,4,5,6].map(n=><option key={n} value={n}>{n}</option>)}
                   </select>
                 </label>
+                <label className="flex items-center gap-2">Колода
+                  <select value={(room.settings as any)?.deckSize ?? localSettings.deckSize} onChange={e=>{ const v=Number(e.target.value) as 24|36|52; setLocalSettings(s=>({...s, deckSize:v})); updateSettings({ deckSize: v }); }} className="bg-white/5 border border-white/15 rounded-md px-2 py-1">
+                    {[24,36,52].map(n=><option key={n} value={n}>{n}</option>)}
+                  </select>
+                </label>
+                <label className="flex items-center gap-2">Скорость
+                  <select value={(room.settings as any)?.speed ?? localSettings.speed} onChange={e=>{ const v=e.target.value as 'slow'|'normal'|'fast'; setLocalSettings(s=>({...s, speed:v})); updateSettings({ speed: v }); }} className="bg-white/5 border border-white/15 rounded-md px-2 py-1">
+                    {['slow','normal','fast'].map(n=><option key={n} value={n}>{n}</option>)}
+                  </select>
+                </label>
+                <label className="flex items-center gap-2">Приватная
+                  <input type="checkbox" className="accent-sky-400" checked={(room.settings as any)?.private ?? localSettings.private} onChange={e=>{ setLocalSettings(s=>({...s, private: e.target.checked})); updateSettings({ private: e.target.checked }); }} />
+                </label>
               </div>
             )}
-            <div className="flex gap-6 flex-wrap">
-              <div className="min-w-[200px]">
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mt-4">
+              <div className="min-w-[200px] order-2 sm:order-1">
                 <h3 className="font-medium mb-2">Игроки</h3>
                 <ul className="space-y-1 text-sm">
                   {room?.players.map(p=> <li key={p.id} className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />{p.nick}{room.state.attacker===p.id && ' (А)'}{room.state.defender===p.id && ' (З)'}{room.state.winner===p.id && ' 🏆'}</li>)}
@@ -145,24 +176,25 @@ export default function Home(){
                 </ul>
                 {room?.spectators?.length ? <div className="mt-4 text-[11px] opacity-60">Зрители: {room.spectators.map(s=>s.nick).join(', ')}</div>: null}
               </div>
-              <div className="flex-1 min-w-[300px]">
+
+              <div className="flex-1 min-w-[280px] order-1 sm:order-2">
                 <h3 className="font-medium mb-2">Стол</h3>
-    <div className="flex flex-wrap gap-3 min-h-[120px]">
+                <div className="flex flex-wrap gap-3 min-h-[120px]">
                   {room?.state.table.map((pair,i:number)=> {
                     const selectable = selfId===room?.state.defender && !pair.defend;
                     const isSelected = defendTarget && defendTarget.r===pair.attack.r && defendTarget.s===pair.attack.s;
                     return (
                       <div key={i} className={"relative group transition-transform " + (selectable? 'cursor-pointer hover:scale-[1.04]':'') + (isSelected? ' ring-2 ring-emerald-400 rounded-lg':'' )} style={{ perspective:'1000px' }}
                         onClick={()=>{ if(selectable) setDefendTarget(pair.attack); }}>
-      <div className="animate-card-in"><MiniCard card={pair.attack} trumpSuit={room?.state.trump?.s} /></div>
-      {pair.defend && <div className="absolute left-6 top-4 rotate-12 animate-defend-in"><MiniCard card={pair.defend} trumpSuit={room?.state.trump?.s} /></div>}
+                        <div className="animate-card-in"><MiniCard card={pair.attack} trumpSuit={room?.state.trump?.s} /></div>
+                        {pair.defend && <div className="absolute left-6 top-4 rotate-12 animate-defend-in"><MiniCard card={pair.defend} trumpSuit={room?.state.trump?.s} /></div>}
                       </div>
                     );
                   })}
                   {room?.state.table.length===0 && <p className="text-sm opacity-50">Нет карт</p>}
                 </div>
                 {room?.state.phase==='playing' && (
-                  <div className="flex gap-3 mt-4 flex-wrap">
+                  <div className="flex gap-3 mt-4 flex-wrap sm:justify-start justify-center">
                     <button className="btn" onClick={()=>sendAction({ type:'END_TURN' })} disabled={!selfId || room.state.attacker!==selfId || room.state.table.some(p=>!p.defend)}>Бито</button>
                     <button className="btn" onClick={()=>sendAction({ type:'TAKE' })} disabled={!selfId || room.state.defender!==selfId}>Взять</button>
                     {selfId===room?.state.defender && room?.settings && (room.settings as any).allowTranslation && room.state.table.length===1 && !room.state.table[0].defend && (
@@ -176,28 +208,19 @@ export default function Home(){
                   </div>
                 )}
               </div>
-              <div className="min-w-[200px]">
+
+              <div className="min-w-[200px] order-3">
                 <h3 className="font-medium mb-2">Трамп</h3>
                 {room?.state.trump && <MiniCard card={room.state.trump} trumpSuit={room.state.trump.s} />}
                 <p className="text-xs opacity-50 mt-2">Колода: {room?.state.deck.length ?? '-'}</p>
               </div>
-              <div className="min-w-[220px] max-h-72 overflow-auto glass-panel/10 rounded-lg p-2 text-[11px] flex-1">
-                <h3 className="font-medium mb-1 text-xs">Лог</h3>
-                <ul className="space-y-0.5">
-                  {room && (room as any).log?.map((e:any,i:number)=> (
-                    <li key={i} className="opacity-80">
-                      {formatLog(e, room)}
-                    </li>
-                  ))}
-                  {!((room as any)?.log?.length) && <li className="opacity-40">Пусто</li>}
-                </ul>
-              </div>
             </div>
-    {selfId && (
-              <div className="mt-6 glass-panel p-4 hand-mobile-fixed">
+
+            {selfId && (
+              <div className="mt-6 glass-panel p-3 sm:p-4 hand-mobile-fixed">
                 <h3 className="font-medium mb-3 hidden sm:block">Ваши карты</h3>
                 <div className="flex gap-2 flex-wrap justify-center">
-  {sortedHand.map((c, i:number)=>{
+                  {sortedHand.map((c, i:number)=>{
                     const canAttack = selfId===room?.state.attacker && (
                       (room.state.table.length===0) || new Set(room.state.table.flatMap(p=>[p.attack.r, p.defend?.r].filter(Boolean))).has((c as any).r)
                     ) && room.state.table.length<6;
@@ -214,20 +237,45 @@ export default function Home(){
                       </div>
                     );
                   })}
-                {defendTarget && <p className="text-xs mt-2 opacity-70">Выберите карту для защиты атаки {defendTarget.r}{defendTarget.s}</p>}
+                  {defendTarget && <p className="text-xs mt-2 opacity-70">Выберите карту для защиты атаки {defendTarget.r}{defendTarget.s}</p>}
                 </div>
               </div>
             )}
-                {room?.state.phase==='finished' && <div className="mt-4 text-center text-lg flex flex-col items-center gap-3">
-                  {(room.state as any).loser ? (
-                    <>
-                      <div className="text-red-300 font-medium">Дурак: {room.players.find(p=>p.id===(room.state as any).loser)?.nick}</div>
-                      <div className="text-sm opacity-70">Выиграли: {room.players.filter(p=>p.id!==(room.state as any).loser).map(p=>p.nick).join(', ')}</div>
-                    </>
-                  ) : <div className="font-medium">Ничья (все вышли)</div>}
-                  <button className="btn" onClick={()=> restart() }>Реванш</button>
-                </div>}
+
+            {room?.state.phase==='finished' && <div className="mt-4 text-center text-lg flex flex-col items-center gap-3">
+              {(room.state as any).loser ? (
+                <>
+                  <div className="text-red-300 font-medium">Дурак: {room.players.find(p=>p.id===(room.state as any).loser)?.nick}</div>
+                  <div className="text-sm opacity-70">Выиграли: {room.players.filter(p=>p.id!==(room.state as any).loser).map(p=>p.nick).join(', ')}</div>
+                </>
+              ) : <div className="font-medium">Ничья (все вышли)</div>}
+              <button className="btn" onClick={()=> restart() }>Реванш</button>
+            </div>}
+
+            <div className="glass-divider my-4" />
+            <div>
+              <h3 className="font-medium mb-2">Комнаты</h3>
+              <div className="glass-panel/10 rounded-lg p-2 max-h-64 overflow-auto">
+                {rooms.length===0 && <div className="text-sm opacity-60">Список пуст</div>}
+                <ul className="text-sm divide-y divide-white/10">
+                  {rooms.map(r=> (
+                    <li key={r.id} className="py-2 flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-3">
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-white/10">{r.phase}</span>
+                        <span className="font-medium">{r.id}</span>
+                        <span className="opacity-70">{r.players}/{r.maxPlayers}</span>
+                        {r.private && <span className="opacity-70">• приват</span>}
+                        <span className="opacity-50">• {r.deckSize}</span>
+                        <span className="opacity-50">• {r.speed}</span>
+                      </div>
+                      <button className="btn" onClick={()=>{ setRoomId(r.id); }}>Войти</button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
           </div>
+
           <div className="fixed bottom-4 right-4 flex flex-col gap-2 z-50">
             {toasts.map(t=> (
               <div key={t.id} className="glass-panel px-4 py-2 text-sm flex items-center gap-3">

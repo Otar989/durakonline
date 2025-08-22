@@ -346,7 +346,111 @@ function sendPrivateHands(roomId, room){
 }
 
 const RANK_ORDER = ['6','7','8','9','10','J','Q','K','A'];
-
+const RANK_ORDER_ALL = ['2','3','4','5','6','7','8','9','10','J','Q','K','A'];
+function rankIndex(r, room){
+  const size = room.settings?.deckSize || 36;
+  let start = 0; // 52 по умолчанию
+  if(size===36) start = RANK_ORDER_ALL.indexOf('6');
+  if(size===24) start = RANK_ORDER_ALL.indexOf('9');
+  const arr = RANK_ORDER_ALL.slice(start);
+  const idx = arr.indexOf(r);
+  return idx<0? 99: idx;
+}
+function canBeat(attack, defend, trumpSuit){
+  if(attack.s===defend.s) return rankIndex(defend.r, { settings:{ deckSize: 36 } }) > rankIndex(attack.r, { settings:{ deckSize: 36 } });
+  return defend.s===trumpSuit && attack.s!==trumpSuit;
+}
+function removeCard(hand, card){
+  const i = hand.findIndex(c=>c.r===card.r && c.s===card.s);
+  if(i>=0) return hand.splice(i,1)[0];
+  return null;
+}
+function tableRanks(table){
+  const s=new Set();
+  for(const p of table){ s.add(p.attack.r); if(p.defend) s.add(p.defend.r); }
+  return s;
+}
+function pushLog(room, event){
+  room.turnLog.push({ t: Date.now(), ...event });
+  room.turnLog = room.turnLog.slice(-100);
+}
+function applyAction(room, playerId, action){
+  const st = room.state;
+  const p = st.players[playerId];
+  if(!p) return;
+  const trumpSuit = st.trump?.s;
+  switch(action.type){
+    case 'ATTACK':{
+      if(st.attacker!==playerId) return;
+      if(st.table.length>=6) return;
+      const defHandSize = st.players[st.defender]?.hand.length || 0;
+      if(st.table.length>=defHandSize) return;
+      const card = removeCard(p.hand, action.card);
+      if(!card) return;
+      if(st.table.length>0){
+        const ranks = tableRanks(st.table);
+        if(!ranks.has(card.r)){ p.hand.push(card); return; }
+      }
+      st.table.push({ attack: card });
+      pushLog(room, { a:'ATTACK', by: playerId, card });
+      return;
+    }
+    case 'DEFEND':{
+      if(st.defender!==playerId) return;
+      const pair = st.table.find(t=>!t.defend && t.attack.r===action.target?.r && t.attack.s===action.target?.s);
+      if(!pair) return;
+      const card = removeCard(p.hand, action.card);
+      if(!card) return;
+      if(!canBeat(pair.attack, card, trumpSuit)){ p.hand.push(card); return; }
+      pair.defend = card;
+      pushLog(room, { a:'DEFEND', by: playerId, card, target: pair.attack });
+      return;
+    }
+    case 'TRANSLATE':{
+      if(!room.settings.allowTranslation) return;
+      if(st.defender!==playerId) return;
+      if(st.table.length===0) return;
+      if(st.table.some(t=>t.defend)) return; // только до защиты
+      const baseRank = st.table[0].attack.r;
+      const card = removeCard(p.hand, action.card);
+      if(!card){ return; }
+      if(card.r!==baseRank){ p.hand.push(card); return; }
+      // Сменить стороны: защитник становится атакующим, новый защитник следующий по кругу
+      st.table.push({ attack: card });
+      pushLog(room, { a:'TRANSLATE', by: playerId, card });
+      const order = seatingOrder(room);
+      st.attacker = playerId;
+      const idx = order.indexOf(playerId);
+      st.defender = order[(idx+1)%order.length];
+      return;
+    }
+    case 'TAKE':{
+      if(st.defender!==playerId) return;
+      const takeCards = [];
+      for(const pair of st.table){ takeCards.push(pair.attack); if(pair.defend) takeCards.push(pair.defend); }
+      p.hand.push(...takeCards);
+      st.table = [];
+      refillHands(room);
+      // после взятия остаётся тот же атакующий, защитник следующий
+      const order = seatingOrder(room);
+      const idxA = order.indexOf(st.attacker);
+      st.defender = order[(idxA+1)%order.length];
+      pushLog(room, { a:'TAKE', by: playerId });
+      return;
+    }
+    case 'END_TURN':{
+      if(st.attacker!==playerId) return;
+      if(st.table.some(t=>!t.defend)) return; // нельзя, если не все отбиты
+      // Все карты в сброс
+      for(const pair of st.table){ st.discard.push(pair.attack); if(pair.defend) st.discard.push(pair.defend); }
+      st.table = [];
+      refillHands(room);
+      nextAttacker(room);
+      pushLog(room, { a:'END_TURN', by: playerId });
+      return;
+    }
+  }
+}
 // --- Persistence (Supabase raw_games) ---
 import { createClient } from '@supabase/supabase-js';
 let supaClient = null;
