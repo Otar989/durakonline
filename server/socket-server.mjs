@@ -27,7 +27,7 @@ const io = new Server(httpServer, {
   }
 });
 
-const rooms = new Map(); // roomId -> { players: Map, spectators: Map, bots: Map, settings, state, turnLog, saved:boolean }
+const rooms = new Map(); // roomId -> { players: Map, spectators: Map, bots: Map, settings, state, turnLog, saved:boolean, turnDeadline?:number }
 const socketUserMap = new Map(); // socket.id -> { userId }
 const lastActionAt = new Map(); // playerId -> timestamp (ms)
 const ACTION_THROTTLE_MS = 120; // минимальный интервал между действиями
@@ -37,6 +37,9 @@ const DEFAULT_SETTINGS = {
   allowTranslation: true, // переводной
   maxPlayers: 6,
   allowBots: true,
+  deckSize: 36, // 24 | 36 | 52
+  speed: 'normal', // slow|normal|fast
+  private: false,
 };
 
 function initialState() {
@@ -50,13 +53,19 @@ function initialState() {
     defender: null,
     phase: 'lobby',
     winner: null,
-  loser: null,
-  finished: [],
+    loser: null,
+    finished: [],
   };
 }
 
-function buildDeck(){
-  const ranks = ['6','7','8','9','10','J','Q','K','A'];
+function buildDeck(size=36){
+  // size: 24 (9..A), 36 (6..A), 52 (2..A)
+  const rankMap = {
+    24: ['9','10','J','Q','K','A'],
+    36: ['6','7','8','9','10','J','Q','K','A'],
+    52: ['2','3','4','5','6','7','8','9','10','J','Q','K','A'],
+  };
+  const ranks = rankMap[size] || rankMap[36];
   const suits = ['♠','♥','♦','♣'];
   const deck = [];
   for(const s of suits) for(const r of ranks) deck.push({r,s});
@@ -118,14 +127,23 @@ function checkWinner(room){
       st.phase='finished';
       st.loser = active[0].id; // последний с картами
       st.winner = null;
-  persistRoomResult(room);
+      persistRoomResult(room);
     } else if(active.length===0){
       st.phase='finished';
       st.loser = null; // все закончили одновременно
-  persistRoomResult(room);
+      persistRoomResult(room);
     }
   }
 }
+
+function speedMs(speed){
+  switch(speed){
+    case 'slow': return 15000;
+    case 'fast': return 6000;
+    default: return 9000; // normal
+  }
+}
+function resetTurnDeadline(room){ room.turnDeadline = Date.now() + speedMs(room.settings.speed); }
 
 io.on('connection', (socket) => {
   // ...existing code before listeners...
@@ -140,6 +158,15 @@ io.on('connection', (socket) => {
   }
   if (!userId) userId = 'guest_' + socket.id;
   socketUserMap.set(socket.id, { userId });
+
+  // Список комнат
+  socket.on('rooms:list', ()=>{
+    const list = [];
+    for(const [id, r] of rooms){
+      list.push({ id, phase: r.state.phase, players: r.players.size + r.bots.size, maxPlayers: r.settings.maxPlayers, private: !!r.settings.private, deckSize: r.settings.deckSize, speed: r.settings.speed });
+    }
+    io.to(socket.id).emit('rooms:list', list);
+  });
 
   // joinRoom override
   const originalJoin = socket.listeners('joinRoom');
@@ -173,8 +200,12 @@ io.on('connection', (socket) => {
     if(options && typeof options==='object'){
       if('allowTranslation' in options) room.settings.allowTranslation = !!options.allowTranslation;
       if('maxPlayers' in options && Number(options.maxPlayers)>=2 && Number(options.maxPlayers)<=6) room.settings.maxPlayers = Number(options.maxPlayers);
+      if('deckSize' in options && [24,36,52].includes(Number(options.deckSize))) room.settings.deckSize = Number(options.deckSize);
+      if('speed' in options && ['slow','normal','fast'].includes(options.speed)) room.settings.speed = options.speed;
+      if('private' in options) room.settings.private = !!options.private;
     }
     startGame(room);
+    resetTurnDeadline(room);
     emitRoom(roomId);
   });
 
@@ -197,6 +228,9 @@ io.on('connection', (socket) => {
     if(typeof newSettings==='object'){
       if('allowTranslation' in newSettings) room.settings.allowTranslation = !!newSettings.allowTranslation;
       if('maxPlayers' in newSettings && Number(newSettings.maxPlayers)>=2 && Number(newSettings.maxPlayers)<=6) room.settings.maxPlayers = Number(newSettings.maxPlayers);
+      if('deckSize' in newSettings && [24,36,52].includes(Number(newSettings.deckSize))) room.settings.deckSize = Number(newSettings.deckSize);
+      if('speed' in newSettings && ['slow','normal','fast'].includes(newSettings.speed)) room.settings.speed = newSettings.speed;
+      if('private' in newSettings) room.settings.private = !!newSettings.private;
     }
     emitRoom(roomId);
   });
@@ -207,6 +241,7 @@ io.on('connection', (socket) => {
     if(!room) return;
     if(room.state.phase!=='finished' && room.state.phase!=='lobby') return;
     startGame(room);
+    resetTurnDeadline(room);
     emitRoom(roomId);
   });
 
@@ -226,6 +261,7 @@ io.on('connection', (socket) => {
     }
     lastActionAt.set(realId, now);
     applyAction(room, realId, action);
+    resetTurnDeadline(room);
     checkWinner(room);
     emitRoom(roomId);
   });
@@ -259,7 +295,7 @@ function startGame(room){
   room.saved = false;
   const st = room.state;
   st.phase='playing';
-  st.deck = shuffle(buildDeck());
+  st.deck = shuffle(buildDeck(room.settings.deckSize));
   st.trump = st.deck[st.deck.length-1];
   const ids = seatingOrder(room);
   for(const id of ids){
@@ -419,8 +455,8 @@ setInterval(()=>{
       if(st.attacker===botId){
         if(st.table.length<6){
           const card = botChooseAttack(st, bot);
-            if(card) applyAction(room, botId, { type:'ATTACK', card });
-            else applyAction(room, botId, { type:'END_TURN' });
+          if(card) applyAction(room, botId, { type:'ATTACK', card });
+          else applyAction(room, botId, { type:'END_TURN' });
         } else {
           applyAction(room, botId, { type:'END_TURN' });
         }
@@ -452,9 +488,28 @@ setInterval(()=>{
         }
       }
     }
+    resetTurnDeadline(room);
     emitRoom(roomId);
   }
 }, 1500);
+
+// Таймер ходов: автоматические действия при истечении времени
+setInterval(()=>{
+  const now = Date.now();
+  for(const [roomId, room] of rooms){
+    if(room.state.phase!=='playing') continue;
+    if(!room.turnDeadline) continue;
+    if(now < room.turnDeadline) continue;
+    const st = room.state;
+    if(st.defender && st.table.some(p=>!p.defend)){
+      applyAction(room, st.defender, { type:'TAKE' });
+    } else if(st.attacker){
+      applyAction(room, st.attacker, { type:'END_TURN' });
+    }
+    resetTurnDeadline(room);
+    emitRoom(roomId);
+  }
+}, 700);
 
 function cardSorter(a,b){ return RANK_ORDER.indexOf(a.r)-RANK_ORDER.indexOf(b.r); }
 
