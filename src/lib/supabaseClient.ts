@@ -1,6 +1,15 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseAnon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+let client: SupabaseClient | null = null;
 
-export const supabase = createClient(supabaseUrl, supabaseAnon);
+export function getSupabase(): SupabaseClient | null {
+	if (client) return client;
+	const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+	const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+	if (!url || !anon) {
+		// На этапе build (SSR/prerender) переменных может не быть — возвращаем null без ошибки.
+		return null;
+	}
+	client = createClient(url, anon);
+	return client;
+}
