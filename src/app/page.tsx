@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect } from 'react';
+import { getSupabase } from '@/lib/supabaseClient';
 import { useGameStore } from '@/store/gameStore';
 import { Card } from '@/lib/durak-engine';
 import { useSocketGame } from '@/hooks/useSocketGame';
@@ -11,6 +12,7 @@ export default function Home(){
   const [roomId,setRoomId] = useState('room1');
   const [copied,setCopied] = useState(false);
   const [defendTarget,setDefendTarget] = useState<Card | null>(null);
+  const [stats,setStats] = useState<{ games: number; wins: number } | null>(null);
   const { room, connected, startGame: startRemoteGame, sendAction, addBot, updateSettings, restart, toasts, removeToast, selfId, selfHand, error: socketError, socketUrl } = useSocketGame({ nickname: nickname||'Игрок', roomId: mode==='online'? roomId : null, debug: true });
   const sortedHand = [...selfHand].sort(cardClientSorter(room?.state.trump?.s) as any); // приведение типов
   useEffect(()=>{
@@ -23,6 +25,33 @@ export default function Home(){
     // eslint-disable-next-line react-hooks/exhaustive-deps
   },[]);
   useEffect(()=>{ if(typeof window!=='undefined' && nickname) localStorage.setItem('durak_nick', nickname); },[nickname]);
+  // simple stats (client side derive from raw_games) — only when in menu and user has anon session
+  useEffect(()=>{
+    if(mode!=='menu') return;
+    const supa = getSupabase();
+    if(!supa) return;
+    (async()=>{
+      try {
+        const { data: { session } } = await supa.auth.getSession();
+        if(!session) return;
+        const uid = session.user.id;
+        const { data, error } = await supa.from('raw_games').select('summary').limit(200); // cap
+        if(error) return;
+        let games = 0, wins = 0;
+        for(const row of data){
+          const s = (row as any).summary;
+            if(!s || !Array.isArray(s.players)) continue;
+            const loser = s.loser;
+            const player = s.players.find((p:any)=>p.id===uid);
+            if(player){
+              games++;
+              if(loser && loser!==uid) wins++; else if(!loser && s.finished?.includes(uid)) wins++; // ничья всем не +1
+            }
+        }
+        setStats({ games, wins });
+      } catch(_){ /* ignore */ }
+    })();
+  },[mode]);
   const shareLink = typeof window!=='undefined'? `${window.location.origin}/?room=${roomId}` : '';
   const copyShare = async ()=>{ try { await navigator.clipboard.writeText(shareLink); setCopied(true); setTimeout(()=>setCopied(false),1500);} catch(_){} };
 
@@ -42,6 +71,7 @@ export default function Home(){
             <button className="btn" onClick={()=>{ if(!nickname) setNickname('Гость'); setMode('online'); }}>Онлайн</button>
           </div>
           <p className="text-xs leading-relaxed opacity-70">Выберите режим. Онлайн матчмейкинг, комнаты, переводной & подкидной варианты и расширенные правила будут добавлены в следующих шагах.</p>
+          {stats && <div className="text-xs opacity-70">Ваши партии: {stats.games} · Побед: {stats.wins}</div>}
         </div>) }
       {mode==='local' && (
         <div className="flex flex-col gap-6 w-full max-w-5xl">

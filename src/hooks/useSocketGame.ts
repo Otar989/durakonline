@@ -53,7 +53,7 @@ export function useSocketGame(opts: UseSocketGameOptions){
     if(debug) console.log('[socket] connecting to', socketUrl);
     const s = io(socketUrl, { transports:['websocket'], autoConnect:true, auth: { token } });
     socketRef.current = s;
-    s.on('connect', ()=> { if(debug) console.log('[socket] connected'); setConnected(true); setError(null); });
+  s.on('connect', ()=> { if(debug) console.log('[socket] connected'); setConnected(true); setError(null); if(roomId && nickname){ s.emit('joinRoom', roomId, nickname); } });
     s.on('disconnect', ()=> { if(debug) console.log('[socket] disconnected'); setConnected(false); });
     s.on('connect_error', (e)=> {
       if(debug) console.error('[socket] connect_error', e.message);
@@ -73,7 +73,7 @@ export function useSocketGame(opts: UseSocketGameOptions){
     s.on('toast', (t: { type: string; message: string })=> {
       setToasts(cur=>[...cur.slice(-4), { id: Math.random().toString(36).slice(2), ...t }]);
     });
-  },[socketUrl, debug]);
+  },[socketUrl, debug, roomId, nickname]);
 
   // Переподключение если изменили socketUrl (фолбэк)
   useEffect(()=>{ if(!socketRef.current && autoConnect) connect(); },[socketUrl, autoConnect, connect]);
