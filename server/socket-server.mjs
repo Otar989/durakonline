@@ -234,11 +234,11 @@ function findRoomId(roomObj){
 }
 
 function sendPrivateHands(roomId, room){
-  for(const playerId of room.players.keys()){
-    const socket = io.sockets.sockets.get(playerId);
+  for(const [, player] of room.players){
+    const socket = io.sockets.sockets.get(player.socketId);
     if(socket){
-      const pl = room.state.players[playerId];
-      if(pl) socket.emit('hand:update', { playerId, hand: pl.hand });
+      const pl = room.state.players[player.id];
+      if(pl) socket.emit('hand:update', { playerId: player.id, hand: pl.hand });
     }
   }
 }
