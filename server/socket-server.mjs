@@ -192,6 +192,33 @@ function applyAction(room, actorId, action){
       room.turnLog.push({ t: Date.now(), a: 'ATTACK', by: actorId, card });
       break;
     }
+    case 'TRANSLATE': {
+      // Перевод хода (переводной дурак)
+      if(!room.settings.allowTranslation) return;
+      if(actorId!==st.defender) return; // только текущий защитник может переводить
+      if(st.table.length!==1) return; // упрощение: разрешаем перевод только при первой атаке одной картой
+      const first = st.table[0];
+      if(first.defend) return; // уже кто-то защитился
+      if(!action.card) return;
+      const idx = actor.hand.findIndex(c=>c.r===action.card.r && c.s===action.card.s);
+      if(idx<0) return;
+      if(action.card.r !== first.attack.r) return; // должна быть одинаковая номинал
+      const order = seatingOrder(room);
+      const curIndex = order.indexOf(actorId);
+      const newDefender = order[(curIndex+1)%order.length];
+      if(!newDefender || newDefender===actorId) return; // нет нового защитника
+      const newDefenderHandSize = st.players[newDefender].hand.length;
+      // после добавления карт число атакующих карт не должно превышать размер руки нового защитника
+      const prospectiveAttacks = st.table.length + 1; // добавим одну карту
+      if(prospectiveAttacks > newDefenderHandSize) return;
+      const [card] = actor.hand.splice(idx,1);
+      st.table.push({ attack: card });
+      // роли меняются: переводивший становится атакующим, новый защитник определяется как следующий игрок
+      st.attacker = actorId;
+      st.defender = newDefender;
+      room.turnLog.push({ t: Date.now(), a: 'TRANSLATE', by: actorId, card });
+      break;
+    }
     case 'DEFEND': {
       if(actorId!==st.defender) return;
       const pair = st.table.find(p=>!p.defend && p.attack.r===action.target.r && p.attack.s===action.target.s);
