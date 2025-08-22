@@ -116,6 +116,14 @@ io.on('connection', (socket) => {
     emitRoom(roomId);
   });
 
+  socket.on('restartGame', (roomId) => {
+    const room = rooms.get(roomId);
+    if(!room) return;
+    if(room.state.phase!=='finished') return;
+    startGame(room);
+    emitRoom(roomId);
+  });
+
   socket.on('action', (roomId, action) => {
     const room = rooms.get(roomId);
     if(!room) return;
@@ -178,10 +186,10 @@ function applyAction(room, actorId, action){
       const idx = actor.hand.findIndex(c=>c.r===action.card.r && c.s===action.card.s);
       if(idx<0) return;
       if(st.table.length>=6) return;
-      // defender capacity check
-      const undefended = st.table.filter(p=>!p.defend).length;
-      const defenderHandSize = st.players[st.defender].hand.length;
-      if(undefended >= defenderHandSize) return;
+  // capacity: общее число атакующих карт не больше количества карт в руке защитника
+  const defenderHandSize = st.players[st.defender].hand.length;
+  const totalAttacks = st.table.length; // каждая запись = одна атакующая карта
+  if(totalAttacks >= defenderHandSize) return;
       if(st.table.length>0){
         const ranksOnTable = new Set();
         for(const p of st.table){ ranksOnTable.add(p.attack.r); if(p.defend) ranksOnTable.add(p.defend.r); }
@@ -213,8 +221,9 @@ function applyAction(room, actorId, action){
       if(!newDefender || newDefender===actorId) return; // нет нового защитника
       const newDefenderHandSize = st.players[newDefender].hand.length;
       // после добавления карт число атакующих карт не должно превышать размер руки нового защитника
-      const prospectiveAttacks = st.table.length + 1; // добавим одну карту
-      if(prospectiveAttacks > newDefenderHandSize) return;
+  const prospectiveAttacks = st.table.length + 1; // добавим одну карту
+  if(prospectiveAttacks > newDefenderHandSize) return;
+  if(prospectiveAttacks > 6) return; // глобальный лимит стола
       const [card] = actor.hand.splice(idx,1);
       st.table.push({ attack: card });
       // роли меняются: переводивший становится атакующим, новый защитник определяется как следующий игрок

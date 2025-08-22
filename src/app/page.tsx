@@ -10,7 +10,8 @@ export default function Home(){
   const [mode,setMode] = useState<'menu'|'local'|'online'>('menu');
   const [roomId,setRoomId] = useState('room1');
   const [defendTarget,setDefendTarget] = useState<Card | null>(null);
-  const { room, connected, startGame: startRemoteGame, sendAction, addBot, updateSettings, toasts, removeToast, selfId, selfHand } = useSocketGame({ nickname: nickname||'Игрок', roomId: mode==='online'? roomId : null });
+  const { room, connected, startGame: startRemoteGame, sendAction, addBot, updateSettings, restart, toasts, removeToast, selfId, selfHand } = useSocketGame({ nickname: nickname||'Игрок', roomId: mode==='online'? roomId : null });
+  const sortedHand = [...selfHand].sort(cardClientSorter(room?.state.trump?.s));
 
   const ensurePlayer = () => { if(!state.players[playerId]) addLocalPlayer(playerId, nickname||'Игрок'); };
   const handleStart = () => { ensurePlayer(); startLocal(); setMode('local'); };
@@ -151,7 +152,7 @@ export default function Home(){
               <div className="mt-6 glass-panel p-4">
                 <h3 className="font-medium mb-3">Ваши карты</h3>
                 <div className="flex gap-2 flex-wrap">
-    {selfHand.map((c: Card,i:number)=>{
+  {sortedHand.map((c: Card,i:number)=>{
                     const canAttack = selfId===room?.state.attacker && (
                       (room.state.table.length===0) || new Set(room.state.table.flatMap(p=>[p.attack.r, p.defend?.r].filter(Boolean))).has(c.r)
                     ) && room.state.table.length<6;
@@ -172,7 +173,9 @@ export default function Home(){
                 </div>
               </div>
             )}
-            {room?.state.phase==='finished' && <div className="mt-4 text-center text-lg">Победитель: {room.state.winner && room.players.find(p=>p.id===room.state.winner)?.nick}</div>}
+                {room?.state.phase==='finished' && <div className="mt-4 text-center text-lg flex flex-col items-center gap-3">Победитель: {room.state.winner && room.players.find(p=>p.id===room.state.winner)?.nick}
+                  <button className="btn" onClick={()=> restart() }>Реванш</button>
+                </div>}
           </div>
           <div className="fixed bottom-4 right-4 flex flex-col gap-2 z-50">
             {toasts.map(t=> (
@@ -227,3 +230,14 @@ function formatLog(e:any, room:any){
     default: return e.a;
   }
 }
+
+function cardClientSorter(trump?: string){
+  const order = ['6','7','8','9','10','J','Q','K','A'];
+  return (a: Card, b: Card) => {
+    const ta = a.s===trump, tb = b.s===trump;
+    if(ta!==tb) return ta? 1: -1; // трампы в конце
+    if(a.s!==b.s) return a.s.localeCompare(b.s);
+    return order.indexOf(a.r)-order.indexOf(b.r);
+  };
+}
+

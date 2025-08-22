@@ -59,6 +59,7 @@ export function useSocketGame(opts: UseSocketGameOptions){
 
   const addBot = useCallback(()=>{ if(socketRef.current && roomId) socketRef.current.emit('addBot', roomId); },[roomId]);
   const updateSettings = useCallback((settings: Record<string, unknown>)=>{ if(socketRef.current && roomId) socketRef.current.emit('setSettings', roomId, settings); },[roomId]);
+  const restart = useCallback(()=>{ if(socketRef.current && roomId) socketRef.current.emit('restartGame', roomId); },[roomId]);
   const removeToast = (id:string)=> setToasts(t=>t.filter(x=>x.id!==id));
-  return { socket: socketRef.current, connected, room, selfHand: hand?.hand || [], error, startGame, sendAction, addBot, updateSettings, toasts, removeToast, selfId };
+  return { socket: socketRef.current, connected, room, selfHand: hand?.hand || [], error, startGame, sendAction, addBot, updateSettings, restart, toasts, removeToast, selfId };
 }
