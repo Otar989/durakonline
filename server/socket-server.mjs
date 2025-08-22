@@ -280,11 +280,13 @@ function serializeRoom(room){
     const ps = room.state.players[p.id];
     publicPlayers.push({ id: p.id, nick: p.nick, handCount: ps? ps.hand.length: 0 });
   }
+  const log = room.turnLog.slice(-30); // последние 30 событий
   return {
     players: publicPlayers,
     spectators: [...room.spectators.values()].map(p=>({ id: p.id, nick: p.nick })),
     settings: room.settings,
     state: { ...room.state, players: undefined },
+    log,
   };
 }
 

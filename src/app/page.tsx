@@ -135,6 +135,17 @@ export default function Home(){
                 {room?.state.trump && <MiniCard card={room.state.trump} trumpSuit={room.state.trump.s} />}
                 <p className="text-xs opacity-50 mt-2">Колода: {room?.state.deck.length ?? '-'}</p>
               </div>
+              <div className="min-w-[220px] max-h-72 overflow-auto glass-panel/10 rounded-lg p-2 text-[11px] flex-1">
+                <h3 className="font-medium mb-1 text-xs">Лог</h3>
+                <ul className="space-y-0.5">
+                  {room && (room as any).log?.map((e:any,i:number)=> (
+                    <li key={i} className="opacity-80">
+                      {formatLog(e, room)}
+                    </li>
+                  ))}
+                  {!((room as any)?.log?.length) && <li className="opacity-40">Пусто</li>}
+                </ul>
+              </div>
             </div>
     {selfId && (
               <div className="mt-6 glass-panel p-4">
@@ -203,4 +214,16 @@ function canBeatJS(a: Card, d: Card, trumpSuit?: string){
   const order = ['6','7','8','9','10','J','Q','K','A'];
   if(a.s===d.s) return order.indexOf(d.r) > order.indexOf(a.r);
   return !!trumpSuit && d.s===trumpSuit && a.s!==trumpSuit;
+}
+
+function formatLog(e:any, room:any){
+  const nick = (id:string)=> room.players.find((p:any)=>p.id===id)?.nick || id;
+  switch(e.a){
+    case 'ATTACK': return `${nick(e.by)} атаковал ${e.card.r}${e.card.s}`;
+    case 'DEFEND': return `${nick(e.by)} отбил ${e.target.r}${e.target.s} картой ${e.card.r}${e.card.s}`;
+    case 'TAKE': return `${nick(e.by)} взял карты`;
+    case 'END_TURN': return `${nick(e.by)} завершил ход`;
+    case 'TRANSLATE': return `${nick(e.by)} перевел ход картой ${e.card.r}${e.card.s}`;
+    default: return e.a;
+  }
 }
