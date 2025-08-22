@@ -242,8 +242,14 @@ function applyAction(room, actorId, action){
       for(const p of st.table){ actor.hand.push(p.attack); if(p.defend) actor.hand.push(p.defend); }
       st.table = [];
       refillHands(room);
-      // attacker stays same, defender becomes next after attacker
-      st.defender = seatingOrder(room).find(id=>id!==st.attacker) || st.attacker;
+      // attacker stays same, new defender = следующий активный игрок после старого защитника
+      const order = seatingOrder(room);
+      const oldDefIdx = order.indexOf(actorId);
+      let nextIdx = (oldDefIdx + 1) % order.length;
+      while(order[nextIdx]===st.attacker && order.length>2){ // если сразу нападающий и есть другие
+        nextIdx = (nextIdx + 1) % order.length;
+      }
+      st.defender = order[nextIdx] || st.attacker;
       room.turnLog.push({ t: Date.now(), a: 'TAKE', by: actorId });
       break;
     }
