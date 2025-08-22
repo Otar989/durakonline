@@ -145,11 +145,21 @@ export default function Home(){
               <div className="mt-6 glass-panel p-4">
                 <h3 className="font-medium mb-3">Ваши карты</h3>
                 <div className="flex gap-2 flex-wrap">
-  {selfHand.map((c: Card,i:number)=>(
-        <div key={i} className="cursor-pointer" onClick={()=>sendAction({ type:'ATTACK', card: c })}>
-                      <MiniCard card={c} trumpSuit={room?.state.trump?.s} />
-                    </div>
-                  ))}
+    {selfHand.map((c: Card,i:number)=>{
+                    const canAttack = selfId===room?.state.attacker && (
+                      (room.state.table.length===0) || new Set(room.state.table.flatMap(p=>[p.attack.r, p.defend?.r].filter(Boolean))).has(c.r)
+                    ) && room.state.table.length<6;
+                    const canTranslate = selfId===room?.state.defender && (room?.settings as any)?.allowTranslation && room.state.table.length>0 && room.state.table.every(p=>!p.defend && p.attack.r===c.r);
+                    const actionable = canAttack || canTranslate;
+                    return (
+                      <div key={i} className={"cursor-pointer transition-transform " + (actionable? 'hover:-translate-y-1':'opacity-40')} onClick={()=>{
+                        if(canAttack) sendAction({ type:'ATTACK', card: c });
+                        else if(canTranslate) sendAction({ type:'TRANSLATE', card: c });
+                      }}>
+                        <MiniCard card={c} trumpSuit={room?.state.trump?.s} />
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             )}

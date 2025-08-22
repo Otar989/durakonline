@@ -196,9 +196,13 @@ function applyAction(room, actorId, action){
       // Перевод хода (переводной дурак)
       if(!room.settings.allowTranslation) return;
       if(actorId!==st.defender) return; // только текущий защитник может переводить
-      if(st.table.length!==1) return; // упрощение: разрешаем перевод только при первой атаке одной картой
-      const first = st.table[0];
-      if(first.defend) return; // уже кто-то защитился
+  if(st.table.length===0) return;
+  // все атаки еще не закрыты и без защит
+  if(st.table.some(p=>p.defend)) return;
+  // все атаки одного ранга
+  const first = st.table[0];
+  const sameRank = st.table.every(p=>p.attack.r===first.attack.r);
+  if(!sameRank) return;
       if(!action.card) return;
       const idx = actor.hand.findIndex(c=>c.r===action.card.r && c.s===action.card.s);
       if(idx<0) return;
