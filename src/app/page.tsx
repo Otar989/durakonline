@@ -2,11 +2,14 @@
 import { useState } from 'react';
 import { useGameStore } from '@/store/gameStore';
 import { Card } from '@/lib/durak-engine';
+import { useSocketGame } from '@/hooks/useSocketGame';
 
 export default function Home(){
   const { state, addLocalPlayer, startLocal, nickname, setNickname } = useGameStore();
   const [playerId] = useState('P1');
-  const [mode,setMode] = useState<'menu'|'local'>('menu');
+  const [mode,setMode] = useState<'menu'|'local'|'online'>('menu');
+  const [roomId,setRoomId] = useState('room1');
+  const { room, connected, startGame: startRemoteGame } = useSocketGame({ nickname: nickname||'Игрок', roomId: mode==='online'? roomId : null });
 
   const ensurePlayer = () => { if(!state.players[playerId]) addLocalPlayer(playerId, nickname||'Игрок'); };
   const handleStart = () => { ensurePlayer(); startLocal(); setMode('local'); };
@@ -22,7 +25,7 @@ export default function Home(){
           </div>
           <div className="grid sm:grid-cols-2 gap-4 mt-2">
             <button className="btn" onClick={handleStart}>Локальная игра</button>
-            <button className="btn opacity-60 cursor-not-allowed" title="Онлайн скоро">Онлайн (WIP)</button>
+            <button className="btn" onClick={()=>{ if(!nickname) setNickname('Гость'); setMode('online'); }}>Онлайн</button>
           </div>
           <div className="glass-divider" />
           <p className="text-xs leading-relaxed opacity-70">Выберите режим. Онлайн матчмейкинг, комнаты, переводной & подкидной варианты и расширенные правила будут добавлены в следующих шагах.</p>
@@ -53,6 +56,53 @@ export default function Home(){
             <h2 className="text-lg font-medium">Ваша рука</h2>
             <div className="flex gap-3 flex-wrap card-stack">
               {state.players[playerId]?.hand.map((c: Card, i: number)=>(<InteractiveCard key={i} card={c} trumpSuit={state.trump?.s} />))}
+            </div>
+          </div>
+        </div>
+      )}
+      {mode==='online' && (
+        <div className="flex flex-col gap-6 w-full max-w-6xl">
+          <div className="glass-panel p-6 flex flex-col gap-4">
+            <h2 className="text-lg font-medium">Онлайн комната</h2>
+            <div className="flex flex-wrap gap-4 items-end">
+              <div className="flex flex-col gap-2">
+                <label className="text-xs opacity-70">Room ID</label>
+                <input value={roomId} onChange={e=>setRoomId(e.target.value)} className="bg-white/5 border border-white/15 rounded-lg px-4 py-2 outline-none focus:ring-2 focus:ring-sky-400/60" />
+              </div>
+              <div className="flex flex-col gap-2">
+                <label className="text-xs opacity-70">Ник</label>
+                <input value={nickname} onChange={e=>setNickname(e.target.value)} className="bg-white/5 border border-white/15 rounded-lg px-4 py-2 outline-none focus:ring-2 focus:ring-sky-400/60" />
+              </div>
+              <button className="btn" onClick={()=>startRemoteGame({})}>Старт</button>
+              <button className="btn" onClick={()=>setMode('menu')}>Назад</button>
+            </div>
+            <div className="text-xs opacity-70">{connected? 'Подключено' : 'Ожидание соединения...'}</div>
+            <div className="glass-divider" />
+            <div className="flex gap-6 flex-wrap">
+              <div className="min-w-[200px]">
+                <h3 className="font-medium mb-2">Игроки</h3>
+                <ul className="space-y-1 text-sm">
+                  {room?.players.map(p=> <li key={p.id} className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />{p.nick}</li>)}
+                  {!room && <li className="opacity-50">Нет данных</li>}
+                </ul>
+              </div>
+              <div className="flex-1 min-w-[300px]">
+                <h3 className="font-medium mb-2">Стол</h3>
+                <div className="flex flex-wrap gap-3 min-h-[120px]">
+                  {room?.state.table.map((pair,i:number)=> (
+                    <div key={i} className="relative" style={{ perspective:'1000px' }}>
+                      <MiniCard card={pair.attack} trumpSuit={room?.state.trump?.s} />
+                      {pair.defend && <div className="absolute left-6 top-4 rotate-12"><MiniCard card={pair.defend} trumpSuit={room?.state.trump?.s} /></div>}
+                    </div>
+                  ))}
+                  {room?.state.table.length===0 && <p className="text-sm opacity-50">Нет карт</p>}
+                </div>
+              </div>
+              <div className="min-w-[200px]">
+                <h3 className="font-medium mb-2">Трамп</h3>
+                {room?.state.trump && <MiniCard card={room.state.trump} trumpSuit={room.state.trump.s} />}
+                <p className="text-xs opacity-50 mt-2">Колода: {room?.state.deck.length ?? '-'}</p>
+              </div>
             </div>
           </div>
         </div>
