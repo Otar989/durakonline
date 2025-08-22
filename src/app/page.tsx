@@ -102,8 +102,20 @@ export default function Home(){
                 <h3 className="font-medium mb-2">Стол</h3>
                 <div className="flex flex-wrap gap-3 min-h-[120px]">
                   {room?.state.table.map((pair,i:number)=> (
-                    <div key={i} className="relative" style={{ perspective:'1000px' }}>
+                    <div key={i} className="relative group" style={{ perspective:'1000px' }}>
                       <MiniCard card={pair.attack} trumpSuit={room?.state.trump?.s} />
+                      {!pair.defend && selfId===room?.state.defender && (
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <button
+                            className="px-2 py-1 text-[10px] rounded bg-emerald-500/80 hover:bg-emerald-500 text-white shadow"
+                            onClick={()=>{
+                              // Выбор карты для защиты: берём первую подходящую
+                              const defendCard = selfHand.find(c=>canBeatJS(pair.attack, c, room?.state.trump?.s));
+                              if(defendCard) sendAction({ type:'DEFEND', card: defendCard, target: pair.attack });
+                            }}
+                          >Защитить</button>
+                        </div>
+                      )}
                       {pair.defend && <div className="absolute left-6 top-4 rotate-12"><MiniCard card={pair.defend} trumpSuit={room?.state.trump?.s} /></div>}
                     </div>
                   ))}
@@ -113,6 +125,13 @@ export default function Home(){
                   <div className="flex gap-3 mt-4 flex-wrap">
                     <button className="btn" onClick={()=>sendAction({ type:'END_TURN' })} disabled={!selfId || room.state.attacker!==selfId || room.state.table.some(p=>!p.defend)}>Бито</button>
                     <button className="btn" onClick={()=>sendAction({ type:'TAKE' })} disabled={!selfId || room.state.defender!==selfId}>Взять</button>
+                    {selfId===room?.state.defender && room?.settings && (room.settings as any).allowTranslation && room.state.table.length===1 && !room.state.table[0].defend && (
+                      <button className="btn" onClick={()=>{
+                        const base = room.state.table[0].attack;
+                        const translateCard = selfHand.find(c=>c.r===base.r && (c.s!==base.s));
+                        if(translateCard) sendAction({ type:'TRANSLATE', card: translateCard });
+                      }}>Перевести</button>
+                    )}
                   </div>
                 )}
               </div>
@@ -126,8 +145,8 @@ export default function Home(){
               <div className="mt-6 glass-panel p-4">
                 <h3 className="font-medium mb-3">Ваши карты</h3>
                 <div className="flex gap-2 flex-wrap">
-      {selfHand.map((c: Card,i:number)=>(
-                    <div key={i} className="cursor-pointer" onClick={()=>sendAction({ type:'ATTACK', card: c })}>
+  {selfHand.map((c: Card,i:number)=>(
+        <div key={i} className="cursor-pointer" onClick={()=>sendAction({ type:'ATTACK', card: c })}>
                       <MiniCard card={c} trumpSuit={room?.state.trump?.s} />
                     </div>
                   ))}
@@ -171,3 +190,9 @@ function InteractiveCard({ card, trumpSuit }: { card: Card; trumpSuit?: string }
 }
 
 // selfId используется напрямую из useSocketGame
+
+function canBeatJS(a: Card, d: Card, trumpSuit?: string){
+  const order = ['6','7','8','9','10','J','Q','K','A'];
+  if(a.s===d.s) return order.indexOf(d.r) > order.indexOf(a.r);
+  return !!trumpSuit && d.s===trumpSuit && a.s!==trumpSuit;
+}
