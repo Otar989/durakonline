@@ -9,6 +9,7 @@ export default function Home(){
   const [playerId] = useState('P1');
   const [mode,setMode] = useState<'menu'|'local'|'online'>('menu');
   const [roomId,setRoomId] = useState('room1');
+  const [defendTarget,setDefendTarget] = useState<Card | null>(null);
   const { room, connected, startGame: startRemoteGame, sendAction, addBot, updateSettings, toasts, removeToast, selfId, selfHand } = useSocketGame({ nickname: nickname||'Игрок', roomId: mode==='online'? roomId : null });
 
   const ensurePlayer = () => { if(!state.players[playerId]) addLocalPlayer(playerId, nickname||'Игрок'); };
@@ -101,24 +102,17 @@ export default function Home(){
               <div className="flex-1 min-w-[300px]">
                 <h3 className="font-medium mb-2">Стол</h3>
                 <div className="flex flex-wrap gap-3 min-h-[120px]">
-                  {room?.state.table.map((pair,i:number)=> (
-                    <div key={i} className="relative group" style={{ perspective:'1000px' }}>
-                      <MiniCard card={pair.attack} trumpSuit={room?.state.trump?.s} />
-                      {!pair.defend && selfId===room?.state.defender && (
-                        <div className="absolute inset-0 flex items-center justify-center">
-                          <button
-                            className="px-2 py-1 text-[10px] rounded bg-emerald-500/80 hover:bg-emerald-500 text-white shadow"
-                            onClick={()=>{
-                              // Выбор карты для защиты: берём первую подходящую
-                              const defendCard = selfHand.find(c=>canBeatJS(pair.attack, c, room?.state.trump?.s));
-                              if(defendCard) sendAction({ type:'DEFEND', card: defendCard, target: pair.attack });
-                            }}
-                          >Защитить</button>
-                        </div>
-                      )}
-                      {pair.defend && <div className="absolute left-6 top-4 rotate-12"><MiniCard card={pair.defend} trumpSuit={room?.state.trump?.s} /></div>}
-                    </div>
-                  ))}
+                  {room?.state.table.map((pair,i:number)=> {
+                    const selectable = selfId===room?.state.defender && !pair.defend;
+                    const isSelected = defendTarget && defendTarget.r===pair.attack.r && defendTarget.s===pair.attack.s;
+                    return (
+                      <div key={i} className={"relative group transition-transform " + (selectable? 'cursor-pointer hover:scale-[1.04]':'') + (isSelected? ' ring-2 ring-emerald-400 rounded-lg':'' )} style={{ perspective:'1000px' }}
+                        onClick={()=>{ if(selectable) setDefendTarget(pair.attack); }}>
+                        <MiniCard card={pair.attack} trumpSuit={room?.state.trump?.s} />
+                        {pair.defend && <div className="absolute left-6 top-4 rotate-12"><MiniCard card={pair.defend} trumpSuit={room?.state.trump?.s} /></div>}
+                      </div>
+                    );
+                  })}
                   {room?.state.table.length===0 && <p className="text-sm opacity-50">Нет карт</p>}
                 </div>
                 {room?.state.phase==='playing' && (
@@ -132,6 +126,7 @@ export default function Home(){
                         if(translateCard) sendAction({ type:'TRANSLATE', card: translateCard });
                       }}>Перевести</button>
                     )}
+                    {defendTarget && <button className="btn" onClick={()=>setDefendTarget(null)}>Отмена защиты</button>}
                   </div>
                 )}
               </div>
@@ -150,16 +145,19 @@ export default function Home(){
                       (room.state.table.length===0) || new Set(room.state.table.flatMap(p=>[p.attack.r, p.defend?.r].filter(Boolean))).has(c.r)
                     ) && room.state.table.length<6;
                     const canTranslate = selfId===room?.state.defender && (room?.settings as any)?.allowTranslation && room.state.table.length>0 && room.state.table.every(p=>!p.defend && p.attack.r===c.r);
-                    const actionable = canAttack || canTranslate;
+                    const canDefend = defendTarget != null && selfId===room?.state.defender && canBeatJS(defendTarget, c, room?.state.trump?.s);
+                    const actionable = canAttack || canTranslate || canDefend;
                     return (
-                      <div key={i} className={"cursor-pointer transition-transform " + (actionable? 'hover:-translate-y-1':'opacity-40')} onClick={()=>{
-                        if(canAttack) sendAction({ type:'ATTACK', card: c });
+                      <div key={i} className={"cursor-pointer transition-transform " + (actionable? 'hover:-translate-y-1': 'opacity-40')} onClick={()=>{
+                        if(canDefend && defendTarget){ sendAction({ type:'DEFEND', card: c, target: defendTarget }); setDefendTarget(null); }
+                        else if(canAttack) sendAction({ type:'ATTACK', card: c });
                         else if(canTranslate) sendAction({ type:'TRANSLATE', card: c });
                       }}>
                         <MiniCard card={c} trumpSuit={room?.state.trump?.s} />
                       </div>
                     );
                   })}
+                {defendTarget && <p className="text-xs mt-2 opacity-70">Выберите карту для защиты атаки {defendTarget.r}{defendTarget.s}</p>}
                 </div>
               </div>
             )}
