@@ -4,10 +4,11 @@ import { io, Socket } from 'socket.io-client';
 import { GameState } from '@/lib/durak-engine';
 
 export interface RemoteRoomPayload {
-  players: { id: string; nick: string }[];
+  players: { id: string; nick: string; handCount?: number }[];
   spectators?: { id: string; nick: string }[];
   settings: Record<string, unknown>;
-  state: GameState;
+  state: GameState; // c серверными расширениями (loser, finished) приходят, но мы их не типизируем жёстко
+  log?: { t: number; a: string; by: string; card?: any; target?: any }[];
 }
 
 interface UseSocketGameOptions {
@@ -24,7 +25,8 @@ export function useSocketGame(opts: UseSocketGameOptions){
   const [room,setRoom] = useState<RemoteRoomPayload | null>(null);
   const [error,setError] = useState<string| null>(null);
   const [toasts,setToasts] = useState<{ id: string; type: string; message: string }[]>([]);
-  const [hand,setHand] = useState<{ playerId: string; hand: any[] }|null>(null);
+  interface PrivateHandPayload { playerId: string; hand: { r: string; s: string }[] }
+  const [hand,setHand] = useState<PrivateHandPayload | null>(null);
   const [selfId,setSelfId] = useState<string | null>(null);
 
   const connect = useCallback(()=>{
@@ -35,7 +37,7 @@ export function useSocketGame(opts: UseSocketGameOptions){
     s.on('disconnect', ()=> setConnected(false));
     s.on('connect_error', (e)=> setError(e.message));
   s.on('room:update', (payload: RemoteRoomPayload)=> setRoom(payload));
-  s.on('hand:update', (payload)=> { if(payload.playerId === s.id) setHand(payload); });
+  s.on('hand:update', (payload: PrivateHandPayload)=> { if(payload.playerId === s.id) setHand(payload); });
     s.on('toast', (t: { type: string; message: string })=> {
       setToasts(cur=>[...cur.slice(-4), { id: Math.random().toString(36).slice(2), ...t }]);
     });
