@@ -1,5 +1,6 @@
 import { createServer } from 'http';
 import { Server } from 'socket.io';
+import jwt from 'jsonwebtoken';
 
 // HTTP сервер с простым health-check (нужен на многих PaaS для проверки живости)
 const httpServer = createServer((req,res)=>{
@@ -16,6 +17,7 @@ const io = new Server(httpServer, {
 });
 
 const rooms = new Map(); // roomId -> { players: Map, spectators: Map, bots: Map, settings, state, turnLog }
+const socketUserMap = new Map(); // socket.id -> { userId }
 
 const DEFAULT_SETTINGS = {
   variant: 'classic', // classic=подкидной
@@ -87,7 +89,7 @@ function nextAttacker(room){
 }
 
 function seatingOrder(room){
-  return [...room.players.keys(), ...room.bots.keys()].filter(id=>room.state.players[id]);
+  return [...room.players.values(), ...room.bots.values()].map(p=>p.id).filter(id=>room.state.players[id]);
 }
 
 function checkWinner(room){
@@ -111,78 +113,82 @@ function checkWinner(room){
 }
 
 io.on('connection', (socket) => {
+  // ...existing code before listeners...
+  let userId = null;
+  const token = socket.handshake.auth && socket.handshake.auth.token;
+  const jwtSecret = process.env.SUPABASE_JWT_SECRET;
+  if (token && jwtSecret) {
+    try {
+      const decoded = jwt.verify(token, jwtSecret);
+      if (decoded && typeof decoded === 'object' && decoded.sub) userId = decoded.sub;
+    } catch (_) { /* ignore */ }
+  }
+  if (!userId) userId = 'guest_' + socket.id;
+  socketUserMap.set(socket.id, { userId });
+
+  // joinRoom override
+  const originalJoin = socket.listeners('joinRoom');
+  socket.removeAllListeners('joinRoom');
   socket.on('joinRoom', (roomId, nick) => {
     let room = rooms.get(roomId);
     if(!room){
       room = { players: new Map(), spectators: new Map(), bots: new Map(), settings: { ...DEFAULT_SETTINGS }, state: initialState(), turnLog: [] };
       rooms.set(roomId, room);
     }
+    const realId = socketUserMap.get(socket.id)?.userId || socket.id;
     if(room.state.phase!=='lobby' || room.players.size + room.bots.size >= room.settings.maxPlayers){
-      room.spectators.set(socket.id, { id: socket.id, nick, spectator: true });
+      room.spectators.set(socket.id, { id: realId, nick, spectator: true, socketId: socket.id });
       socket.join(roomId);
       emitRoom(roomId);
       io.to(socket.id).emit('toast', { type:'info', message:'Вы вошли как зритель' });
     } else {
-      room.players.set(socket.id, { id: socket.id, nick });
+      room.players.set(realId, { id: realId, nick, socketId: socket.id });
       socket.join(roomId);
       broadcast(roomId, `${nick} присоединился`);
       emitRoom(roomId);
     }
   });
 
-  socket.on('startGame', (roomId, options) => {
-    const room = rooms.get(roomId);
-    if(!room) return;
-    if(room.state.phase !== 'lobby') return;
-    if(options) room.settings = { ...room.settings, ...options };
-    startGame(room);
-    emitRoom(roomId);
-  });
-
-  socket.on('restartGame', (roomId) => {
-    const room = rooms.get(roomId);
-    if(!room) return;
-    if(room.state.phase!=='finished') return;
-    startGame(room);
-    emitRoom(roomId);
-  });
-
+  // action override
+  const origAction = socket.listeners('action');
+  socket.removeAllListeners('action');
   socket.on('action', (roomId, action) => {
     const room = rooms.get(roomId);
     if(!room) return;
     if(room.state.phase!=='playing') return;
-    applyAction(room, socket.id, action);
+    const realId = socketUserMap.get(socket.id)?.userId || socket.id;
+    applyAction(room, realId, action);
     checkWinner(room);
     emitRoom(roomId);
   });
 
-  socket.on('setSettings', (roomId, settings)=>{
-    const room = rooms.get(roomId);
-    if(!room || room.state.phase!=='lobby') return;
-    room.settings = { ...room.settings, ...settings };
-    emitRoom(roomId);
-  });
-
-  socket.on('addBot', (roomId) => {
-    const room = rooms.get(roomId);
-    if(!room || room.state.phase!=='lobby' || !room.settings.allowBots) return;
-    const id = 'BOT_'+Math.random().toString(36).slice(2,7).toUpperCase();
-    room.bots.set(id, { id, nick: '🤖 Bot '+id.slice(-3) });
-    broadcast(roomId, `Добавлен бот ${id.slice(-3)}`);
-    emitRoom(roomId);
-  });
-
+  // disconnect override
+  const origDisconnect = socket.listeners('disconnect');
+  socket.removeAllListeners('disconnect');
   socket.on('disconnect', () => {
     for(const [roomId, room] of rooms){
       let changed = false;
-      if(room.players.delete(socket.id)) { changed = true; broadcast(roomId,'Игрок отключился'); }
-      if(room.spectators.delete(socket.id)) changed = true;
+      for(const [pid, p] of room.players){
+        if(p.socketId === socket.id){ room.players.delete(pid); changed = true; broadcast(roomId,'Игрок отключился'); break; }
+      }
+      for(const [sid, s] of room.spectators){
+        if(s.socketId === socket.id){ room.spectators.delete(sid); changed = true; break; }
+      }
       if(changed) emitRoom(roomId);
       if(room.players.size===0 && room.bots.size===0) rooms.delete(roomId);
     }
+    socketUserMap.delete(socket.id);
+    // вызов старых слушателей, если нужно
+    for(const fn of origDisconnect){ try { fn(); } catch(e){} }
   });
 });
 
+// seatingOrder override
+function seatingOrder(room){
+  return [...room.players.values(), ...room.bots.values()].map(p=>p.id).filter(id=>room.state.players[id]);
+}
+
+// startGame override
 function startGame(room){
   room.state = initialState();
   const st = room.state;
@@ -198,132 +204,15 @@ function startGame(room){
   broadcast(room, 'Игра началась');
 }
 
-function applyAction(room, actorId, action){
-  const st = room.state;
-  const actor = st.players[actorId];
-  if(!actor) return;
-  switch(action.type){
-    case 'ATTACK': {
-      if(actorId!==st.attacker) return;
-      if(!action.card) return;
-      const idx = actor.hand.findIndex(c=>c.r===action.card.r && c.s===action.card.s);
-      if(idx<0) return;
-      if(st.table.length>=6) return;
-  // capacity: общее число атакующих карт не больше количества карт в руке защитника
-  const defenderHandSize = st.players[st.defender].hand.length;
-  const totalAttacks = st.table.length; // каждая запись = одна атакующая карта
-  if(totalAttacks >= defenderHandSize) return;
-      if(st.table.length>0){
-        const ranksOnTable = new Set();
-        for(const p of st.table){ ranksOnTable.add(p.attack.r); if(p.defend) ranksOnTable.add(p.defend.r); }
-        if(!ranksOnTable.has(action.card.r)) return;
-      }
-      const [card] = actor.hand.splice(idx,1);
-      st.table.push({ attack: card });
-      room.turnLog.push({ t: Date.now(), a: 'ATTACK', by: actorId, card });
-      break;
-    }
-    case 'TRANSLATE': {
-      // Перевод хода (переводной дурак)
-      if(!room.settings.allowTranslation) return;
-      if(actorId!==st.defender) return; // только текущий защитник может переводить
-  if(st.table.length===0) return;
-  // все атаки еще не закрыты и без защит
-  if(st.table.some(p=>p.defend)) return;
-  // все атаки одного ранга
-  const first = st.table[0];
-  const sameRank = st.table.every(p=>p.attack.r===first.attack.r);
-  if(!sameRank) return;
-      if(!action.card) return;
-      const idx = actor.hand.findIndex(c=>c.r===action.card.r && c.s===action.card.s);
-      if(idx<0) return;
-      if(action.card.r !== first.attack.r) return; // должна быть одинаковая номинал
-      const order = seatingOrder(room);
-      const curIndex = order.indexOf(actorId);
-      const newDefender = order[(curIndex+1)%order.length];
-      if(!newDefender || newDefender===actorId) return; // нет нового защитника
-      const newDefenderHandSize = st.players[newDefender].hand.length;
-      // после добавления карт число атакующих карт не должно превышать размер руки нового защитника
-  const prospectiveAttacks = st.table.length + 1; // добавим одну карту
-  if(prospectiveAttacks > newDefenderHandSize) return;
-  if(prospectiveAttacks > 6) return; // глобальный лимит стола
-      const [card] = actor.hand.splice(idx,1);
-      st.table.push({ attack: card });
-      // роли меняются: переводивший становится атакующим, новый защитник определяется как следующий игрок
-      st.attacker = actorId;
-      st.defender = newDefender;
-      room.turnLog.push({ t: Date.now(), a: 'TRANSLATE', by: actorId, card });
-      break;
-    }
-    case 'DEFEND': {
-      if(actorId!==st.defender) return;
-      const pair = st.table.find(p=>!p.defend && p.attack.r===action.target.r && p.attack.s===action.target.s);
-      if(!pair) return;
-      const idx = actor.hand.findIndex(c=>c.r===action.card.r && c.s===action.card.s);
-      if(idx<0) return;
-      const card = actor.hand[idx];
-      if(!canBeat(pair.attack, card, st.trump.s)) return;
-      actor.hand.splice(idx,1);
-      pair.defend = card;
-      room.turnLog.push({ t: Date.now(), a: 'DEFEND', by: actorId, card, target: pair.attack });
-      break;
-    }
-    case 'TAKE': {
-      if(actorId!==st.defender) return;
-      // defender takes all
-      for(const p of st.table){ actor.hand.push(p.attack); if(p.defend) actor.hand.push(p.defend); }
-      st.table = [];
-      refillHands(room);
-      // attacker stays same, new defender = следующий активный игрок после старого защитника
-      const order = seatingOrder(room);
-      const oldDefIdx = order.indexOf(actorId);
-      let nextIdx = (oldDefIdx + 1) % order.length;
-      while(order[nextIdx]===st.attacker && order.length>2){ // если сразу нападающий и есть другие
-        nextIdx = (nextIdx + 1) % order.length;
-      }
-      st.defender = order[nextIdx] || st.attacker;
-      room.turnLog.push({ t: Date.now(), a: 'TAKE', by: actorId });
-      break;
-    }
-    case 'END_TURN': {
-      if(actorId!==st.attacker) return;
-      // all defended?
-      if(st.table.some(p=>!p.defend)) return; // cannot end yet
-      // move to discard
-      for(const p of st.table){ st.discard.push(p.attack); if(p.defend) st.discard.push(p.defend); }
-      st.table = [];
-      refillHands(room);
-      nextAttacker(room);
-      room.turnLog.push({ t: Date.now(), a: 'END_TURN', by: actorId });
-      break;
-    }
-  }
-  // post-action: re-evaluate finished players (without deck empty condition)
-  for(const p of Object.values(st.players)){
-    if(p.hand.length===0 && !st.finished.includes(p.id)) st.finished.push(p.id);
-  }
-}
-
-function canBeat(a, d, trumpSuit){
-  const order = ['6','7','8','9','10','J','Q','K','A'];
-  if(a.s===d.s) return order.indexOf(d.r) > order.indexOf(a.r);
-  return d.s===trumpSuit && a.s!==trumpSuit;
-}
-
+// serializeRoom override
 function serializeRoom(room){
   const publicPlayers = [];
   for(const p of [...room.players.values(), ...room.bots.values()]){
     const ps = room.state.players[p.id];
     publicPlayers.push({ id: p.id, nick: p.nick, handCount: ps? ps.hand.length: 0 });
   }
-  const log = room.turnLog.slice(-30); // последние 30 событий
-  return {
-    players: publicPlayers,
-    spectators: [...room.spectators.values()].map(p=>({ id: p.id, nick: p.nick })),
-    settings: room.settings,
-    state: { ...room.state, players: undefined },
-    log,
-  };
+  const log = room.turnLog.slice(-30);
+  return { players: publicPlayers, spectators: [...room.spectators.values()].map(p=>({ id: p.id, nick: p.nick })), settings: room.settings, state: { ...room.state, players: undefined }, log };
 }
 
 function emitRoom(roomOrId){
