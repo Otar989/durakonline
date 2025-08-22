@@ -1,7 +1,8 @@
 {
   "files.associations": {
     "*.postgres.sql": "postgresql",
-    "*rls_raw_games*.sql": "postgresql"
+  "*rls_raw_games*.sql": "postgresql",
+  "raw_games_policies.sql": "postgresql"
   },
   "sql.telemetry.disableTelemetry": true,
   "[postgresql]": {
