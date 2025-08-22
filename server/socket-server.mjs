@@ -327,7 +327,56 @@ function sendPrivateHands(roomId, room){
   }
 }
 
-// Simple bot tick
+const RANK_ORDER = ['6','7','8','9','10','J','Q','K','A'];
+
+function botChooseAttack(st, bot){
+  // кандидаты: если стол пуст – все карты, иначе только ранги присутствующие на столе
+  const ranksOnTable = new Set();
+  for(const p of st.table){ ranksOnTable.add(p.attack.r); if(p.defend) ranksOnTable.add(p.defend.r); }
+  let candidates = [];
+  if(st.table.length===0) candidates = bot.hand.slice(); else candidates = bot.hand.filter(c=>ranksOnTable.has(c.r));
+  // лимит по количеству атак относительно защитника
+  const defenderHandSize = st.players[st.defender].hand.length;
+  const totalAttacks = st.table.length;
+  candidates = candidates.filter(()=> totalAttacks < defenderHandSize && totalAttacks < 6);
+  // сортируем: нетрамп по возрастанию ранга, потом трампы
+  return candidates.sort((a,b)=>{
+    const ta = a.s===st.trump.s, tb = b.s===st.trump.s;
+    if(ta!==tb) return ta? 1:-1;
+    return RANK_ORDER.indexOf(a.r)-RANK_ORDER.indexOf(b.r);
+  })[0];
+}
+
+function botChooseDefend(st, bot){
+  const pair = st.table.find(p=>!p.defend);
+  if(!pair) return null;
+  const beaters = bot.hand.filter(c=>canBeat(pair.attack, c, st.trump.s));
+  if(!beaters.length) return null;
+  // предпочитаем нетрамп, минимальный ранг; трамп только если без альтернатив
+  beaters.sort((a,b)=>{
+    const ta=a.s===st.trump.s, tb=b.s===st.trump.s;
+    if(ta!==tb) return ta?1:-1;
+    return RANK_ORDER.indexOf(a.r)-RANK_ORDER.indexOf(b.r);
+  });
+  return { defendCard: beaters[0], target: pair.attack };
+}
+
+function botCanTranslate(st, botId){
+  if(!st || !st.trump){/* noop */}
+  return st.table.length>0 && st.table.every(p=>!p.defend) && st.table.every(p=>p.attack.r===st.table[0].attack.r);
+}
+
+function botChooseTranslateCard(st, bot){
+  const rank = st.table[0].attack.r;
+  const sameRank = bot.hand.filter(c=>c.r===rank);
+  if(sameRank.length===0) return null;
+  // оставить одну, перевести другой (берём наименьшую по масти/трампу логику)
+  return sameRank.sort((a,b)=>{
+    const ta=a.s===st.trump.s, tb=b.s===st.trump.s; if(ta!==tb) return ta?1:-1; return RANK_ORDER.indexOf(a.r)-RANK_ORDER.indexOf(b.r);
+  })[0];
+}
+
+// Simple (improved) bot tick
 setInterval(()=>{
   for(const [roomId, room] of rooms){
     if(room.state.phase!=='playing') continue;
@@ -337,18 +386,36 @@ setInterval(()=>{
       if(!bot) continue;
       // attacker move
       if(st.attacker===botId){
-        // attack with lowest card
         if(st.table.length<6){
-          const card = bot.hand.sort(cardSorter)[0];
-          if(card) applyAction(room, botId, { type:'ATTACK', card });
-        } else applyAction(room, botId, { type:'END_TURN' });
+          const card = botChooseAttack(st, bot);
+            if(card) applyAction(room, botId, { type:'ATTACK', card });
+            else applyAction(room, botId, { type:'END_TURN' });
+        } else {
+          applyAction(room, botId, { type:'END_TURN' });
+        }
       } else if(st.defender===botId){
-        // defend each attack sequentially
-        const pair = st.table.find(p=>!p.defend);
-        if(pair){
-          const defendCard = bot.hand.find(c=>canBeat(pair.attack, c, st.trump.s));
-            if(defendCard) applyAction(room, botId, { type:'DEFEND', card: defendCard, target: pair.attack });
-            else applyAction(room, botId, { type:'TAKE' });
+        // возможность перевода до защиты
+        if(room.settings.allowTranslation && botCanTranslate(st, botId)){
+          const order = seatingOrder(room);
+          const curIndex = order.indexOf(botId);
+          const newDefender = order[(curIndex+1)%order.length];
+          if(newDefender && newDefender!==botId){
+            const ndHand = st.players[newDefender].hand.length;
+            const prospective = st.table.length + 1;
+            if(prospective <= ndHand && prospective <=6){
+              const translateCard = botChooseTranslateCard(st, bot);
+              if(translateCard){
+                applyAction(room, botId, { type:'TRANSLATE', card: translateCard });
+                continue;
+              }
+            }
+          }
+        }
+        const choice = botChooseDefend(st, bot);
+        if(choice){
+          applyAction(room, botId, { type:'DEFEND', card: choice.defendCard, target: choice.target });
+        } else if(st.table.some(p=>!p.defend)) {
+          applyAction(room, botId, { type:'TAKE' });
         } else {
           applyAction(room, botId, { type:'END_TURN' });
         }
@@ -358,10 +425,7 @@ setInterval(()=>{
   }
 }, 1500);
 
-function cardSorter(a,b){
-  const order = ['6','7','8','9','10','J','Q','K','A'];
-  return order.indexOf(a.r)-order.indexOf(b.r);
-}
+function cardSorter(a,b){ return RANK_ORDER.indexOf(a.r)-RANK_ORDER.indexOf(b.r); }
 
 const port = process.env.SOCKET_PORT || 4001;
 httpServer.listen(port, () => {
