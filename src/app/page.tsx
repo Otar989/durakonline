@@ -15,6 +15,19 @@ export default function Home(){
   const [stats,setStats] = useState<{ games: number; wins: number } | null>(null);
   const { room, connected, startGame: startRemoteGame, sendAction, addBot, updateSettings, restart, toasts, removeToast, selfId, selfHand, error: socketError, socketUrl, socket } = useSocketGame({ nickname: nickname||'Игрок', roomId: mode==='online'? roomId : null, debug: true });
   const sortedHand = [...selfHand].sort(cardClientSorter(room?.state.trump?.s) as any); // приведение типов
+  const [deadlineLeft, setDeadlineLeft] = useState<number | null>(null);
+
+  useEffect(()=>{
+    if(!socket) return;
+    const tick = () => {
+      const dl = (room as any)?.deadline as number | undefined;
+      if(!dl){ setDeadlineLeft(null); return; }
+      const left = Math.max(0, dl - Date.now());
+      setDeadlineLeft(left);
+    };
+    const i = setInterval(tick, 200);
+    return ()=> clearInterval(i);
+  },[socket, room]);
 
   // Локальные настройки для старта комнаты (в т.ч. при её создании)
   const [localSettings, setLocalSettings] = useState<{ allowTranslation: boolean; maxPlayers: number; deckSize: 24|36|52; speed: 'slow'|'normal'|'fast'; private: boolean }>({ allowTranslation: true, maxPlayers: 6, deckSize: 36, speed: 'normal', private: false });
@@ -192,15 +205,10 @@ export default function Home(){
                 </div>
                 {room?.state.phase==='playing' && (
                   <div className="flex gap-3 mt-4 flex-wrap sm:justify-start justify-center">
+                    {typeof deadlineLeft==='number' && <div className="text-xs opacity-70 self-center">⏱ {(Math.ceil((deadlineLeft||0)/1000))}s</div>}
                     <button className="btn" onClick={()=>sendAction({ type:'END_TURN' })} disabled={!selfId || room.state.attacker!==selfId || room.state.table.some(p=>!p.defend)}>Бито</button>
                     <button className="btn" onClick={()=>sendAction({ type:'TAKE' })} disabled={!selfId || room.state.defender!==selfId}>Взять</button>
-                    {selfId===room?.state.defender && room?.settings && (room.settings as any).allowTranslation && room.state.table.length===1 && !room.state.table[0].defend && (
-                      <button className="btn" onClick={()=>{
-                        const base = room.state.table[0].attack;
-                        const translateCard = selfHand.find(c=>c.r===base.r && (c.s!==base.s));
-                        if(translateCard) sendAction({ type:'TRANSLATE', card: translateCard });
-                      }}>Перевести</button>
-                    )}
+                    {/* переводной отключён */}
                     {defendTarget && <button className="btn" onClick={()=>setDefendTarget(null)}>Отмена защиты</button>}
                   </div>
                 )}
@@ -215,6 +223,8 @@ export default function Home(){
 
             {selfId && (
               <div className="mt-6 glass-panel p-3 sm:p-4 hand-mobile-fixed">
+                {/* жесты: свайп вниз/вверх */}
+                <GestureLayer onSwipeUp={()=>{ if(selfId===room?.state.attacker && !room.state.table.some(p=>!p.defend)) sendAction({ type:'END_TURN' }); }} onSwipeDown={()=>{ if(selfId===room?.state.defender) sendAction({ type:'TAKE' }); }} />
                 <h3 className="font-medium mb-3 hidden sm:block">Ваши карты</h3>
                 <div className="flex gap-2 flex-wrap justify-center">
                   {sortedHand.map((c, i:number)=>{
@@ -335,5 +345,19 @@ function cardClientSorter(trump?: string){
     if(a.s!==b.s) return a.s.localeCompare(b.s);
     return order.indexOf(a.r)-order.indexOf(b.r);
   };
+}
+
+function GestureLayer({ onSwipeUp, onSwipeDown }: { onSwipeUp: ()=>void; onSwipeDown: ()=>void }){
+  // простая реализация на touch событиях
+  if (typeof window==='undefined') return null as any;
+  let startY = 0, endY = 0;
+  return (
+    <div
+      onTouchStart={(e:any)=>{ startY = e.touches[0].clientY; }}
+      onTouchMove={(e:any)=>{ endY = e.touches[0].clientY; }}
+      onTouchEnd={()=>{ const delta = endY - startY; if(delta>60) onSwipeDown(); if(delta<-60) onSwipeUp(); }}
+      className="absolute inset-0 -z-10"
+    />
+  );
 }
 
