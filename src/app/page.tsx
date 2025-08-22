@@ -1,5 +1,5 @@
 "use client";
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useGameStore } from '@/store/gameStore';
 import { Card } from '@/lib/durak-engine';
 import { useSocketGame } from '@/hooks/useSocketGame';
@@ -9,9 +9,22 @@ export default function Home(){
   const [playerId] = useState('P1');
   const [mode,setMode] = useState<'menu'|'local'|'online'>('menu');
   const [roomId,setRoomId] = useState('room1');
+  const [copied,setCopied] = useState(false);
   const [defendTarget,setDefendTarget] = useState<Card | null>(null);
   const { room, connected, startGame: startRemoteGame, sendAction, addBot, updateSettings, restart, toasts, removeToast, selfId, selfHand } = useSocketGame({ nickname: nickname||'Игрок', roomId: mode==='online'? roomId : null });
   const sortedHand = [...selfHand].sort(cardClientSorter(room?.state.trump?.s));
+  useEffect(()=>{
+    if(typeof window==='undefined') return;
+    const saved = localStorage.getItem('durak_nick');
+    if(saved && !nickname) setNickname(saved);
+    const params = new URLSearchParams(window.location.search);
+    const rid = params.get('room');
+    if(rid) setRoomId(rid);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[]);
+  useEffect(()=>{ if(typeof window!=='undefined' && nickname) localStorage.setItem('durak_nick', nickname); },[nickname]);
+  const shareLink = typeof window!=='undefined'? `${window.location.origin}/?room=${roomId}` : '';
+  const copyShare = async ()=>{ try { await navigator.clipboard.writeText(shareLink); setCopied(true); setTimeout(()=>setCopied(false),1500);} catch(_){} };
 
   const ensurePlayer = () => { if(!state.players[playerId]) addLocalPlayer(playerId, nickname||'Игрок'); };
   const handleStart = () => { ensurePlayer(); startLocal(); setMode('local'); };
@@ -67,15 +80,17 @@ export default function Home(){
             <div className="flex flex-wrap gap-4 items-end">
               <div className="flex flex-col gap-2">
                 <label className="text-xs opacity-70">Room ID</label>
-                <input value={roomId} onChange={e=>setRoomId(e.target.value)} className="bg-white/5 border border-white/15 rounded-lg px-4 py-2 outline-none focus:ring-2 focus:ring-sky-400/60" />
+                    <input value={roomId} onChange={e=>setRoomId(e.target.value)} className="bg-white/5 border border-white/15 rounded-lg px-4 py-2 outline-none focus:ring-2 focus:ring-sky-400/60" />
+                    <p className="text-[10px] opacity-50 break-all leading-snug max-w-[160px]">{shareLink}</p>
               </div>
               <div className="flex flex-col gap-2">
                 <label className="text-xs opacity-70">Ник</label>
                 <input value={nickname} onChange={e=>setNickname(e.target.value)} className="bg-white/5 border border-white/15 rounded-lg px-4 py-2 outline-none focus:ring-2 focus:ring-sky-400/60" />
               </div>
-              <button className="btn" disabled={room?.state.phase!=='lobby'} onClick={()=>startRemoteGame({})}>Старт</button>
-              <button className="btn" onClick={()=>setMode('menu')}>Назад</button>
-              <button className="btn" disabled={room?.state.phase!=='lobby'} onClick={()=>addBot()}>+ Бот</button>
+                  <button className="btn" disabled={room?.state.phase!=='lobby'} onClick={()=>startRemoteGame({})}>Старт</button>
+                  <button className="btn" onClick={()=>setMode('menu')}>Назад</button>
+                  <button className="btn" disabled={room?.state.phase!=='lobby'} onClick={()=>addBot()}>+ Бот</button>
+                  <button className="btn" onClick={copyShare}>Ссылка{copied && ' ✓'}</button>
             </div>
             <div className="text-xs opacity-70">{connected? 'Подключено' : 'Ожидание соединения...'}</div>
             <div className="glass-divider" />
