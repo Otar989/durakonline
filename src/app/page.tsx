@@ -188,7 +188,13 @@ export default function Home(){
                 </div>
               </div>
             )}
-                {room?.state.phase==='finished' && <div className="mt-4 text-center text-lg flex flex-col items-center gap-3">Победитель: {room.state.winner && room.players.find(p=>p.id===room.state.winner)?.nick}
+                {room?.state.phase==='finished' && <div className="mt-4 text-center text-lg flex flex-col items-center gap-3">
+                  {(room.state as any).loser ? (
+                    <>
+                      <div className="text-red-300 font-medium">Дурак: {room.players.find(p=>p.id===(room.state as any).loser)?.nick}</div>
+                      <div className="text-sm opacity-70">Выиграли: {room.players.filter(p=>p.id!==(room.state as any).loser).map(p=>p.nick).join(', ')}</div>
+                    </>
+                  ) : <div className="font-medium">Ничья (все вышли)</div>}
                   <button className="btn" onClick={()=> restart() }>Реванш</button>
                 </div>}
           </div>

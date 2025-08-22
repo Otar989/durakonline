@@ -26,6 +26,8 @@ function initialState() {
     defender: null,
     phase: 'lobby',
     winner: null,
+  loser: null,
+  finished: [],
   };
 }
 
@@ -80,10 +82,22 @@ function seatingOrder(room){
 }
 
 function checkWinner(room){
-  const active = Object.values(room.state.players).filter(p=>p.hand.length>0);
-  if(active.length===1 && room.state.deck.length===0){
-    room.state.phase='finished';
-    room.state.winner = seatingOrder(room).find(id=>room.state.players[id].hand.length===0) || null;
+  const st = room.state;
+  if(st.phase!=='playing') return;
+  const active = Object.values(st.players).filter(p=>p.hand.length>0);
+  // отметить закончивших
+  for(const p of Object.values(st.players)){
+    if(p.hand.length===0 && !st.finished.includes(p.id)) st.finished.push(p.id);
+  }
+  if(st.deck.length===0){
+    if(active.length===1){
+      st.phase='finished';
+      st.loser = active[0].id; // последний с картами
+      st.winner = null;
+    } else if(active.length===0){
+      st.phase='finished';
+      st.loser = null; // все закончили одновременно
+    }
   }
 }
 
@@ -274,6 +288,10 @@ function applyAction(room, actorId, action){
       room.turnLog.push({ t: Date.now(), a: 'END_TURN', by: actorId });
       break;
     }
+  }
+  // post-action: re-evaluate finished players (without deck empty condition)
+  for(const p of Object.values(st.players)){
+    if(p.hand.length===0 && !st.finished.includes(p.id)) st.finished.push(p.id);
   }
 }
 
