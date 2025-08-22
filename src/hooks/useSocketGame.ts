@@ -5,6 +5,8 @@ import { GameState } from '@/lib/durak-engine';
 
 export interface RemoteRoomPayload {
   players: { id: string; nick: string }[];
+  spectators?: { id: string; nick: string }[];
+  settings: any; // TODO
   state: GameState;
 }
 
@@ -21,6 +23,7 @@ export function useSocketGame(opts: UseSocketGameOptions){
   const [connected,setConnected] = useState(false);
   const [room,setRoom] = useState<RemoteRoomPayload | null>(null);
   const [error,setError] = useState<string| null>(null);
+  const [toasts,setToasts] = useState<{ id: string; type: string; message: string }[]>([]);
 
   const connect = useCallback(()=>{
     if(socketRef.current) return;
@@ -30,6 +33,9 @@ export function useSocketGame(opts: UseSocketGameOptions){
     s.on('disconnect', ()=> setConnected(false));
     s.on('connect_error', (e)=> setError(e.message));
     s.on('room:update', (payload: RemoteRoomPayload)=> setRoom(payload));
+    s.on('toast', (t: { type: string; message: string })=> {
+      setToasts(cur=>[...cur.slice(-4), { id: Math.random().toString(36).slice(2), ...t }]);
+    });
   },[url]);
 
   useEffect(()=>{ if(autoConnect) connect(); },[autoConnect, connect]);
@@ -48,5 +54,8 @@ export function useSocketGame(opts: UseSocketGameOptions){
     if(socketRef.current && roomId) socketRef.current.emit('action', roomId, action);
   },[roomId]);
 
-  return { socket: socketRef.current, connected, room, error, startGame, sendAction };
+  const addBot = useCallback(()=>{ if(socketRef.current && roomId) socketRef.current.emit('addBot', roomId); },[roomId]);
+  const updateSettings = useCallback((settings: Record<string, unknown>)=>{ if(socketRef.current && roomId) socketRef.current.emit('setSettings', roomId, settings); },[roomId]);
+  const removeToast = (id:string)=> setToasts(t=>t.filter(x=>x.id!==id));
+  return { socket: socketRef.current, connected, room, error, startGame, sendAction, addBot, updateSettings, toasts, removeToast };
 }
