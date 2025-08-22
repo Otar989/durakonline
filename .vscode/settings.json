@@ -1,0 +1,15 @@
+{
+  "files.associations": {
+    "*.postgres.sql": "postgresql",
+    "*rls_raw_games*.sql": "postgresql"
+  },
+  "sql.telemetry.disableTelemetry": true,
+  "[postgresql]": {
+    "editor.defaultFormatter": "ckolkman.vscode-postgres"
+  },
+  "editor.quickSuggestions": {
+    "comments": false,
+    "strings": true,
+    "other": true
+  }
+}
