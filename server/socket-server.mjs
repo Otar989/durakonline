@@ -233,11 +233,16 @@ function canBeat(a, d, trumpSuit){
 }
 
 function serializeRoom(room){
+  const publicPlayers = [];
+  for(const p of [...room.players.values(), ...room.bots.values()]){
+    const ps = room.state.players[p.id];
+    publicPlayers.push({ id: p.id, nick: p.nick, handCount: ps? ps.hand.length: 0 });
+  }
   return {
-    players: [...room.players.values(), ...room.bots.values()].map(p=>({ id: p.id, nick: p.nick })),
+    players: publicPlayers,
     spectators: [...room.spectators.values()].map(p=>({ id: p.id, nick: p.nick })),
     settings: room.settings,
-    state: room.state,
+    state: { ...room.state, players: undefined },
   };
 }
 
@@ -246,6 +251,7 @@ function emitRoom(roomOrId){
   const room = typeof roomOrId==='string'? rooms.get(roomOrId): roomOrId;
   if(!room) return;
   io.to(roomId).emit('room:update', serializeRoom(room));
+  sendPrivateHands(roomId, room);
 }
 
 function broadcast(roomOrId, message){
@@ -256,6 +262,16 @@ function broadcast(roomOrId, message){
 function findRoomId(roomObj){
   for(const [id, r] of rooms) if(r===roomObj) return id;
   return null;
+}
+
+function sendPrivateHands(roomId, room){
+  for(const playerId of room.players.keys()){
+    const socket = io.sockets.sockets.get(playerId);
+    if(socket){
+      const pl = room.state.players[playerId];
+      if(pl) socket.emit('hand:update', { playerId, hand: pl.hand });
+    }
+  }
 }
 
 // Simple bot tick
