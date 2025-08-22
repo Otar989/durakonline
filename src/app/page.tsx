@@ -11,8 +11,8 @@ export default function Home(){
   const [roomId,setRoomId] = useState('room1');
   const [copied,setCopied] = useState(false);
   const [defendTarget,setDefendTarget] = useState<Card | null>(null);
-  const { room, connected, startGame: startRemoteGame, sendAction, addBot, updateSettings, restart, toasts, removeToast, selfId, selfHand } = useSocketGame({ nickname: nickname||'Игрок', roomId: mode==='online'? roomId : null });
-  const sortedHand = [...selfHand].sort(cardClientSorter(room?.state.trump?.s));
+  const { room, connected, startGame: startRemoteGame, sendAction, addBot, updateSettings, restart, toasts, removeToast, selfId, selfHand, error: socketError, socketUrl } = useSocketGame({ nickname: nickname||'Игрок', roomId: mode==='online'? roomId : null, debug: true });
+  const sortedHand = [...selfHand].sort(cardClientSorter(room?.state.trump?.s) as any); // приведение типов
   useEffect(()=>{
     if(typeof window==='undefined') return;
     const saved = localStorage.getItem('durak_nick');
@@ -92,7 +92,7 @@ export default function Home(){
                   <button className="btn" disabled={room?.state.phase!=='lobby'} onClick={()=>addBot()}>+ Бот</button>
                   <button className="btn" onClick={copyShare}>Ссылка{copied && ' ✓'}</button>
             </div>
-            <div className="text-xs opacity-70">{connected? 'Подключено' : 'Ожидание соединения...'}</div>
+            <div className="text-xs opacity-70">{connected? 'Подключено' : 'Ожидание соединения...'} <span className="opacity-50">({socketUrl})</span>{socketError && <span className="text-red-400 ml-2">{socketError}</span>}</div>
             <div className="glass-divider" />
     {room?.state.phase==='lobby' && room.settings && (
               <div className="flex flex-wrap gap-4 items-center text-xs">
@@ -167,12 +167,12 @@ export default function Home(){
               <div className="mt-6 glass-panel p-4 hand-mobile-fixed">
                 <h3 className="font-medium mb-3 hidden sm:block">Ваши карты</h3>
                 <div className="flex gap-2 flex-wrap justify-center">
-  {sortedHand.map((c: Card,i:number)=>{
+  {sortedHand.map((c, i:number)=>{
                     const canAttack = selfId===room?.state.attacker && (
-                      (room.state.table.length===0) || new Set(room.state.table.flatMap(p=>[p.attack.r, p.defend?.r].filter(Boolean))).has(c.r)
+                      (room.state.table.length===0) || new Set(room.state.table.flatMap(p=>[p.attack.r, p.defend?.r].filter(Boolean))).has((c as any).r)
                     ) && room.state.table.length<6;
-                    const canTranslate = selfId===room?.state.defender && (room?.settings as any)?.allowTranslation && room.state.table.length>0 && room.state.table.every(p=>!p.defend && p.attack.r===c.r);
-                    const canDefend = defendTarget != null && selfId===room?.state.defender && canBeatJS(defendTarget, c, room?.state.trump?.s);
+                    const canTranslate = selfId===room?.state.defender && (room?.settings as any)?.allowTranslation && room.state.table.length>0 && room.state.table.every(p=>!p.defend && p.attack.r===(c as any).r);
+                    const canDefend = defendTarget != null && selfId===room?.state.defender && canBeatJS(defendTarget as any, c as any, room?.state.trump?.s);
                     const actionable = canAttack || canTranslate || canDefend;
                     return (
                       <div key={i} className={"cursor-pointer transition-transform " + (actionable? 'hover:-translate-y-1': 'opacity-40')} onClick={()=>{
@@ -180,7 +180,7 @@ export default function Home(){
                         else if(canAttack) sendAction({ type:'ATTACK', card: c });
                         else if(canTranslate) sendAction({ type:'TRANSLATE', card: c });
                       }}>
-                        <MiniCard card={c} trumpSuit={room?.state.trump?.s} />
+                        <MiniCard card={c as any} trumpSuit={room?.state.trump?.s} />
                       </div>
                     );
                   })}
