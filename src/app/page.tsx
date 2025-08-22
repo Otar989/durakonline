@@ -123,7 +123,7 @@ export default function Home(){
       {mode==='online' && (
         <div className="flex flex-col gap-6 w-full max-w-6xl">
           <div className="glass-panel p-4 sm:p-6 flex flex-col gap-4">
-            <h2 className="text-lg font-medium">Онлайн комната</h2>
+            <h2 className="text-lg font-medium">Онлайн комната · Классический</h2>
             <div className="flex flex-wrap gap-3 sm:gap-4 items-end">
               <div className="flex flex-col gap-2 min-w-[160px]">
                 <label className="text-xs opacity-70">Room ID</label>
@@ -143,9 +143,6 @@ export default function Home(){
             <div className="glass-divider" />
             {room?.state.phase==='lobby' && (
               <div className="flex flex-wrap gap-4 items-center text-xs">
-                <label className="flex items-center gap-2">Переводной
-                  <input type="checkbox" className="accent-sky-400" checked={(room.settings as any)?.allowTranslation ?? localSettings.allowTranslation} onChange={e=>{ setLocalSettings(s=>({...s, allowTranslation: e.target.checked})); updateSettings({ allowTranslation: e.target.checked }); }} />
-                </label>
                 <label className="flex items-center gap-2">Макс игроков
                   <select value={(room.settings as any)?.maxPlayers ?? localSettings.maxPlayers} onChange={e=>{ const v=Number(e.target.value); setLocalSettings(s=>({...s, maxPlayers:v})); updateSettings({ maxPlayers: v }); }} className="bg-white/5 border border-white/15 rounded-md px-2 py-1">
                     {[2,3,4,5,6].map(n=><option key={n} value={n}>{n}</option>)}

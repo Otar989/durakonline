@@ -33,8 +33,8 @@ const lastActionAt = new Map(); // playerId -> timestamp (ms)
 const ACTION_THROTTLE_MS = 120; // минимальный интервал между действиями
 
 const DEFAULT_SETTINGS = {
-  variant: 'classic', // classic=подкидной
-  allowTranslation: true, // переводной
+  variant: 'classic', // только подкидной
+  allowTranslation: false, // переводной отключен
   maxPlayers: 6,
   allowBots: true,
   deckSize: 36, // 24 | 36 | 52
@@ -196,9 +196,9 @@ io.on('connection', (socket) => {
     const room = rooms.get(roomId);
     if(!room) return;
     if(room.state.phase!=='lobby') return;
-    // merge settings if options contain allowed keys
+    // merge settings (без allowTranslation)
     if(options && typeof options==='object'){
-      if('allowTranslation' in options) room.settings.allowTranslation = !!options.allowTranslation;
+      // allowTranslation игнорируем — классический режим
       if('maxPlayers' in options && Number(options.maxPlayers)>=2 && Number(options.maxPlayers)<=6) room.settings.maxPlayers = Number(options.maxPlayers);
       if('deckSize' in options && [24,36,52].includes(Number(options.deckSize))) room.settings.deckSize = Number(options.deckSize);
       if('speed' in options && ['slow','normal','fast'].includes(options.speed)) room.settings.speed = options.speed;
@@ -226,7 +226,7 @@ io.on('connection', (socket) => {
     if(!room) return;
     if(room.state.phase!=='lobby') return;
     if(typeof newSettings==='object'){
-      if('allowTranslation' in newSettings) room.settings.allowTranslation = !!newSettings.allowTranslation;
+      // allowTranslation игнорируем — классический режим
       if('maxPlayers' in newSettings && Number(newSettings.maxPlayers)>=2 && Number(newSettings.maxPlayers)<=6) room.settings.maxPlayers = Number(newSettings.maxPlayers);
       if('deckSize' in newSettings && [24,36,52].includes(Number(newSettings.deckSize))) room.settings.deckSize = Number(newSettings.deckSize);
       if('speed' in newSettings && ['slow','normal','fast'].includes(newSettings.speed)) room.settings.speed = newSettings.speed;
