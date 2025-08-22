@@ -14,7 +14,7 @@ export const useGameStore = create<GameStore>((set) => ({
   state: initialState(),
   nickname: '',
   setNickname: (n: string) => set({ nickname: n }),
-  addLocalPlayer: (id: string, nick: string) => set((s) => { const st = { ...s.state }; st.players[id] = { id, nick, hand: [] as Card[] }; return { state: st }; }),
-  startLocal: () => set((s) => { const st = { ...s.state }; startGame(st); return { state: st }; }),
-  action: (a: Action) => set((s) => { const st = { ...s.state }; applyAction(st, a); return { state: st }; })
+  addLocalPlayer: (id: string, nick: string) => set((s: GameStore) => { const st = { ...s.state }; st.players[id] = { id, nick, hand: [] as Card[] }; return { state: st }; }),
+  startLocal: () => set((s: GameStore) => { const st = { ...s.state }; startGame(st); return { state: st }; }),
+  action: (a: Action) => set((s: GameStore) => { const st = { ...s.state }; applyAction(st, a); return { state: st }; })
 }));
