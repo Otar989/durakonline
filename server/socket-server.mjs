@@ -314,7 +314,7 @@ function serializeRoom(room){
     publicPlayers.push({ id: p.id, nick: p.nick, handCount: ps? ps.hand.length: 0 });
   }
   const log = room.turnLog.slice(-30);
-  return { players: publicPlayers, spectators: [...room.spectators.values()].map(p=>({ id: p.id, nick: p.nick })), settings: room.settings, state: { ...room.state, players: undefined }, log };
+  return { players: publicPlayers, spectators: [...room.spectators.values()].map(p=>({ id: p.id, nick: p.nick })), settings: room.settings, state: { ...room.state, players: undefined }, log, deadline: room.turnDeadline };
 }
 
 function emitRoom(roomOrId){
@@ -347,17 +347,16 @@ function sendPrivateHands(roomId, room){
 
 const RANK_ORDER = ['6','7','8','9','10','J','Q','K','A'];
 const RANK_ORDER_ALL = ['2','3','4','5','6','7','8','9','10','J','Q','K','A'];
-function rankIndex(r, room){
-  const size = room.settings?.deckSize || 36;
+function rankIndex(r, deckSize){
   let start = 0; // 52 по умолчанию
-  if(size===36) start = RANK_ORDER_ALL.indexOf('6');
-  if(size===24) start = RANK_ORDER_ALL.indexOf('9');
+  if(deckSize===36) start = RANK_ORDER_ALL.indexOf('6');
+  if(deckSize===24) start = RANK_ORDER_ALL.indexOf('9');
   const arr = RANK_ORDER_ALL.slice(start);
   const idx = arr.indexOf(r);
   return idx<0? 99: idx;
 }
-function canBeat(attack, defend, trumpSuit){
-  if(attack.s===defend.s) return rankIndex(defend.r, { settings:{ deckSize: 36 } }) > rankIndex(attack.r, { settings:{ deckSize: 36 } });
+function canBeat(attack, defend, trumpSuit, deckSize){
+  if(attack.s===defend.s) return rankIndex(defend.r, deckSize) > rankIndex(attack.r, deckSize);
   return defend.s===trumpSuit && attack.s!==trumpSuit;
 }
 function removeCard(hand, card){
@@ -379,6 +378,7 @@ function applyAction(room, playerId, action){
   const p = st.players[playerId];
   if(!p) return;
   const trumpSuit = st.trump?.s;
+  const deckSize = room.settings?.deckSize || 36;
   switch(action.type){
     case 'ATTACK':{
       if(st.attacker!==playerId) return;
@@ -401,7 +401,7 @@ function applyAction(room, playerId, action){
       if(!pair) return;
       const card = removeCard(p.hand, action.card);
       if(!card) return;
-      if(!canBeat(pair.attack, card, trumpSuit)){ p.hand.push(card); return; }
+      if(!canBeat(pair.attack, card, trumpSuit, deckSize)){ p.hand.push(card); return; }
       pair.defend = card;
       pushLog(room, { a:'DEFEND', by: playerId, card, target: pair.attack });
       return;
