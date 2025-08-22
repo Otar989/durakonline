@@ -182,6 +182,11 @@ function applyAction(room, actorId, action){
       const undefended = st.table.filter(p=>!p.defend).length;
       const defenderHandSize = st.players[st.defender].hand.length;
       if(undefended >= defenderHandSize) return;
+      if(st.table.length>0){
+        const ranksOnTable = new Set();
+        for(const p of st.table){ ranksOnTable.add(p.attack.r); if(p.defend) ranksOnTable.add(p.defend.r); }
+        if(!ranksOnTable.has(action.card.r)) return;
+      }
       const [card] = actor.hand.splice(idx,1);
       st.table.push({ attack: card });
       room.turnLog.push({ t: Date.now(), a: 'ATTACK', by: actorId, card });
