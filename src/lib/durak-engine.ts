@@ -16,7 +16,13 @@ export interface GameState {
   winner?: string;
 }
 
-export interface Action { type: string; [k: string]: any; }
+export type Action =
+  | { type: 'ATTACK'; player: string; card: Card }
+  | { type: 'DEFEND'; player: string; card: Card; target: Card }
+  | { type: string; [k: string]: unknown }; // fallback for future actions
+
+function isAttack(a: Action): a is { type: 'ATTACK'; player: string; card: Card } { return a.type==='ATTACK'; }
+function isDefend(a: Action): a is { type: 'DEFEND'; player: string; card: Card; target: Card } { return a.type==='DEFEND'; }
 
 export const ranks: Rank[] = ['6','7','8','9','10','J','Q','K','A'];
 export const suits: Suit[] = ['♠','♥','♦','♣'];
@@ -48,31 +54,29 @@ export function canBeat(a: Card, d: Card, trump: Suit): boolean {
 
 export function applyAction(st: GameState, action: Action) {
   // Simplified local logic placeholder
-  switch(action.type){
-    case 'ATTACK': {
-      const p = st.players[action.player];
-      if(!p) break;
-      const idx = p.hand.findIndex(c=>c.r===action.card.r && c.s===action.card.s);
-      if(idx>=0){
-        const [card] = p.hand.splice(idx,1);
-        st.table.push({ attack: card });
-      }
-      break;
+  if(isAttack(action)) {
+    const p = st.players[action.player];
+    if(!p) return;
+    const idx = p.hand.findIndex((c: Card)=>c.r===action.card.r && c.s===action.card.s);
+    if(idx>=0){
+      const [card] = p.hand.splice(idx,1);
+      st.table.push({ attack: card });
     }
-    case 'DEFEND': {
-      const pair = st.table.find(t=>!t.defend && t.attack.r===action.target.r && t.attack.s===action.target.s);
-      const p = st.players[action.player];
-      if(pair && p){
-        const idx = p.hand.findIndex(c=>c.r===action.card.r && c.s===action.card.s);
-        if(idx>=0){
-          const card = p.hand[idx];
-            if( canBeat(pair.attack, card, st.trump!.s) ){
-              p.hand.splice(idx,1);
-              pair.defend = card;
-            }
+    return;
+  }
+  if(isDefend(action)) {
+    const pair = st.table.find(t=>!t.defend && t.attack.r===action.target.r && t.attack.s===action.target.s);
+    const p = st.players[action.player];
+    if(pair && p){
+      const idx = p.hand.findIndex((c: Card)=>c.r===action.card.r && c.s===action.card.s);
+      if(idx>=0){
+        const card = p.hand[idx];
+        if( canBeat(pair.attack, card, st.trump!.s) ){
+          p.hand.splice(idx,1);
+          pair.defend = card;
         }
       }
-      break;
     }
+    return;
   }
 }
