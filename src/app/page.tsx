@@ -9,7 +9,7 @@ export default function Home(){
   const [playerId] = useState('P1');
   const [mode,setMode] = useState<'menu'|'local'|'online'>('menu');
   const [roomId,setRoomId] = useState('room1');
-  const { room, connected, startGame: startRemoteGame, sendAction, addBot, updateSettings, toasts, removeToast, selfId } = useSocketGame({ nickname: nickname||'Игрок', roomId: mode==='online'? roomId : null });
+  const { room, connected, startGame: startRemoteGame, sendAction, addBot, updateSettings, toasts, removeToast, selfId, selfHand } = useSocketGame({ nickname: nickname||'Игрок', roomId: mode==='online'? roomId : null });
 
   const ensurePlayer = () => { if(!state.players[playerId]) addLocalPlayer(playerId, nickname||'Игрок'); };
   const handleStart = () => { ensurePlayer(); startLocal(); setMode('local'); };
@@ -122,13 +122,13 @@ export default function Home(){
                 <p className="text-xs opacity-50 mt-2">Колода: {room?.state.deck.length ?? '-'}</p>
               </div>
             </div>
-            {selfId && room?.state.players[selfId] && (
+    {selfId && (
               <div className="mt-6 glass-panel p-4">
                 <h3 className="font-medium mb-3">Ваши карты</h3>
                 <div className="flex gap-2 flex-wrap">
-                  {room.state.players[selfId].hand.map((c: Card,i:number)=>(
+      {selfHand.map((c: Card,i:number)=>(
                     <div key={i} className="cursor-pointer" onClick={()=>sendAction({ type:'ATTACK', card: c })}>
-                      <MiniCard card={c} trumpSuit={room.state.trump?.s} />
+                      <MiniCard card={c} trumpSuit={room?.state.trump?.s} />
                     </div>
                   ))}
                 </div>

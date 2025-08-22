@@ -24,6 +24,7 @@ export function useSocketGame(opts: UseSocketGameOptions){
   const [room,setRoom] = useState<RemoteRoomPayload | null>(null);
   const [error,setError] = useState<string| null>(null);
   const [toasts,setToasts] = useState<{ id: string; type: string; message: string }[]>([]);
+  const [hand,setHand] = useState<{ playerId: string; hand: any[] }|null>(null);
   const [selfId,setSelfId] = useState<string | null>(null);
 
   const connect = useCallback(()=>{
@@ -33,7 +34,8 @@ export function useSocketGame(opts: UseSocketGameOptions){
   s.on('connect', ()=> { setConnected(true); setSelfId(s.id || null); });
     s.on('disconnect', ()=> setConnected(false));
     s.on('connect_error', (e)=> setError(e.message));
-    s.on('room:update', (payload: RemoteRoomPayload)=> setRoom(payload));
+  s.on('room:update', (payload: RemoteRoomPayload)=> setRoom(payload));
+  s.on('hand:update', (payload)=> { if(payload.playerId === s.id) setHand(payload); });
     s.on('toast', (t: { type: string; message: string })=> {
       setToasts(cur=>[...cur.slice(-4), { id: Math.random().toString(36).slice(2), ...t }]);
     });
@@ -58,5 +60,5 @@ export function useSocketGame(opts: UseSocketGameOptions){
   const addBot = useCallback(()=>{ if(socketRef.current && roomId) socketRef.current.emit('addBot', roomId); },[roomId]);
   const updateSettings = useCallback((settings: Record<string, unknown>)=>{ if(socketRef.current && roomId) socketRef.current.emit('setSettings', roomId, settings); },[roomId]);
   const removeToast = (id:string)=> setToasts(t=>t.filter(x=>x.id!==id));
-  return { socket: socketRef.current, connected, room, error, startGame, sendAction, addBot, updateSettings, toasts, removeToast, selfId };
+  return { socket: socketRef.current, connected, room, selfHand: hand?.hand || [], error, startGame, sendAction, addBot, updateSettings, toasts, removeToast, selfId };
 }
