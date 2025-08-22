@@ -1,8 +1,8 @@
 "use client";
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { getSupabase } from '@/lib/supabaseClient';
 import { useGameStore } from '@/store/gameStore';
-import { Card } from '@/lib/durak-engine';
+import { Card, TablePair } from '@/lib/durak-engine';
 import { useSocketGame } from '@/hooks/useSocketGame';
 
 export default function Home(){
@@ -34,15 +34,29 @@ export default function Home(){
   // Список комнат
   const [rooms,setRooms] = useState<{ id: string; phase: string; players: number; maxPlayers: number; private: boolean; deckSize: number; speed: string }[]>([]);
 
+  // Параметры URL: room, cfg (base64), auto
+  const [initialCfg,setInitialCfg] = useState<any | null>(null);
   useEffect(()=>{
     if(typeof window==='undefined') return;
     const saved = localStorage.getItem('durak_nick');
     if(saved && !nickname) setNickname(saved);
     const params = new URLSearchParams(window.location.search);
-    const rid = params.get('room');
-    if(rid) setRoomId(rid);
+    const rid = params.get('room'); if(rid) setRoomId(rid);
+    const cfg = params.get('cfg');
+    if(cfg){
+      try { const decoded = JSON.parse(decodeURIComponent(atob(cfg))); setInitialCfg(decoded); setLocalSettings((s:any)=>({...s, ...decoded})); } catch(_){}
+    }
+    if(params.get('auto') && rid){ setMode('online'); }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   },[]);
+  // Применить сохранённые настройки после подключения и входа в лобби (только один раз)
+  const [appliedCfg,setAppliedCfg] = useState(false);
+  useEffect(()=>{
+    if(appliedCfg || !initialCfg || !socket || !roomId || mode!=='online') return;
+    // обновляем каждое поле
+    Object.entries(initialCfg).forEach(([k,v])=> updateSettings({ [k]: v }));
+    setAppliedCfg(true);
+  },[initialCfg, appliedCfg, socket, roomId, mode, updateSettings]);
   useEffect(()=>{ if(typeof window!=='undefined' && nickname) localStorage.setItem('durak_nick', nickname); },[nickname]);
   // simple stats (client side derive from raw_games) — only when in menu and user has anon session
   useEffect(()=>{
@@ -99,6 +113,7 @@ export default function Home(){
           <div className="grid grid-cols-2 gap-3 sm:gap-4 mt-2">
             <button className="btn" onClick={handleStart}>Локальная игра</button>
             <button className="btn" onClick={()=>{ if(!nickname) setNickname('Гость'); setMode('online'); }}>Онлайн</button>
+            <a className="btn col-span-2" href="/create-game">Создать игру</a>
           </div>
           <p className="text-xs leading-relaxed opacity-70">Режимы и интерфейс приближены к приложению. Мобильная верстка включена.</p>
           {stats && <div className="text-xs opacity-70">Ваши партии: {stats.games} · Побед: {stats.wins}</div>}
@@ -115,7 +130,7 @@ export default function Home(){
           </div>
           <div className="glass-panel p-6 flex flex-col gap-4">
             <h2 className="text-lg font-medium">Стол</h2>
-            <div className="flex flex-wrap gap-3 min-h-[120px]">
+            <div className="flex flex-wrap gap-3 min-h-[120px] table-surface rounded-xl p-4">
               {state.table.map((pair, i: number)=> (
                 <div key={i} className="relative" style={{ perspective:'1000px' }}>
                   <div className="animate-card-in"><MiniCard card={pair.attack} trumpSuit={state.trump?.s} /></div>
@@ -189,7 +204,7 @@ export default function Home(){
 
               <div className="flex-1 min-w-[280px] order-1 sm:order-2">
                 <h3 className="font-medium mb-2">Стол</h3>
-                <div className="flex flex-wrap gap-3 min-h-[120px]">
+                <div className="flex flex-wrap gap-3 min-h-[120px] table-surface rounded-xl p-4">
                   {room?.state.table.map((pair,i:number)=> {
                     const selectable = selfId===room?.state.defender && !pair.defend;
                     const isSelected = defendTarget && defendTarget.r===pair.attack.r && defendTarget.s===pair.attack.s;
@@ -206,7 +221,7 @@ export default function Home(){
                 {room?.state.phase==='playing' && (
                   <div className="flex gap-3 mt-4 flex-wrap sm:justify-start justify-center">
                     {typeof deadlineLeft==='number' && <div className="text-xs opacity-70 self-center">⏱ {(Math.ceil((deadlineLeft||0)/1000))}s</div>}
-                    <button className="btn" onClick={()=>sendAction({ type:'END_TURN' })} disabled={!selfId || room.state.attacker!==selfId || room.state.table.some(p=>!p.defend)}>Бито</button>
+                    <button className="btn" onClick={()=>sendAction({ type:'END_TURN' })} disabled={!selfId || room.state.attacker!==selfId || room.state.table.some((p:TablePair)=>!p.defend)}>Бито</button>
                     <button className="btn" onClick={()=>sendAction({ type:'TAKE' })} disabled={!selfId || room.state.defender!==selfId}>Взять</button>
                     {/* переводной отключён */}
                     {defendTarget && <button className="btn" onClick={()=>setDefendTarget(null)}>Отмена защиты</button>}
@@ -224,14 +239,19 @@ export default function Home(){
             {selfId && (
               <div className="mt-6 glass-panel p-3 sm:p-4 hand-mobile-fixed">
                 {/* жесты: свайп вниз/вверх */}
-                <GestureLayer onSwipeUp={()=>{ if(selfId===room?.state.attacker && !room.state.table.some(p=>!p.defend)) sendAction({ type:'END_TURN' }); }} onSwipeDown={()=>{ if(selfId===room?.state.defender) sendAction({ type:'TAKE' }); }} />
+                <GestureLayer
+                  onSwipeUp={()=>{ if(selfId===room?.state.attacker && !room.state.table.some(p=>!p.defend)) sendAction({ type:'END_TURN' }); }}
+                  onSwipeDown={()=>{ if(selfId===room?.state.defender) sendAction({ type:'TAKE' }); }}
+                  onSwipeLeft={()=>{ if(selfId===room?.state.attacker && !room.state.table.some(p=>!p.defend)) sendAction({ type:'END_TURN' }); }}
+                  onSwipeRight={()=>{ if(selfId===room?.state.defender) sendAction({ type:'TAKE' }); }}
+                />
                 <h3 className="font-medium mb-3 hidden sm:block">Ваши карты</h3>
                 <div className="flex gap-2 flex-wrap justify-center">
                   {sortedHand.map((c, i:number)=>{
                     const canAttack = selfId===room?.state.attacker && (
-                      (room.state.table.length===0) || new Set(room.state.table.flatMap(p=>[p.attack.r, p.defend?.r].filter(Boolean))).has((c as any).r)
+                      (room.state.table.length===0) || new Set(room.state.table.flatMap((p:TablePair)=>[p.attack.r, p.defend?.r].filter(Boolean) as any)).has((c as any).r)
                     ) && room.state.table.length<6;
-                    const canTranslate = selfId===room?.state.defender && (room?.settings as any)?.allowTranslation && room.state.table.length>0 && room.state.table.every(p=>!p.defend && p.attack.r===(c as any).r);
+                    const canTranslate = selfId===room?.state.defender && (room?.settings as any)?.allowTranslation && room.state.table.length>0 && room.state.table.every((p:TablePair)=>!p.defend && p.attack.r===(c as any).r);
                     const canDefend = defendTarget != null && selfId===room?.state.defender && canBeatJS(defendTarget as any, c as any, room?.state.trump?.s);
                     const actionable = canAttack || canTranslate || canDefend;
                     return (
@@ -347,17 +367,19 @@ function cardClientSorter(trump?: string){
   };
 }
 
-function GestureLayer({ onSwipeUp, onSwipeDown }: { onSwipeUp: ()=>void; onSwipeDown: ()=>void }){
-  // простая реализация на touch событиях
+function GestureLayer({ onSwipeUp, onSwipeDown, onSwipeLeft, onSwipeRight }: { onSwipeUp: ()=>void; onSwipeDown: ()=>void; onSwipeLeft: ()=>void; onSwipeRight: ()=>void }){
+  // простая реализация горизонтальных и вертикальных свайпов
   if (typeof window==='undefined') return null as any;
-  let startY = 0, endY = 0;
+  let startY = 0, endY = 0, startX=0, endX=0;
   return (
     <div
-      onTouchStart={(e:any)=>{ startY = e.touches[0].clientY; }}
-      onTouchMove={(e:any)=>{ endY = e.touches[0].clientY; }}
-      onTouchEnd={()=>{ const delta = endY - startY; if(delta>60) onSwipeDown(); if(delta<-60) onSwipeUp(); }}
+      onTouchStart={(e:any)=>{ startY = e.touches[0].clientY; startX = e.touches[0].clientX; }}
+      onTouchMove={(e:any)=>{ endY = e.touches[0].clientY; endX = e.touches[0].clientX; }}
+      onTouchEnd={()=>{ const dY = endY - startY; const dX = endX - startX; if(Math.abs(dX)>Math.abs(dY)){ if(dX>60) onSwipeRight(); else if(dX<-60) onSwipeLeft(); } else { if(dY>60) onSwipeDown(); else if(dY<-60) onSwipeUp(); } }}
       className="absolute inset-0 -z-10"
-    />
+    >
+      <div className="absolute left-1/2 -translate-x-1/2 top-1 pointer-events-none text-[10px] opacity-40 tracking-wide">Свайп ← Бито · Взять →</div>
+    </div>
   );
 }
 
