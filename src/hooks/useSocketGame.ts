@@ -46,11 +46,11 @@ export function useSocketGame(opts: UseSocketGameOptions){
     }
     const s = io(url, { transports:['websocket'], autoConnect:true, auth: { token } });
     socketRef.current = s;
-  s.on('connect', ()=> { setConnected(true); setSelfId(s.id || null); });
+  s.on('connect', ()=> { setConnected(true); });
     s.on('disconnect', ()=> setConnected(false));
     s.on('connect_error', (e)=> setError(e.message));
   s.on('room:update', (payload: RemoteRoomPayload)=> setRoom(payload));
-  s.on('hand:update', (payload: PrivateHandPayload)=> { if(payload.playerId === s.id) setHand(payload); });
+  s.on('hand:update', (payload: PrivateHandPayload)=> { setHand(payload); setSelfId(payload.playerId); });
     s.on('toast', (t: { type: string; message: string })=> {
       setToasts(cur=>[...cur.slice(-4), { id: Math.random().toString(36).slice(2), ...t }]);
     });

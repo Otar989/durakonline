@@ -151,6 +151,52 @@ io.on('connection', (socket) => {
     }
   });
 
+  // startGame handler
+  socket.on('startGame', (roomId, options={}) => {
+    const room = rooms.get(roomId);
+    if(!room) return;
+    if(room.state.phase!=='lobby') return;
+    // merge settings if options contain allowed keys
+    if(options && typeof options==='object'){
+      if('allowTranslation' in options) room.settings.allowTranslation = !!options.allowTranslation;
+      if('maxPlayers' in options && Number(options.maxPlayers)>=2 && Number(options.maxPlayers)<=6) room.settings.maxPlayers = Number(options.maxPlayers);
+    }
+    startGame(room);
+    emitRoom(roomId);
+  });
+
+  // addBot handler
+  socket.on('addBot', (roomId) => {
+    const room = rooms.get(roomId);
+    if(!room) return;
+    if(room.state.phase!=='lobby') return;
+    if(room.players.size + room.bots.size >= room.settings.maxPlayers) return;
+    const botId = 'bot_'+Math.random().toString(36).slice(2,8);
+    room.bots.set(botId, { id: botId, nick: 'Бот', socketId: null });
+    emitRoom(roomId);
+  });
+
+  // update settings
+  socket.on('setSettings', (roomId, newSettings={}) => {
+    const room = rooms.get(roomId);
+    if(!room) return;
+    if(room.state.phase!=='lobby') return;
+    if(typeof newSettings==='object'){
+      if('allowTranslation' in newSettings) room.settings.allowTranslation = !!newSettings.allowTranslation;
+      if('maxPlayers' in newSettings && Number(newSettings.maxPlayers)>=2 && Number(newSettings.maxPlayers)<=6) room.settings.maxPlayers = Number(newSettings.maxPlayers);
+    }
+    emitRoom(roomId);
+  });
+
+  // restart game (simple: just start anew if finished)
+  socket.on('restartGame', (roomId) => {
+    const room = rooms.get(roomId);
+    if(!room) return;
+    if(room.state.phase!=='finished' && room.state.phase!=='lobby') return;
+    startGame(room);
+    emitRoom(roomId);
+  });
+
   // action override
   const origAction = socket.listeners('action');
   socket.removeAllListeners('action');
