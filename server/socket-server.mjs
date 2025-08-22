@@ -12,8 +12,19 @@ const httpServer = createServer((req,res)=>{
   res.writeHead(404);
   res.end();
 });
+// Разрешённые origin'ы через переменную (через запятую). Fallback: * (dev)
+const allowedOrigins = (process.env.SOCKET_CORS_ORIGINS || '*')
+  .split(',')
+  .map(o=>o.trim())
+  .filter(Boolean);
 const io = new Server(httpServer, {
-  cors: { origin: '*'}
+  cors: {
+    origin: (origin, cb)=>{
+      if(!origin || allowedOrigins.includes('*') || allowedOrigins.includes(origin)) return cb(null, true);
+      return cb(new Error('CORS blocked'));
+    },
+    credentials: false
+  }
 });
 
 const rooms = new Map(); // roomId -> { players: Map, spectators: Map, bots: Map, settings, state, turnLog, saved:boolean }
@@ -296,10 +307,20 @@ import { createClient } from '@supabase/supabase-js';
 let supaClient = null;
 function getSupa(){
   if(supaClient) return supaClient;
-  const url = process.env.SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if(!url || !key) return null;
-  supaClient = createClient(url, key);
+  // Используем приватный URL, иначе fallback на публичный (если не настроен отдельный SUPABASE_URL)
+  const url = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY; // service role key (НЕ на клиенте)
+  if(!url || !key){
+    if(!url) console.warn('[supabase] SUPABASE_URL (или NEXT_PUBLIC_SUPABASE_URL) не задан – сохранение игр отключено');
+    if(!key) console.warn('[supabase] SUPABASE_SERVICE_ROLE_KEY не задан – сохранение игр отключено');
+    return null;
+  }
+  try {
+    supaClient = createClient(url, key);
+  } catch(e){
+    console.error('[supabase] createClient error', e?.message||e);
+    return null;
+  }
   return supaClient;
 }
 async function persistRoomResult(room){
