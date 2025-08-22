@@ -55,13 +55,13 @@ export default function Home(){
           </div>
           <div className="glass-panel p-6 flex flex-col gap-4">
             <h2 className="text-lg font-medium">Стол</h2>
-            <div className="flex flex-wrap gap-3 min-h-[120px]">
-              {state.table.map((pair, i: number)=> (
-                <div key={i} className="relative" style={{ perspective:'1000px' }}>
-                  <MiniCard card={pair.attack} trumpSuit={state.trump?.s} />
-                  {pair.defend && <div className="absolute left-6 top-4 rotate-12"><MiniCard card={pair.defend} trumpSuit={state.trump?.s} /></div>}
-                </div>
-              ))}
+                <div className="flex flex-wrap gap-3 min-h-[120px]">
+                  {state.table.map((pair, i: number)=> (
+                    <div key={i} className="relative" style={{ perspective:'1000px' }}>
+                      <div className="animate-card-in"><MiniCard card={pair.attack} trumpSuit={state.trump?.s} /></div>
+                      {pair.defend && <div className="absolute left-6 top-4 rotate-12 animate-defend-in"><MiniCard card={pair.defend} trumpSuit={state.trump?.s} /></div>}
+                    </div>
+                  ))}
               {state.table.length===0 && <p className="text-sm opacity-50">Нет карт</p>}
             </div>
           </div>
@@ -117,15 +117,15 @@ export default function Home(){
               </div>
               <div className="flex-1 min-w-[300px]">
                 <h3 className="font-medium mb-2">Стол</h3>
-                <div className="flex flex-wrap gap-3 min-h-[120px]">
+    <div className="flex flex-wrap gap-3 min-h-[120px]">
                   {room?.state.table.map((pair,i:number)=> {
                     const selectable = selfId===room?.state.defender && !pair.defend;
                     const isSelected = defendTarget && defendTarget.r===pair.attack.r && defendTarget.s===pair.attack.s;
                     return (
                       <div key={i} className={"relative group transition-transform " + (selectable? 'cursor-pointer hover:scale-[1.04]':'') + (isSelected? ' ring-2 ring-emerald-400 rounded-lg':'' )} style={{ perspective:'1000px' }}
                         onClick={()=>{ if(selectable) setDefendTarget(pair.attack); }}>
-                        <MiniCard card={pair.attack} trumpSuit={room?.state.trump?.s} />
-                        {pair.defend && <div className="absolute left-6 top-4 rotate-12"><MiniCard card={pair.defend} trumpSuit={room?.state.trump?.s} /></div>}
+      <div className="animate-card-in"><MiniCard card={pair.attack} trumpSuit={room?.state.trump?.s} /></div>
+      {pair.defend && <div className="absolute left-6 top-4 rotate-12 animate-defend-in"><MiniCard card={pair.defend} trumpSuit={room?.state.trump?.s} /></div>}
                       </div>
                     );
                   })}
