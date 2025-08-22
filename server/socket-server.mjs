@@ -1,7 +1,16 @@
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 
-const httpServer = createServer();
+// HTTP сервер с простым health-check (нужен на многих PaaS для проверки живости)
+const httpServer = createServer((req,res)=>{
+  if(req.url==='/health'){
+    res.writeHead(200, { 'Content-Type':'text/plain' });
+    res.end('ok');
+    return;
+  }
+  res.writeHead(404);
+  res.end();
+});
 const io = new Server(httpServer, {
   cors: { origin: '*'}
 });
@@ -445,7 +454,7 @@ setInterval(()=>{
 
 function cardSorter(a,b){ return RANK_ORDER.indexOf(a.r)-RANK_ORDER.indexOf(b.r); }
 
-const port = process.env.SOCKET_PORT || 4001;
+const port = process.env.PORT || process.env.SOCKET_PORT || 4001;
 httpServer.listen(port, () => {
   console.log('Socket server listening on', port);
 });
