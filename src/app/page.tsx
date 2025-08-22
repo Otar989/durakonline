@@ -9,7 +9,7 @@ export default function Home(){
   const [playerId] = useState('P1');
   const [mode,setMode] = useState<'menu'|'local'|'online'>('menu');
   const [roomId,setRoomId] = useState('room1');
-  const { room, connected, startGame: startRemoteGame, sendAction, addBot, updateSettings, toasts, removeToast } = useSocketGame({ nickname: nickname||'Игрок', roomId: mode==='online'? roomId : null });
+  const { room, connected, startGame: startRemoteGame, sendAction, addBot, updateSettings, toasts, removeToast, selfId } = useSocketGame({ nickname: nickname||'Игрок', roomId: mode==='online'? roomId : null });
 
   const ensurePlayer = () => { if(!state.players[playerId]) addLocalPlayer(playerId, nickname||'Игрок'); };
   const handleStart = () => { ensurePlayer(); startLocal(); setMode('local'); };
@@ -111,8 +111,8 @@ export default function Home(){
                 </div>
                 {room?.state.phase==='playing' && (
                   <div className="flex gap-3 mt-4 flex-wrap">
-                    <button className="btn" onClick={()=>sendAction({ type:'END_TURN' })} disabled={true /* need self id */}>Бито</button>
-                    <button className="btn" onClick={()=>sendAction({ type:'TAKE' })} disabled={true /* need self id */}>Взять</button>
+                    <button className="btn" onClick={()=>sendAction({ type:'END_TURN' })} disabled={!selfId || room.state.attacker!==selfId || room.state.table.some(p=>!p.defend)}>Бито</button>
+                    <button className="btn" onClick={()=>sendAction({ type:'TAKE' })} disabled={!selfId || room.state.defender!==selfId}>Взять</button>
                   </div>
                 )}
               </div>
@@ -122,6 +122,18 @@ export default function Home(){
                 <p className="text-xs opacity-50 mt-2">Колода: {room?.state.deck.length ?? '-'}</p>
               </div>
             </div>
+            {selfId && room?.state.players[selfId] && (
+              <div className="mt-6 glass-panel p-4">
+                <h3 className="font-medium mb-3">Ваши карты</h3>
+                <div className="flex gap-2 flex-wrap">
+                  {room.state.players[selfId].hand.map((c: Card,i:number)=>(
+                    <div key={i} className="cursor-pointer" onClick={()=>sendAction({ type:'ATTACK', card: c })}>
+                      <MiniCard card={c} trumpSuit={room.state.trump?.s} />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
             {room?.state.phase==='finished' && <div className="mt-4 text-center text-lg">Победитель: {room.state.winner && room.players.find(p=>p.id===room.state.winner)?.nick}</div>}
           </div>
           <div className="fixed bottom-4 right-4 flex flex-col gap-2 z-50">
@@ -158,8 +170,4 @@ function InteractiveCard({ card, trumpSuit }: { card: Card; trumpSuit?: string }
   );
 }
 
-function findSelf(room: any){
-  if(!room) return null;
-  // client side cannot reliably know its id yet (would need socket id relay). Placeholder null.
-  return null;
-}
+// selfId используется напрямую из useSocketGame
