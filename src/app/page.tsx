@@ -40,7 +40,7 @@ export default function Home(){
           <div className="glass-panel p-6 flex flex-col gap-4">
             <h2 className="text-lg font-medium">Стол</h2>
             <div className="flex flex-wrap gap-3 min-h-[120px]">
-              {state.table.map((pair,i)=> (
+              {state.table.map((pair, i: number)=> (
                 <div key={i} className="relative" style={{ perspective:'1000px' }}>
                   <MiniCard card={pair.attack} trumpSuit={state.trump?.s} />
                   {pair.defend && <div className="absolute left-6 top-4 rotate-12"><MiniCard card={pair.defend} trumpSuit={state.trump?.s} /></div>}
@@ -52,7 +52,7 @@ export default function Home(){
           <div className="glass-panel p-6 flex flex-col gap-4">
             <h2 className="text-lg font-medium">Ваша рука</h2>
             <div className="flex gap-3 flex-wrap card-stack">
-              {state.players[playerId]?.hand.map((c,i)=>(<InteractiveCard key={i} card={c} trumpSuit={state.trump?.s} />))}
+              {state.players[playerId]?.hand.map((c: Card, i: number)=>(<InteractiveCard key={i} card={c} trumpSuit={state.trump?.s} />))}
             </div>
           </div>
         </div>
@@ -66,7 +66,7 @@ function suitColor(s: string){ return s==='♥' || s==='♦' ? 'text-red-500' : 
 function MiniCard({ card, trumpSuit }: { card: Card; trumpSuit?: string }){
   return (
     <div className="playing-card scale-90 origin-bottom" data-trump={card.s===trumpSuit}>
-      <div className="rank {}`">{card.r}</div>
+      <div className="rank">{card.r}</div>
       <div className={`suit ${suitColor(card.s)}`}>{card.s}</div>
     </div>
   );
