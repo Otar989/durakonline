@@ -1,5 +1,6 @@
 "use client";
 import React, { useState, useEffect, type ChangeEvent } from 'react';
+interface LocalSettings { allowTranslation: boolean; maxPlayers: number; deckSize: 24|36|52; speed: 'slow'|'normal'|'fast'; private: boolean }
 import { getSupabase } from '@/lib/supabaseClient';
 import { useGameStore } from '@/store/gameStore';
 import { Card, TablePair } from '@/lib/durak-engine';
@@ -30,7 +31,7 @@ export default function Home(){
   },[socket, room]);
 
   // Локальные настройки для старта комнаты (в т.ч. при её создании)
-  const [localSettings, setLocalSettings] = useState<{ allowTranslation: boolean; maxPlayers: number; deckSize: 24|36|52; speed: 'slow'|'normal'|'fast'; private: boolean }>({ allowTranslation: true, maxPlayers: 6, deckSize: 36, speed: 'normal', private: false });
+  const [localSettings, setLocalSettings] = useState<LocalSettings>({ allowTranslation: true, maxPlayers: 6, deckSize: 36, speed: 'normal', private: false });
   // Список комнат
   const [rooms,setRooms] = useState<{ id: string; phase: string; players: number; maxPlayers: number; private: boolean; deckSize: number; speed: string }[]>([]);
 
@@ -44,7 +45,7 @@ export default function Home(){
     const rid = params.get('room'); if(rid) setRoomId(rid);
     const cfg = params.get('cfg');
     if(cfg){
-      try { const decoded = JSON.parse(decodeURIComponent(atob(cfg))); setInitialCfg(decoded); setLocalSettings((s:any)=>({...s, ...decoded})); } catch(_){}
+      try { const decoded = JSON.parse(decodeURIComponent(atob(cfg))); setInitialCfg(decoded); setLocalSettings(s=>({...s, ...decoded})); } catch(_){ }
     }
     if(params.get('auto') && rid){ setMode('online'); }
     // eslint-disable-next-line react-hooks/exhaustive-deps
