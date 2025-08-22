@@ -1,103 +1,82 @@
-import Image from "next/image";
+"use client";
+import { useState } from 'react';
+import { useGameStore } from '@/store/gameStore';
+import { Card } from '@/lib/durak-engine';
 
-export default function Home() {
+export default function Home(){
+  const { state, addLocalPlayer, startLocal, nickname, setNickname } = useGameStore();
+  const [playerId] = useState('P1');
+  const [mode,setMode] = useState<'menu'|'local'>('menu');
+
+  const ensurePlayer = () => { if(!state.players[playerId]) addLocalPlayer(playerId, nickname||'Игрок'); };
+  const handleStart = () => { ensurePlayer(); startLocal(); setMode('local'); };
+
   return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
-
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+    <div className="w-full min-h-dvh px-6 py-10 flex flex-col items-center gap-10">
+      <h1 className="text-4xl font-semibold bg-clip-text text-transparent bg-gradient-to-r from-sky-400 via-cyan-300 to-blue-500 drop-shadow-[0_2px_8px_rgba(0,150,255,0.35)]">Durak Online</h1>
+      {mode==='menu' && (
+        <div className="glass-panel max-w-xl w-full p-8 flex flex-col gap-6">
+          <div className="flex flex-col gap-2">
+            <label className="text-sm opacity-80">Никнейм</label>
+            <input value={nickname} onChange={e=>setNickname(e.target.value)} placeholder="Введите ник" className="bg-white/5 border border-white/15 rounded-lg px-4 py-2 outline-none focus:ring-2 focus:ring-sky-400/60"/>
+          </div>
+          <div className="grid sm:grid-cols-2 gap-4 mt-2">
+            <button className="btn" onClick={handleStart}>Локальная игра</button>
+            <button className="btn opacity-60 cursor-not-allowed" title="Онлайн скоро">Онлайн (WIP)</button>
+          </div>
+          <div className="glass-divider" />
+          <p className="text-xs leading-relaxed opacity-70">Выберите режим. Онлайн матчмейкинг, комнаты, переводной & подкидной варианты и расширенные правила будут добавлены в следующих шагах.</p>
+        </div>) }
+      {mode==='local' && (
+        <div className="flex flex-col gap-6 w-full max-w-5xl">
+          <div className="flex flex-wrap gap-4 items-center justify-between">
+            <div className="glass-panel px-5 py-3 flex items-center gap-4">
+              <span className="text-sm font-medium opacity-80">Трамп:</span>
+              {state.trump && <MiniCard card={state.trump} trumpSuit={state.trump.s} />}
+              <span className="text-xs opacity-60">Колода: {state.deck.length}</span>
+            </div>
+            <button className="btn" onClick={()=>window.location.reload()}>Новая игра</button>
+          </div>
+          <div className="glass-panel p-6 flex flex-col gap-4">
+            <h2 className="text-lg font-medium">Стол</h2>
+            <div className="flex flex-wrap gap-3 min-h-[120px]">
+              {state.table.map((pair,i)=> (
+                <div key={i} className="relative" style={{ perspective:'1000px' }}>
+                  <MiniCard card={pair.attack} trumpSuit={state.trump?.s} />
+                  {pair.defend && <div className="absolute left-6 top-4 rotate-12"><MiniCard card={pair.defend} trumpSuit={state.trump?.s} /></div>}
+                </div>
+              ))}
+              {state.table.length===0 && <p className="text-sm opacity-50">Нет карт</p>}
+            </div>
+          </div>
+          <div className="glass-panel p-6 flex flex-col gap-4">
+            <h2 className="text-lg font-medium">Ваша рука</h2>
+            <div className="flex gap-3 flex-wrap card-stack">
+              {state.players[playerId]?.hand.map((c,i)=>(<InteractiveCard key={i} card={c} trumpSuit={state.trump?.s} />))}
+            </div>
+          </div>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+      )}
+    </div>
+  );
+}
+
+function suitColor(s: string){ return s==='♥' || s==='♦' ? 'text-red-500' : 'text-slate-800'; }
+
+function MiniCard({ card, trumpSuit }: { card: Card; trumpSuit?: string }){
+  return (
+    <div className="playing-card scale-90 origin-bottom" data-trump={card.s===trumpSuit}>
+      <div className="rank {}`">{card.r}</div>
+      <div className={`suit ${suitColor(card.s)}`}>{card.s}</div>
+    </div>
+  );
+}
+
+function InteractiveCard({ card, trumpSuit }: { card: Card; trumpSuit?: string }){
+  return (
+    <div className="playing-card hover:z-10" data-trump={card.s===trumpSuit}>
+      <div className="rank">{card.r}</div>
+      <div className={`suit ${suitColor(card.s)}`}>{card.s}</div>
     </div>
   );
 }
