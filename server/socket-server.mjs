@@ -185,10 +185,7 @@ io.on('connection', (socket) => {
   });
 });
 
-// seatingOrder override
-function seatingOrder(room){
-  return [...room.players.values(), ...room.bots.values()].map(p=>p.id).filter(id=>room.state.players[id]);
-}
+// (Удалено дублирующее seatingOrder; используется исходная версия выше)
 
 // startGame override
 function startGame(room){
