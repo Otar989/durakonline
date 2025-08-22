@@ -16,7 +16,7 @@ const io = new Server(httpServer, {
   cors: { origin: '*'}
 });
 
-const rooms = new Map(); // roomId -> { players: Map, spectators: Map, bots: Map, settings, state, turnLog }
+const rooms = new Map(); // roomId -> { players: Map, spectators: Map, bots: Map, settings, state, turnLog, saved:boolean }
 const socketUserMap = new Map(); // socket.id -> { userId }
 
 const DEFAULT_SETTINGS = {
@@ -105,9 +105,11 @@ function checkWinner(room){
       st.phase='finished';
       st.loser = active[0].id; // последний с картами
       st.winner = null;
+  persistRoomResult(room);
     } else if(active.length===0){
       st.phase='finished';
       st.loser = null; // все закончили одновременно
+  persistRoomResult(room);
     }
   }
 }
@@ -191,6 +193,7 @@ function seatingOrder(room){
 // startGame override
 function startGame(room){
   room.state = initialState();
+  room.saved = false;
   const st = room.state;
   st.phase='playing';
   st.deck = shuffle(buildDeck());
@@ -244,6 +247,45 @@ function sendPrivateHands(roomId, room){
 }
 
 const RANK_ORDER = ['6','7','8','9','10','J','Q','K','A'];
+
+// --- Persistence (Supabase raw_games) ---
+import { createClient } from '@supabase/supabase-js';
+let supaClient = null;
+function getSupa(){
+  if(supaClient) return supaClient;
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if(!url || !key) return null;
+  supaClient = createClient(url, key);
+  return supaClient;
+}
+async function persistRoomResult(room){
+  if(room.saved) return;
+  const supa = getSupa();
+  if(!supa) return;
+  try {
+    const st = room.state;
+    const summary = {
+      loser: st.loser,
+      finished: st.finished,
+      deck_left: st.deck.length,
+      trump: st.trump? `${st.trump.r}${st.trump.s}`: null,
+      allow_translation: !!room.settings.allowTranslation,
+      players: [...room.players.values()].map(p=>({ id: p.id, nick: p.nick, cards_left: (st.players[p.id]?.hand.length)||0 })),
+      turns: room.turnLog.length,
+      ended_at: new Date().toISOString()
+    };
+    if(process.env.SUPABASE_SAVE_GAME_URL){
+      await fetch(process.env.SUPABASE_SAVE_GAME_URL, {
+        method:'POST', headers:{ 'Content-Type':'application/json', 'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}` }, body: JSON.stringify(summary)
+      });
+    } else {
+      // Ожидается таблица raw_games (id uuid default gen_random_uuid(), created_at timestamptz default now(), summary jsonb)
+      await supa.from('raw_games').insert({ summary });
+    }
+    room.saved = true;
+  } catch(e){ console.error('persist failed', e?.message||e); }
+}
 
 function botChooseAttack(st, bot){
   // кандидаты: если стол пуст – все карты, иначе только ранги присутствующие на столе
