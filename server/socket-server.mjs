@@ -29,6 +29,8 @@ const io = new Server(httpServer, {
 
 const rooms = new Map(); // roomId -> { players: Map, spectators: Map, bots: Map, settings, state, turnLog, saved:boolean }
 const socketUserMap = new Map(); // socket.id -> { userId }
+const lastActionAt = new Map(); // playerId -> timestamp (ms)
+const ACTION_THROTTLE_MS = 120; // минимальный интервал между действиями
 
 const DEFAULT_SETTINGS = {
   variant: 'classic', // classic=подкидной
@@ -216,6 +218,13 @@ io.on('connection', (socket) => {
     if(!room) return;
     if(room.state.phase!=='playing') return;
     const realId = socketUserMap.get(socket.id)?.userId || socket.id;
+    const now = Date.now();
+    const prev = lastActionAt.get(realId) || 0;
+    if(now - prev < ACTION_THROTTLE_MS){
+      io.to(socket.id).emit('toast', { type:'warn', message:`Слишком часто (>${ACTION_THROTTLE_MS}ms)` });
+      return;
+    }
+    lastActionAt.set(realId, now);
     applyAction(room, realId, action);
     checkWinner(room);
     emitRoom(roomId);
