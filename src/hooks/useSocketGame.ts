@@ -16,11 +16,17 @@ interface UseSocketGameOptions {
   nickname: string;
   roomId: string | null;
   autoConnect?: boolean;
-  url?: string;
+  url?: string; // предпочтительный URL
+  debug?: boolean;
 }
 
 export function useSocketGame(opts: UseSocketGameOptions){
-  const { nickname, roomId, autoConnect=true, url = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:4001' } = opts;
+  const { nickname, roomId, autoConnect=true, url: preferredUrl, debug=false } = opts;
+  // Статический build-time env
+  const buildEnvUrl = process.env.NEXT_PUBLIC_SOCKET_URL;
+  // Стартовый URL
+  const initialUrl = preferredUrl || buildEnvUrl || 'http://localhost:4001';
+  const [socketUrl,setSocketUrl] = useState(initialUrl);
   const socketRef = useRef<Socket | null>(null);
   const [connected,setConnected] = useState(false);
   const [room,setRoom] = useState<RemoteRoomPayload | null>(null);
@@ -40,21 +46,37 @@ export function useSocketGame(opts: UseSocketGameOptions){
         token = data.session?.access_token;
         if(!token){
           const anon = await supabase.auth.signInAnonymously();
-          token = anon.data.session?.access_token;
+            token = anon.data.session?.access_token;
         }
-      } catch(e){ /* ignore */ }
+      } catch(e){ if(debug) console.warn('[socket] supabase auth fail', e); }
     }
-    const s = io(url, { transports:['websocket'], autoConnect:true, auth: { token } });
+    if(debug) console.log('[socket] connecting to', socketUrl);
+    const s = io(socketUrl, { transports:['websocket'], autoConnect:true, auth: { token } });
     socketRef.current = s;
-  s.on('connect', ()=> { setConnected(true); });
-    s.on('disconnect', ()=> setConnected(false));
-    s.on('connect_error', (e)=> setError(e.message));
-  s.on('room:update', (payload: RemoteRoomPayload)=> setRoom(payload));
-  s.on('hand:update', (payload: PrivateHandPayload)=> { setHand(payload); setSelfId(payload.playerId); });
+    s.on('connect', ()=> { if(debug) console.log('[socket] connected'); setConnected(true); setError(null); });
+    s.on('disconnect', ()=> { if(debug) console.log('[socket] disconnected'); setConnected(false); });
+    s.on('connect_error', (e)=> {
+      if(debug) console.error('[socket] connect_error', e.message);
+      setError(e.message);
+      // Авто-фолбэк: если сейчас localhost и мы НЕ на localhost домене → пробуем onrender
+      if(socketUrl.includes('localhost') && typeof window!== 'undefined' && window.location.hostname!=='localhost'){
+        const fallback = 'https://durak-socket.onrender.com';
+        if(fallback !== socketUrl){
+          if(debug) console.log('[socket] fallback to', fallback);
+          setSocketUrl(fallback);
+          socketRef.current = null; // позволить повторное подключение
+        }
+      }
+    });
+    s.on('room:update', (payload: RemoteRoomPayload)=> setRoom(payload));
+    s.on('hand:update', (payload: PrivateHandPayload)=> { setHand(payload); setSelfId(payload.playerId); });
     s.on('toast', (t: { type: string; message: string })=> {
       setToasts(cur=>[...cur.slice(-4), { id: Math.random().toString(36).slice(2), ...t }]);
     });
-  },[url]);
+  },[socketUrl, debug]);
+
+  // Переподключение если изменили socketUrl (фолбэк)
+  useEffect(()=>{ if(!socketRef.current && autoConnect) connect(); },[socketUrl, autoConnect, connect]);
 
   useEffect(()=>{ if(autoConnect) connect(); },[autoConnect, connect]);
 
@@ -76,5 +98,5 @@ export function useSocketGame(opts: UseSocketGameOptions){
   const updateSettings = useCallback((settings: Record<string, unknown>)=>{ if(socketRef.current && roomId) socketRef.current.emit('setSettings', roomId, settings); },[roomId]);
   const restart = useCallback(()=>{ if(socketRef.current && roomId) socketRef.current.emit('restartGame', roomId); },[roomId]);
   const removeToast = (id:string)=> setToasts(t=>t.filter(x=>x.id!==id));
-  return { socket: socketRef.current, connected, room, selfHand: hand?.hand || [], error, startGame, sendAction, addBot, updateSettings, restart, toasts, removeToast, selfId };
+  return { socket: socketRef.current, connected, room, selfHand: hand?.hand || [], error, startGame, sendAction, addBot, updateSettings, restart, toasts, removeToast, selfId, socketUrl };
 }
