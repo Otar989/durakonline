@@ -87,6 +87,18 @@ body {
 
 .glass-divider { height:1px; width:100%; background:linear-gradient(90deg,rgba(255,255,255,0) 0%,rgba(255,255,255,.45) 45%,rgba(255,255,255,0) 100%); }
 
+/* Mobile tuning */
+@media (max-width: 640px){
+  .playing-card { width:52px; height:74px; padding:4px 4px 3px; }
+  .playing-card .rank { font-size:13px; }
+  .playing-card .suit { font-size:16px; }
+  .btn { padding:.55rem .9rem; font-size:.8rem; }
+  .glass-panel { border-radius: 14px; }
+  .hand-mobile-fixed { position:fixed; bottom:8px; left:50%; transform:translateX(-50%); width:calc(100% - 16px); z-index:40; }
+  .hand-mobile-fixed .playing-card { transition: transform .3s; }
+  .hand-mobile-fixed .playing-card:hover { transform: translateY(-4px) rotate3d(1,0,0,6deg); }
+}
+
 /* Scrollbar minimal */
 ::-webkit-scrollbar { width:10px; height:10px; }
 ::-webkit-scrollbar-track { background: transparent; }

@@ -164,9 +164,9 @@ export default function Home(){
               </div>
             </div>
     {selfId && (
-              <div className="mt-6 glass-panel p-4">
-                <h3 className="font-medium mb-3">Ваши карты</h3>
-                <div className="flex gap-2 flex-wrap">
+              <div className="mt-6 glass-panel p-4 hand-mobile-fixed">
+                <h3 className="font-medium mb-3 hidden sm:block">Ваши карты</h3>
+                <div className="flex gap-2 flex-wrap justify-center">
   {sortedHand.map((c: Card,i:number)=>{
                     const canAttack = selfId===room?.state.attacker && (
                       (room.state.table.length===0) || new Set(room.state.table.flatMap(p=>[p.attack.r, p.defend?.r].filter(Boolean))).has(c.r)
