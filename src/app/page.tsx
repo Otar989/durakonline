@@ -77,13 +77,13 @@ export default function Home(){
             </div>
             <div className="text-xs opacity-70">{connected? 'Подключено' : 'Ожидание соединения...'}</div>
             <div className="glass-divider" />
-            {room?.state.phase==='lobby' && (
+    {room?.state.phase==='lobby' && room.settings && (
               <div className="flex flex-wrap gap-4 items-center text-xs">
                 <label className="flex items-center gap-2">Переводной
-                  <input type="checkbox" className="accent-sky-400" defaultChecked={room.settings.allowTranslation} onChange={e=>updateSettings({ allowTranslation: e.target.checked })} />
+      <input type="checkbox" className="accent-sky-400" defaultChecked={(room.settings as {allowTranslation?:boolean}).allowTranslation ?? false} onChange={e=>updateSettings({ allowTranslation: e.target.checked })} />
                 </label>
                 <label className="flex items-center gap-2">Макс игроков
-                  <select defaultValue={room.settings.maxPlayers} onChange={e=>updateSettings({ maxPlayers: Number(e.target.value) })} className="bg-white/5 border border-white/15 rounded-md px-2 py-1">
+      <select defaultValue={(room.settings as {maxPlayers?:number}).maxPlayers ?? 6} onChange={e=>updateSettings({ maxPlayers: Number(e.target.value) })} className="bg-white/5 border border-white/15 rounded-md px-2 py-1">
                     {[2,3,4,5,6].map(n=><option key={n} value={n}>{n}</option>)}
                   </select>
                 </label>
