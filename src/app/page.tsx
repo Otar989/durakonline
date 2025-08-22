@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, type ChangeEvent } from 'react';
 import { getSupabase } from '@/lib/supabaseClient';
 import { useGameStore } from '@/store/gameStore';
 import { Card, TablePair } from '@/lib/durak-engine';
@@ -108,7 +108,7 @@ export default function Home(){
         <div className="glass-panel max-w-xl w-full p-5 sm:p-8 flex flex-col gap-5 sm:gap-6">
           <div className="flex flex-col gap-2">
             <label className="text-sm opacity-80">Никнейм</label>
-            <input value={nickname} onChange={e=>setNickname(e.target.value)} placeholder="Введите ник" className="bg-white/5 border border-white/15 rounded-lg px-4 py-2 outline-none focus:ring-2 focus:ring-sky-400/60"/>
+            <input value={nickname} onChange={(e:ChangeEvent<HTMLInputElement>)=>setNickname(e.target.value)} placeholder="Введите ник" className="bg-white/5 border border-white/15 rounded-lg px-4 py-2 outline-none focus:ring-2 focus:ring-sky-400/60"/>
           </div>
           <div className="grid grid-cols-2 gap-3 sm:gap-4 mt-2">
             <button className="btn" onClick={handleStart}>Локальная игра</button>
@@ -131,7 +131,7 @@ export default function Home(){
           <div className="glass-panel p-6 flex flex-col gap-4">
             <h2 className="text-lg font-medium">Стол</h2>
             <div className="flex flex-wrap gap-3 min-h-[120px] table-surface rounded-xl p-4">
-              {state.table.map((pair, i: number)=> (
+              {state.table.map((pair: TablePair, i: number)=> (
                 <div key={i} className="relative" style={{ perspective:'1000px' }}>
                   <div className="animate-card-in"><MiniCard card={pair.attack} trumpSuit={state.trump?.s} /></div>
                   {pair.defend && <div className="absolute left-6 top-4 rotate-12 animate-defend-in"><MiniCard card={pair.defend} trumpSuit={state.trump?.s} /></div>}
@@ -155,12 +155,12 @@ export default function Home(){
             <div className="flex flex-wrap gap-3 sm:gap-4 items-end">
               <div className="flex flex-col gap-2 min-w-[160px]">
                 <label className="text-xs opacity-70">Room ID</label>
-                <input value={roomId} onChange={e=>setRoomId(e.target.value)} className="bg-white/5 border border-white/15 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-sky-400/60" />
+                <input value={roomId} onChange={(e:ChangeEvent<HTMLInputElement>)=>setRoomId(e.target.value)} className="bg-white/5 border border-white/15 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-sky-400/60" />
                 <p className="text-[10px] opacity-50 break-all leading-snug max-w-[180px] hidden sm:block">{shareLink}</p>
               </div>
               <div className="flex flex-col gap-2">
                 <label className="text-xs opacity-70">Ник</label>
-                <input value={nickname} onChange={e=>setNickname(e.target.value)} className="bg-white/5 border border-white/15 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-sky-400/60" />
+                <input value={nickname} onChange={(e:ChangeEvent<HTMLInputElement>)=>setNickname(e.target.value)} className="bg-white/5 border border-white/15 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-sky-400/60" />
               </div>
               <button className="btn" disabled={room?.state.phase!=='lobby'} onClick={()=>startRemoteGame(localSettings)}>Старт</button>
               <button className="btn" onClick={()=>setMode('menu')}>Назад</button>
@@ -172,22 +172,22 @@ export default function Home(){
             {room?.state.phase==='lobby' && (
               <div className="flex flex-wrap gap-4 items-center text-xs">
                 <label className="flex items-center gap-2">Макс игроков
-                  <select value={(room.settings as any)?.maxPlayers ?? localSettings.maxPlayers} onChange={e=>{ const v=Number(e.target.value); setLocalSettings(s=>({...s, maxPlayers:v})); updateSettings({ maxPlayers: v }); }} className="bg-white/5 border border-white/15 rounded-md px-2 py-1">
+                  <select value={(room.settings as any)?.maxPlayers ?? localSettings.maxPlayers} onChange={(e:ChangeEvent<HTMLSelectElement>)=>{ const v=Number(e.target.value); setLocalSettings(s=>({...s, maxPlayers:v})); updateSettings({ maxPlayers: v }); }} className="bg-white/5 border border-white/15 rounded-md px-2 py-1">
                     {[2,3,4,5,6].map(n=><option key={n} value={n}>{n}</option>)}
                   </select>
                 </label>
                 <label className="flex items-center gap-2">Колода
-                  <select value={(room.settings as any)?.deckSize ?? localSettings.deckSize} onChange={e=>{ const v=Number(e.target.value) as 24|36|52; setLocalSettings(s=>({...s, deckSize:v})); updateSettings({ deckSize: v }); }} className="bg-white/5 border border-white/15 rounded-md px-2 py-1">
+                  <select value={(room.settings as any)?.deckSize ?? localSettings.deckSize} onChange={(e:ChangeEvent<HTMLSelectElement>)=>{ const v=Number(e.target.value) as 24|36|52; setLocalSettings(s=>({...s, deckSize:v})); updateSettings({ deckSize: v }); }} className="bg-white/5 border border-white/15 rounded-md px-2 py-1">
                     {[24,36,52].map(n=><option key={n} value={n}>{n}</option>)}
                   </select>
                 </label>
                 <label className="flex items-center gap-2">Скорость
-                  <select value={(room.settings as any)?.speed ?? localSettings.speed} onChange={e=>{ const v=e.target.value as 'slow'|'normal'|'fast'; setLocalSettings(s=>({...s, speed:v})); updateSettings({ speed: v }); }} className="bg-white/5 border border-white/15 rounded-md px-2 py-1">
+                  <select value={(room.settings as any)?.speed ?? localSettings.speed} onChange={(e:ChangeEvent<HTMLSelectElement>)=>{ const v=e.target.value as 'slow'|'normal'|'fast'; setLocalSettings(s=>({...s, speed:v})); updateSettings({ speed: v }); }} className="bg-white/5 border border-white/15 rounded-md px-2 py-1">
                     {['slow','normal','fast'].map(n=><option key={n} value={n}>{n}</option>)}
                   </select>
                 </label>
                 <label className="flex items-center gap-2">Приватная
-                  <input type="checkbox" className="accent-sky-400" checked={(room.settings as any)?.private ?? localSettings.private} onChange={e=>{ setLocalSettings(s=>({...s, private: e.target.checked})); updateSettings({ private: e.target.checked }); }} />
+                  <input type="checkbox" className="accent-sky-400" checked={(room.settings as any)?.private ?? localSettings.private} onChange={(e:ChangeEvent<HTMLInputElement>)=>{ setLocalSettings(s=>({...s, private: e.target.checked})); updateSettings({ private: e.target.checked }); }} />
                 </label>
               </div>
             )}
@@ -240,9 +240,9 @@ export default function Home(){
               <div className="mt-6 glass-panel p-3 sm:p-4 hand-mobile-fixed">
                 {/* жесты: свайп вниз/вверх */}
                 <GestureLayer
-                  onSwipeUp={()=>{ if(selfId===room?.state.attacker && !room.state.table.some(p=>!p.defend)) sendAction({ type:'END_TURN' }); }}
+                  onSwipeUp={()=>{ if(selfId===room?.state.attacker && !room.state.table.some((p:TablePair)=>!p.defend)) sendAction({ type:'END_TURN' }); }}
                   onSwipeDown={()=>{ if(selfId===room?.state.defender) sendAction({ type:'TAKE' }); }}
-                  onSwipeLeft={()=>{ if(selfId===room?.state.attacker && !room.state.table.some(p=>!p.defend)) sendAction({ type:'END_TURN' }); }}
+                  onSwipeLeft={()=>{ if(selfId===room?.state.attacker && !room.state.table.some((p:TablePair)=>!p.defend)) sendAction({ type:'END_TURN' }); }}
                   onSwipeRight={()=>{ if(selfId===room?.state.defender) sendAction({ type:'TAKE' }); }}
                 />
                 <h3 className="font-medium mb-3 hidden sm:block">Ваши карты</h3>
