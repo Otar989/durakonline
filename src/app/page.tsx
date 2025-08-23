@@ -15,6 +15,7 @@ export default function Home(){
   const [defendTarget,setDefendTarget] = useState<Card | null>(null);
   const [stats,setStats] = useState<{ games: number; wins: number } | null>(null);
   const { room, connected, startGame: startRemoteGame, sendAction, addBot, updateSettings, restart, toasts, removeToast, selfId, selfHand, error: socketError, socketUrl, socket, reconnect } = useSocketGame({ nickname: nickname||'Игрок', roomId: mode==='online'? roomId : null, debug: true });
+  const [showHelp,setShowHelp] = useState(false);
   const sortedHand = [...selfHand].sort(cardClientSorter(room?.state.trump?.s) as any); // приведение типов
   const [deadlineLeft, setDeadlineLeft] = useState<number | null>(null);
   const baseTurnMs = useMemo(()=>{ const sp = (room?.settings as any)?.speed||'normal'; return sp==='slow'?15000: sp==='fast'?6000:9000; },[room?.settings]);
@@ -124,15 +125,6 @@ export default function Home(){
     const ranksOnTable = new Set(room.state.table.flatMap((p:TablePair)=>[p.attack.r, p.defend?.r].filter(Boolean) as any));
     return ranksOnTable.has(c.r);
   },[room, selfId]);
-  const canTranslateOnline = useCallback((c:Card)=>{
-    if(!room || !selfId) return false;
-    if(room.state.phase!=='playing') return false;
-    if(room.state.defender!==selfId) return false;
-    if(!(room.settings as any)?.allowTranslation) return false;
-    if(room.state.table.length===0) return false;
-    if(room.state.table.some((p:TablePair)=>p.defend)) return false;
-    return room.state.table.every((p:TablePair)=>p.attack.r===c.r);
-  },[room, selfId]);
   const canDefendOnline = useCallback((target:Card, card:Card)=>{
     if(!room || !selfId) return false;
     if(room.state.phase!=='playing') return false;
@@ -144,8 +136,7 @@ export default function Home(){
   const handleDropAttackOnline = (e:React.DragEvent) => {
     e.preventDefault();
     if(!dragCard) return;
-    if(canAttackOnline(dragCard)) sendAction({ type:'ATTACK', card: dragCard });
-    else if(canTranslateOnline(dragCard)) sendAction({ type:'TRANSLATE', card: dragCard });
+  if(canAttackOnline(dragCard)) sendAction({ type:'ATTACK', card: dragCard });
     clearDrag();
   };
   const handleDropDefendOnline = (target:Card) => (e:React.DragEvent) => {
@@ -309,10 +300,10 @@ export default function Home(){
                   onDrop={handleDropAttackOnline}
                 >
                   {deadlinePct!==null && <div className="absolute top-1 right-2 text-[10px] opacity-50">{Math.ceil((deadlineLeft||0)/1000)}s</div>}
-                  {room?.state.table.length===0 && selfId===room?.state.attacker && <Hint text="Ходите любой картой" />}
-                  {room?.state.table && room.state.table.length>0 && selfId===room?.state.attacker && room.state.table.some(p=>!p.defend) && <Hint text="Можно подкидывать ранги уже на столе" />}
-                  {selfId===room?.state.defender && room.state.table.some(p=>!p.defend) && <Hint text="Отбейте или нажмите ‘Взять’" />}
-                  {selfId===room?.state.attacker && room.state.table.length>0 && room.state.table.every(p=>p.defend) && <Hint text="Нажмите ‘Бито’ если больше не подкидываете" />}
+                  {room?.state.table.length===0 && selfId===room?.state.attacker && <Hint text="Ваш ход: перетащите любую карту" />}
+                  {room?.state.table && room.state.table.length>0 && selfId===room?.state.attacker && room.state.table.some(p=>!p.defend) && <Hint text="Подкиньте ту же рангу" />}
+                  {selfId===room?.state.defender && room.state.table.some(p=>!p.defend) && <Hint text="Отбейте старше той же масти или козырем" />}
+                  {selfId===room?.state.attacker && room.state.table.length>0 && room.state.table.every(p=>p.defend) && <Hint text="Все отбито: нажмите ‘Бито’" />}
                   {room?.state.table.map((pair:TablePair, idx:number)=> {
                     const selectable = selfId===room?.state.defender && !pair.defend;
                     return (
@@ -340,7 +331,7 @@ export default function Home(){
                     {typeof deadlineLeft==='number' && <div className="text-xs opacity-70 self-center">⏱ {(Math.ceil((deadlineLeft||0)/1000))}s</div>}
                     <button className="btn" onClick={()=>sendAction({ type:'END_TURN' })} disabled={!selfId || room.state.attacker!==selfId || room.state.table.some((p:TablePair)=>!p.defend)}>Бито</button>
                     <button className="btn" onClick={()=>sendAction({ type:'TAKE' })} disabled={!selfId || room.state.defender!==selfId}>Взять</button>
-                    {/* переводной отключён */}
+                    <button className="btn" onClick={()=>setShowHelp(true)}>Правила</button>
                     {defendTarget && <button className="btn" onClick={()=>setDefendTarget(null)}>Отмена защиты</button>}
                   </div>
                 )}
@@ -370,7 +361,7 @@ export default function Home(){
                 <h3 className="font-medium mb-3 hidden sm:block">Ваши карты</h3>
                 <div className="flex gap-2 flex-wrap justify-center">
                   {sortedHand.map((c, i:number)=>{
-                    const actionable = canAttackOnline(c as any) || canTranslateOnline(c as any) || (!!defendTarget && canDefendOnline(defendTarget, c as any));
+                    const actionable = canAttackOnline(c as any) || (!!defendTarget && canDefendOnline(defendTarget, c as any));
                     return (
                       <div key={i}
                         className={"transition-transform " + (actionable? 'cursor-move hover:-translate-y-1': 'opacity-40')}
@@ -380,7 +371,6 @@ export default function Home(){
                         onClick={()=>{
                           if(defendTarget && canDefendOnline(defendTarget, c as any)){ sendAction({ type:'DEFEND', card: c as any, target: defendTarget }); setDefendTarget(null); }
                           else if(canAttackOnline(c as any)) sendAction({ type:'ATTACK', card: c as any });
-                          else if(canTranslateOnline(c as any)) sendAction({ type:'TRANSLATE', card: c as any });
                         }}
                       >
                         <MiniCard card={c as any} trumpSuit={room?.state.trump?.s} />
@@ -434,6 +424,7 @@ export default function Home(){
               </div>
             ))}
           </div>
+          {showHelp && <RulesModal onClose={()=>setShowHelp(false)} />}
         </div>
       )}
     </div>
@@ -475,7 +466,6 @@ function formatLog(e:any, room:any){
     case 'DEFEND': return `${nick(e.by)} отбил ${e.target.r}${e.target.s} картой ${e.card.r}${e.card.s}`;
     case 'TAKE': return `${nick(e.by)} взял карты`;
     case 'END_TURN': return `${nick(e.by)} завершил ход`;
-    case 'TRANSLATE': return `${nick(e.by)} перевел ход картой ${e.card.r}${e.card.s}`;
     default: return e.a;
   }
 }
@@ -512,5 +502,28 @@ function RoleBadge({ label, active=true }: { label:string; active?:boolean }){
 
 function Hint({ text }: { text:string }){
   return <div className="absolute -top-5 left-2 text-[10px] text-sky-300/80 animate-pulse">{text}</div>;
+}
+
+function RulesModal({ onClose }:{ onClose: ()=>void }){
+  return (
+    <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+      <div className="glass-panel max-w-md w-full p-6 relative overflow-y-auto max-h-[80vh]">
+        <button onClick={onClose} className="absolute top-2 right-2 text-xs opacity-60 hover:opacity-100">×</button>
+        <h3 className="text-lg font-semibold mb-3">Как играть в дурака</h3>
+        <ol className="list-decimal ml-5 space-y-2 text-sm leading-relaxed">
+          <li>Сдаётся по 6 карт. Открытая карта под колодой показывает козырь.</li>
+          <li>Первым ходит игрок с самым младшим козырем.</li>
+          <li>Атака: положите любую карту. Подкидывать можно только ранги, уже лежащие на столе.</li>
+          <li>Защита: бьём старшей той же масти или козырем. Козырь бьётся старшим козырем.</li>
+          <li>Подкидываний не больше карт у защитника в начале раунда и максимум 6.</li>
+          <li>Не можете отбить — жмите «Взять»: все карты стола переходят в вашу руку.</li>
+          <li>Все карты отбиты — атакующий жмёт «Бито»: карты уходят в сброс, ход переходит дальше.</li>
+          <li>После раунда добор до 6 начиная с атакующего. Когда колода пустая — играем до конца без добора.</li>
+          <li>Проигрывает тот, у кого остались карты. Если все вышли одновременно — ничья.</li>
+        </ol>
+        <p className="mt-4 text-xs opacity-60">Подсказки над столом описывают текущий шаг.</p>
+      </div>
+    </div>
+  );
 }
 
