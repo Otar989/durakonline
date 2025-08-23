@@ -246,6 +246,34 @@ io.on('connection', (socket) => {
     emitRoom(roomId);
   });
 
+  // takeSeat: зритель занимает свободное место даже во время игры
+  socket.on('takeSeat', (roomId) => {
+    const room = rooms.get(roomId);
+    if(!room) return;
+    const realId = socketUserMap.get(socket.id)?.userId || socket.id;
+    if(room.players.has(realId)) return; // уже игрок
+    if(room.players.size + room.bots.size >= room.settings.maxPlayers) return;
+    // убрать из зрителей
+    for(const [sid, spec] of room.spectators){ if(spec.id===realId){ room.spectators.delete(sid); break; } }
+    room.players.set(realId, { id: realId, nick: 'Игрок', socketId: socket.id });
+    // Инициализируем руку
+    if(!room.state.players[realId]){
+      room.state.players[realId] = { id: realId, nick: 'Игрок', hand: [] };
+      // добор до 6 если есть колода
+      while(room.state.players[realId].hand.length < 6 && room.state.deck.length){
+        room.state.players[realId].hand.push(room.state.deck.shift());
+      }
+    }
+    // Если была только 1 рука (игра могла быть некорректной) — откорректировать attacker/defender
+    if(room.state.phase==='playing' && !room.state.attacker){
+      const ids = seatingOrder(room);
+      room.state.attacker = ids[0];
+      room.state.defender = ids[1] || ids[0];
+    }
+    emitRoom(roomId);
+    io.to(socket.id).emit('toast', { type:'info', message:'Вы заняли место' });
+  });
+
   // action override
   const origAction = socket.listeners('action');
   socket.removeAllListeners('action');
