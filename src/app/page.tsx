@@ -188,23 +188,28 @@ export default function Home(){
           <div className="glass-panel p-6 flex flex-col gap-4">
             <h2 className="text-lg font-medium">Стол</h2>
             <div
-              className="relative table-surface rounded-xl p-4 grid grid-cols-3 gap-4 min-h-[160px]"
+              className="relative table-surface rounded-xl p-3 md:p-4 table-board"
               onDragOver={(e:React.DragEvent)=>{ if(dragCard) e.preventDefault(); }}
               onDrop={handleDropAttackLocal}
             >
-              {Array.from({ length:6 }).map((_,idx)=>{
-                const pair = state.table[idx];
-                if(!pair) return <div key={idx} className="h-[100px] rounded-lg border border-white/5 bg-white/0 flex items-center justify-center text-[10px] tracking-wide text-white/20">{idx===0? 'Перетащите карту' : ''}</div>;
-                return (
-                  <div key={idx} className="relative h-[100px]" onDragOver={(e:React.DragEvent)=>{ if(dragCard && !pair.defend) e.preventDefault(); }} onDrop={handleDropDefendLocal(pair.attack)}>
-                    <div className="absolute inset-0 flex items-center">
-                      <div className="animate-card-in"><MiniCard card={pair.attack} trumpSuit={state.trump?.s} /></div>
-                      {pair.defend && <div className="ml-4 rotate-12 animate-defend-in"><MiniCard card={pair.defend} trumpSuit={state.trump?.s} /></div>}
-                      {!pair.defend && state.defender===playerId && <div className="absolute inset-0 rounded-lg ring-1 ring-white/10 pointer-events-none" />}
-                    </div>
+              {state.table.map((pair:TablePair, idx:number)=> (
+                <div key={idx} className="table-pair" onDragOver={(e:React.DragEvent)=>{ if(dragCard && !pair.defend) e.preventDefault(); }} onDrop={handleDropDefendLocal(pair.attack)}>
+                  <div className="pair-inner">
+                    <div className="attack animate-card-in"><MiniCard card={pair.attack} trumpSuit={state.trump?.s} /></div>
+                    {pair.defend ? (
+                      <div className="defense animate-defend-in"><MiniCard card={pair.defend} trumpSuit={state.trump?.s} /></div>
+                    ) : state.defender===playerId ? (
+                      <div className="defense-slot" />
+                    ): null}
                   </div>
-                );
-              })}
+                </div>
+              ))}
+              {state.attacker===playerId && state.table.length<6 && (
+                <div className="table-slot" onDragOver={(e:React.DragEvent)=>{ if(dragCard) e.preventDefault(); }} onDrop={handleDropAttackLocal}>
+                  <span className="slot-hint">Атака</span>
+                </div>
+              )}
+              {state.table.length===0 && state.attacker!==playerId && <div className="text-[11px] opacity-40 px-2">Ожидание атаки…</div>}
             </div>
           </div>
           <div className="glass-panel p-6 flex flex-col gap-4">
@@ -279,30 +284,31 @@ export default function Home(){
               <div className="flex-1 min-w-[280px] order-1 sm:order-2">
                 <h3 className="font-medium mb-2">Стол</h3>
                 <div
-                  className="relative table-surface rounded-xl p-4 grid grid-cols-3 gap-4 min-h-[160px]"
+                  className="relative table-surface rounded-xl p-3 md:p-4 table-board"
                   onDragOver={(e:React.DragEvent)=>{ if(dragCard) e.preventDefault(); }}
                   onDrop={handleDropAttackOnline}
                 >
-                  {Array.from({ length:6 }).map((_,idx)=>{
-                    const pair = room?.state.table[idx];
-                    if(!pair) return <div key={idx} className="h-[100px] rounded-lg border border-white/5 bg-white/0 flex items-center justify-center text-[10px] tracking-wide text-white/20">{idx===0? 'Перетащите карту' : ''}</div>;
+                  {room?.state.table.map((pair:TablePair, idx:number)=> {
                     const selectable = selfId===room?.state.defender && !pair.defend;
                     return (
-                      <div
-                        key={idx}
-                        className={"relative h-[100px] group " + (selectable? '': '')}
-                        onClick={()=>{ if(selectable) setDefendTarget(pair.attack); }}
-                        onDragOver={(e:React.DragEvent)=>{ if(dragCard && !pair.defend) e.preventDefault(); }}
-                        onDrop={handleDropDefendOnline(pair.attack)}
-                      >
-                        <div className="absolute inset-0 flex items-center">
-                          <div className="animate-card-in"><MiniCard card={pair.attack} trumpSuit={room?.state.trump?.s} /></div>
-                          {pair.defend && <div className="ml-4 rotate-12 animate-defend-in"><MiniCard card={pair.defend} trumpSuit={room?.state.trump?.s} /></div>}
-                          {!pair.defend && selectable && <div className="absolute inset-0 rounded-lg ring-1 ring-emerald-400/40 animate-pulse pointer-events-none" />}
+                      <div key={idx} className={"table-pair " + (selectable? 'selectable':'')} onClick={()=>{ if(selectable) setDefendTarget(pair.attack); }} onDragOver={(e:React.DragEvent)=>{ if(dragCard && !pair.defend) e.preventDefault(); }} onDrop={handleDropDefendOnline(pair.attack)}>
+                        <div className="pair-inner">
+                          <div className="attack animate-card-in"><MiniCard card={pair.attack} trumpSuit={room?.state.trump?.s} /></div>
+                          {pair.defend ? (
+                            <div className="defense animate-defend-in"><MiniCard card={pair.defend} trumpSuit={room?.state.trump?.s} /></div>
+                          ) : selectable ? (
+                            <div className="defense-slot" />
+                          ) : null}
                         </div>
                       </div>
                     );
                   })}
+                  {selfId===room?.state.attacker && room.state.table.length<6 && (
+                    <div className="table-slot" onDragOver={(e:React.DragEvent)=>{ if(dragCard) e.preventDefault(); }} onDrop={handleDropAttackOnline}>
+                      <span className="slot-hint">Атака</span>
+                    </div>
+                  )}
+                  {room?.state.table.length===0 && selfId!==room?.state.attacker && <div className="text-[11px] opacity-40 px-2">Ожидание атаки…</div>}
                 </div>
                 {room?.state.phase==='playing' && (
                   <div className="flex gap-3 mt-4 flex-wrap sm:justify-start justify-center">
