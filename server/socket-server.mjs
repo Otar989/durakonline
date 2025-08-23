@@ -55,6 +55,7 @@ function initialState() {
     winner: null,
     loser: null,
     finished: [],
+  turnDefenderInitialHandCount: 0,
   };
 }
 
@@ -303,6 +304,7 @@ function startGame(room){
   }
   st.attacker = lowestTrumpOwner(st.players, st.trump) || ids[0];
   st.defender = ids.find(i=>i!==st.attacker) || st.attacker;
+  st.turnDefenderInitialHandCount = st.players[st.defender]?.hand.length || 0;
   broadcast(room, 'Игра началась');
 }
 
@@ -381,10 +383,11 @@ function applyAction(room, playerId, action){
   const deckSize = room.settings?.deckSize || 36;
   switch(action.type){
     case 'ATTACK':{
-      if(st.attacker!==playerId) return;
-      if(st.table.length>=6) return;
-      const defHandSize = st.players[st.defender]?.hand.length || 0;
-      if(st.table.length>=defHandSize) return;
+  // Разрешаем подкидывать любому игроку кроме защитника. Первый ход должен сделать текущий атакующий.
+  if(st.table.length===0 && st.attacker!==playerId) return; // первое нападение только атакующий
+  if(playerId===st.defender) return; // защитник не подкидывает
+  const attackLimit = Math.min(6, st.turnDefenderInitialHandCount || (st.players[st.defender]?.hand.length||6));
+  if(st.table.length>=attackLimit) return; // лимит по исходному количеству карт защитника или 6
       const card = removeCard(p.hand, action.card);
       if(!card) return;
       if(st.table.length>0){
@@ -435,6 +438,7 @@ function applyAction(room, playerId, action){
       const order = seatingOrder(room);
       const idxA = order.indexOf(st.attacker);
       st.defender = order[(idxA+1)%order.length];
+  st.turnDefenderInitialHandCount = st.players[st.defender]?.hand.length || 0;
       pushLog(room, { a:'TAKE', by: playerId });
       return;
     }
@@ -446,6 +450,7 @@ function applyAction(room, playerId, action){
       st.table = [];
       refillHands(room);
       nextAttacker(room);
+  st.turnDefenderInitialHandCount = st.players[st.defender]?.hand.length || 0;
       pushLog(room, { a:'END_TURN', by: playerId });
       return;
     }

@@ -115,9 +115,10 @@ export default function Home(){
   const canAttackOnline = useCallback((c:Card)=> {
     if(!room || !selfId) return false;
     if(room.state.phase!=='playing') return false;
-    if(room.state.attacker!==selfId) return false;
+    if(selfId===room.state.defender) return false; // защитник не подкидывает
     if(room.state.table.length>=6) return false;
-    if(room.state.table.length===0) return true;
+    // первое нападение только текущий атакующий
+    if(room.state.table.length===0) return selfId===room.state.attacker;
     const ranksOnTable = new Set(room.state.table.flatMap((p:TablePair)=>[p.attack.r, p.defend?.r].filter(Boolean) as any));
     return ranksOnTable.has(c.r);
   },[room, selfId]);
@@ -153,7 +154,7 @@ export default function Home(){
   };
 
   // Локальные проверки (один игрок) упрощенные: всегда может атаковать пока <6
-  const canAttackLocal = (c:Card) => state.attacker===playerId && state.table.length<6 && (state.table.length===0 || new Set(state.table.flatMap((p:TablePair)=>[p.attack.r,p.defend?.r].filter(Boolean) as any)).has(c.r));
+  const canAttackLocal = (c:Card) => state.table.length<6 && (state.table.length===0 ? state.attacker===playerId : new Set(state.table.flatMap((p:TablePair)=>[p.attack.r,p.defend?.r].filter(Boolean) as any)).has(c.r));
   const canDefendLocal = (target:Card, card:Card) => state.defender===playerId && canBeatJS(target as any, card as any, state.trump?.s);
   const handleDropAttackLocal = (e:React.DragEvent) => { e.preventDefault(); if(!dragCard) return; if(canAttackLocal(dragCard)) useGameStore.getState().action({ type:'ATTACK', player: playerId, card: dragCard }); clearDrag(); };
   const handleDropDefendLocal = (target:Card) => (e:React.DragEvent) => { e.preventDefault(); if(!dragCard) return; if(canDefendLocal(target, dragCard)) useGameStore.getState().action({ type:'DEFEND', player: playerId, card: dragCard, target }); clearDrag(); };
