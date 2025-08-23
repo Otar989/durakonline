@@ -14,7 +14,7 @@ export default function Home(){
   const [copied,setCopied] = useState(false);
   const [defendTarget,setDefendTarget] = useState<Card | null>(null);
   const [stats,setStats] = useState<{ games: number; wins: number } | null>(null);
-  const { room, connected, startGame: startRemoteGame, sendAction, addBot, updateSettings, restart, toasts, removeToast, selfId, selfHand, error: socketError, socketUrl, socket } = useSocketGame({ nickname: nickname||'Игрок', roomId: mode==='online'? roomId : null, debug: true });
+  const { room, connected, startGame: startRemoteGame, sendAction, addBot, updateSettings, restart, toasts, removeToast, selfId, selfHand, error: socketError, socketUrl, socket, reconnect } = useSocketGame({ nickname: nickname||'Игрок', roomId: mode==='online'? roomId : null, debug: true });
   const sortedHand = [...selfHand].sort(cardClientSorter(room?.state.trump?.s) as any); // приведение типов
   const [deadlineLeft, setDeadlineLeft] = useState<number | null>(null);
   const baseTurnMs = useMemo(()=>{ const sp = (room?.settings as any)?.speed||'normal'; return sp==='slow'?15000: sp==='fast'?6000:9000; },[room?.settings]);
@@ -248,8 +248,9 @@ export default function Home(){
               <button className="btn" onClick={()=>setMode('menu')}>Назад</button>
               <button className="btn" disabled={room?.state.phase!=='lobby'} onClick={()=>addBot()}>+ Бот</button>
               <button className="btn" onClick={copyShare}>Ссылка{copied && ' ✓'}</button>
+              <button className="btn" onClick={()=>reconnect()} disabled={connected && !socketError}>Переподключить</button>
             </div>
-            <div className="text-xs opacity-70">{connected? 'Подключено' : 'Ожидание соединения...'} <span className="opacity-50">({socketUrl})</span>{socketError && <span className="text-red-400 ml-2">{socketError}</span>}</div>
+            <div className="text-xs opacity-70">{connected? 'Подключено' : 'Ожидание соединения...'} <span className="opacity-50">({socketUrl})</span>{socketError && <span className="text-red-400 ml-2">{socketError}</span>}{!connected && !socketError && <span className="ml-2 text-amber-300">Нет соединения</span>}</div>
             <div className="glass-divider" />
             {room?.state.phase==='playing' && (
               <div className="flex flex-wrap gap-2 items-center text-xs">

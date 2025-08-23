@@ -75,6 +75,14 @@ export function useSocketGame(opts: UseSocketGameOptions){
     });
   },[socketUrl, debug, roomId, nickname]);
 
+  const reconnect = useCallback(()=>{
+    try { socketRef.current?.disconnect(); } catch(_){}
+    socketRef.current = null;
+    setConnected(false);
+    setError(null);
+    connect();
+  },[connect]);
+
   // Переподключение если изменили socketUrl (фолбэк)
   useEffect(()=>{ if(!socketRef.current && autoConnect) connect(); },[socketUrl, autoConnect, connect]);
 
@@ -98,5 +106,5 @@ export function useSocketGame(opts: UseSocketGameOptions){
   const updateSettings = useCallback((settings: Record<string, unknown>)=>{ if(socketRef.current && roomId) socketRef.current.emit('setSettings', roomId, settings); },[roomId]);
   const restart = useCallback(()=>{ if(socketRef.current && roomId) socketRef.current.emit('restartGame', roomId); },[roomId]);
   const removeToast = (id:string)=> setToasts(t=>t.filter(x=>x.id!==id));
-  return { socket: socketRef.current, connected, room, selfHand: hand?.hand || [], error, startGame, sendAction, addBot, updateSettings, restart, toasts, removeToast, selfId, socketUrl };
+  return { socket: socketRef.current, connected, room, selfHand: hand?.hand || [], error, startGame, sendAction, addBot, updateSettings, restart, toasts, removeToast, selfId, socketUrl, reconnect };
 }
