@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect, type ChangeEvent } from 'react';
+import React, { useState, useEffect, type ChangeEvent, useCallback } from 'react';
 interface LocalSettings { allowTranslation: boolean; maxPlayers: number; deckSize: 24|36|52; speed: 'slow'|'normal'|'fast'; private: boolean }
 import { getSupabase } from '@/lib/supabaseClient';
 import { useGameStore } from '@/store/gameStore';
@@ -45,7 +45,7 @@ export default function Home(){
     const rid = params.get('room'); if(rid) setRoomId(rid);
     const cfg = params.get('cfg');
     if(cfg){
-      try { const decoded = JSON.parse(decodeURIComponent(atob(cfg))); setInitialCfg(decoded); setLocalSettings(s=>({...s, ...decoded})); } catch(_){ }
+  try { const decoded = JSON.parse(decodeURIComponent(atob(cfg))); setInitialCfg(decoded); setLocalSettings((prev: LocalSettings)=>({ ...prev, ...decoded })); } catch(_){ }
     }
     if(params.get('auto') && rid){ setMode('online'); }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -102,6 +102,62 @@ export default function Home(){
 
   const ensurePlayer = () => { if(!state.players[playerId]) addLocalPlayer(playerId, nickname||'Игрок'); };
   const handleStart = () => { ensurePlayer(); startLocal(); setMode('local'); };
+  // Общая DnD логика (простая HTML5). actionContext описывает куда можно кидать.
+  const [dragCard,setDragCard] = useState<Card | null>(null);
+  const onDragStart = (card:Card) => (e: React.DragEvent) => {
+    setDragCard(card);
+    e.dataTransfer.setData('text/plain', JSON.stringify(card));
+    e.dataTransfer.effectAllowed = 'move';
+  };
+  const clearDrag = () => setDragCard(null);
+
+  // Вспомогательные проверки (локальные и онлайн схожи)
+  const canAttackOnline = useCallback((c:Card)=> {
+    if(!room || !selfId) return false;
+    if(room.state.phase!=='playing') return false;
+    if(room.state.attacker!==selfId) return false;
+    if(room.state.table.length>=6) return false;
+    if(room.state.table.length===0) return true;
+    const ranksOnTable = new Set(room.state.table.flatMap((p:TablePair)=>[p.attack.r, p.defend?.r].filter(Boolean) as any));
+    return ranksOnTable.has(c.r);
+  },[room, selfId]);
+  const canTranslateOnline = useCallback((c:Card)=>{
+    if(!room || !selfId) return false;
+    if(room.state.phase!=='playing') return false;
+    if(room.state.defender!==selfId) return false;
+    if(!(room.settings as any)?.allowTranslation) return false;
+    if(room.state.table.length===0) return false;
+    if(room.state.table.some((p:TablePair)=>p.defend)) return false;
+    return room.state.table.every((p:TablePair)=>p.attack.r===c.r);
+  },[room, selfId]);
+  const canDefendOnline = useCallback((target:Card, card:Card)=>{
+    if(!room || !selfId) return false;
+    if(room.state.phase!=='playing') return false;
+    if(room.state.defender!==selfId) return false;
+    if(room.state.table.find((p:TablePair)=>p.attack.r===target.r && p.attack.s===target.s)?.defend) return false;
+    return canBeatJS(target as any, card as any, room.state.trump?.s);
+  },[room, selfId]);
+
+  const handleDropAttackOnline = (e:React.DragEvent) => {
+    e.preventDefault();
+    if(!dragCard) return;
+    if(canAttackOnline(dragCard)) sendAction({ type:'ATTACK', card: dragCard });
+    else if(canTranslateOnline(dragCard)) sendAction({ type:'TRANSLATE', card: dragCard });
+    clearDrag();
+  };
+  const handleDropDefendOnline = (target:Card) => (e:React.DragEvent) => {
+    e.preventDefault();
+    if(!dragCard) return;
+    if(canDefendOnline(target, dragCard)) sendAction({ type:'DEFEND', card: dragCard, target });
+    clearDrag();
+  };
+
+  // Локальные проверки (один игрок) упрощенные: всегда может атаковать пока <6
+  const canAttackLocal = (c:Card) => state.attacker===playerId && state.table.length<6 && (state.table.length===0 || new Set(state.table.flatMap((p:TablePair)=>[p.attack.r,p.defend?.r].filter(Boolean) as any)).has(c.r));
+  const canDefendLocal = (target:Card, card:Card) => state.defender===playerId && canBeatJS(target as any, card as any, state.trump?.s);
+  const handleDropAttackLocal = (e:React.DragEvent) => { e.preventDefault(); if(!dragCard) return; if(canAttackLocal(dragCard)) useGameStore.getState().action({ type:'ATTACK', player: playerId, card: dragCard }); clearDrag(); };
+  const handleDropDefendLocal = (target:Card) => (e:React.DragEvent) => { e.preventDefault(); if(!dragCard) return; if(canDefendLocal(target, dragCard)) useGameStore.getState().action({ type:'DEFEND', player: playerId, card: dragCard, target }); clearDrag(); };
+
   return (
     <div className="w-full min-h-dvh px-4 sm:px-6 py-6 sm:py-10 flex flex-col items-center gap-6 sm:gap-10">
       <h1 className="text-3xl sm:text-4xl font-semibold bg-clip-text text-transparent bg-gradient-to-r from-sky-400 via-cyan-300 to-blue-500 drop-shadow-[0_2px_8px_rgba(0,150,255,0.35)]">Durak Online</h1>
@@ -131,20 +187,37 @@ export default function Home(){
           </div>
           <div className="glass-panel p-6 flex flex-col gap-4">
             <h2 className="text-lg font-medium">Стол</h2>
-            <div className="flex flex-wrap gap-3 min-h-[120px] table-surface rounded-xl p-4">
-              {state.table.map((pair: TablePair, i: number)=> (
-                <div key={i} className="relative" style={{ perspective:'1000px' }}>
-                  <div className="animate-card-in"><MiniCard card={pair.attack} trumpSuit={state.trump?.s} /></div>
-                  {pair.defend && <div className="absolute left-6 top-4 rotate-12 animate-defend-in"><MiniCard card={pair.defend} trumpSuit={state.trump?.s} /></div>}
-                </div>
-              ))}
-              {state.table.length===0 && <p className="text-sm opacity-50">Нет карт</p>}
+            <div
+              className="relative table-surface rounded-xl p-4 grid grid-cols-3 gap-4 min-h-[160px]"
+              onDragOver={(e:React.DragEvent)=>{ if(dragCard) e.preventDefault(); }}
+              onDrop={handleDropAttackLocal}
+            >
+              {Array.from({ length:6 }).map((_,idx)=>{
+                const pair = state.table[idx];
+                if(!pair) return <div key={idx} className="h-[100px] rounded-lg border border-white/5 bg-white/0 flex items-center justify-center text-[10px] tracking-wide text-white/20">{idx===0? 'Перетащите карту' : ''}</div>;
+                return (
+                  <div key={idx} className="relative h-[100px]" onDragOver={(e:React.DragEvent)=>{ if(dragCard && !pair.defend) e.preventDefault(); }} onDrop={handleDropDefendLocal(pair.attack)}>
+                    <div className="absolute inset-0 flex items-center">
+                      <div className="animate-card-in"><MiniCard card={pair.attack} trumpSuit={state.trump?.s} /></div>
+                      {pair.defend && <div className="ml-4 rotate-12 animate-defend-in"><MiniCard card={pair.defend} trumpSuit={state.trump?.s} /></div>}
+                      {!pair.defend && state.defender===playerId && <div className="absolute inset-0 rounded-lg ring-1 ring-white/10 pointer-events-none" />}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
           <div className="glass-panel p-6 flex flex-col gap-4">
             <h2 className="text-lg font-medium">Ваша рука</h2>
             <div className="flex gap-3 flex-wrap card-stack">
-              {state.players[playerId]?.hand.map((c: Card, i: number)=>(<InteractiveCard key={i} card={c} trumpSuit={state.trump?.s} />))}
+              {state.players[playerId]?.hand.map((c: Card, i: number)=>{
+                const actionable = canAttackLocal(c) || state.table.some((p:TablePair)=>canDefendLocal(p.attack, c) && !p.defend);
+                return (
+                  <div key={i} draggable={actionable} onDragStart={onDragStart(c)} onDragEnd={clearDrag}>
+                    <InteractiveCard card={c} trumpSuit={state.trump?.s} />
+                  </div>
+                );
+              })}
             </div>
           </div>
         </div>
@@ -205,19 +278,31 @@ export default function Home(){
 
               <div className="flex-1 min-w-[280px] order-1 sm:order-2">
                 <h3 className="font-medium mb-2">Стол</h3>
-                <div className="flex flex-wrap gap-3 min-h-[120px] table-surface rounded-xl p-4">
-                  {room?.state.table.map((pair,i:number)=> {
+                <div
+                  className="relative table-surface rounded-xl p-4 grid grid-cols-3 gap-4 min-h-[160px]"
+                  onDragOver={(e:React.DragEvent)=>{ if(dragCard) e.preventDefault(); }}
+                  onDrop={handleDropAttackOnline}
+                >
+                  {Array.from({ length:6 }).map((_,idx)=>{
+                    const pair = room?.state.table[idx];
+                    if(!pair) return <div key={idx} className="h-[100px] rounded-lg border border-white/5 bg-white/0 flex items-center justify-center text-[10px] tracking-wide text-white/20">{idx===0? 'Перетащите карту' : ''}</div>;
                     const selectable = selfId===room?.state.defender && !pair.defend;
-                    const isSelected = defendTarget && defendTarget.r===pair.attack.r && defendTarget.s===pair.attack.s;
                     return (
-                      <div key={i} className={"relative group transition-transform " + (selectable? 'cursor-pointer hover:scale-[1.04]':'') + (isSelected? ' ring-2 ring-emerald-400 rounded-lg':'' )} style={{ perspective:'1000px' }}
-                        onClick={()=>{ if(selectable) setDefendTarget(pair.attack); }}>
-                        <div className="animate-card-in"><MiniCard card={pair.attack} trumpSuit={room?.state.trump?.s} /></div>
-                        {pair.defend && <div className="absolute left-6 top-4 rotate-12 animate-defend-in"><MiniCard card={pair.defend} trumpSuit={room?.state.trump?.s} /></div>}
+                      <div
+                        key={idx}
+                        className={"relative h-[100px] group " + (selectable? '': '')}
+                        onClick={()=>{ if(selectable) setDefendTarget(pair.attack); }}
+                        onDragOver={(e:React.DragEvent)=>{ if(dragCard && !pair.defend) e.preventDefault(); }}
+                        onDrop={handleDropDefendOnline(pair.attack)}
+                      >
+                        <div className="absolute inset-0 flex items-center">
+                          <div className="animate-card-in"><MiniCard card={pair.attack} trumpSuit={room?.state.trump?.s} /></div>
+                          {pair.defend && <div className="ml-4 rotate-12 animate-defend-in"><MiniCard card={pair.defend} trumpSuit={room?.state.trump?.s} /></div>}
+                          {!pair.defend && selectable && <div className="absolute inset-0 rounded-lg ring-1 ring-emerald-400/40 animate-pulse pointer-events-none" />}
+                        </div>
                       </div>
                     );
                   })}
-                  {room?.state.table.length===0 && <p className="text-sm opacity-50">Нет карт</p>}
                 </div>
                 {room?.state.phase==='playing' && (
                   <div className="flex gap-3 mt-4 flex-wrap sm:justify-start justify-center">
@@ -249,23 +334,24 @@ export default function Home(){
                 <h3 className="font-medium mb-3 hidden sm:block">Ваши карты</h3>
                 <div className="flex gap-2 flex-wrap justify-center">
                   {sortedHand.map((c, i:number)=>{
-                    const canAttack = selfId===room?.state.attacker && (
-                      (room.state.table.length===0) || new Set(room.state.table.flatMap((p:TablePair)=>[p.attack.r, p.defend?.r].filter(Boolean) as any)).has((c as any).r)
-                    ) && room.state.table.length<6;
-                    const canTranslate = selfId===room?.state.defender && (room?.settings as any)?.allowTranslation && room.state.table.length>0 && room.state.table.every((p:TablePair)=>!p.defend && p.attack.r===(c as any).r);
-                    const canDefend = defendTarget != null && selfId===room?.state.defender && canBeatJS(defendTarget as any, c as any, room?.state.trump?.s);
-                    const actionable = canAttack || canTranslate || canDefend;
+                    const actionable = canAttackOnline(c) || canTranslateOnline(c) || (defendTarget && canDefendOnline(defendTarget, c));
                     return (
-                      <div key={i} className={"cursor-pointer transition-transform " + (actionable? 'hover:-translate-y-1': 'opacity-40')} onClick={()=>{
-                        if(canDefend && defendTarget){ sendAction({ type:'DEFEND', card: c, target: defendTarget }); setDefendTarget(null); }
-                        else if(canAttack) sendAction({ type:'ATTACK', card: c });
-                        else if(canTranslate) sendAction({ type:'TRANSLATE', card: c });
-                      }}>
+                      <div key={i}
+                        className={"transition-transform " + (actionable? 'cursor-move hover:-translate-y-1': 'opacity-40')}
+                        draggable={actionable}
+                        onDragStart={onDragStart(c as any)}
+                        onDragEnd={clearDrag}
+                        onClick={()=>{
+                          if(defendTarget && canDefendOnline(defendTarget, c)){ sendAction({ type:'DEFEND', card: c, target: defendTarget }); setDefendTarget(null); }
+                          else if(canAttackOnline(c)) sendAction({ type:'ATTACK', card: c });
+                          else if(canTranslateOnline(c)) sendAction({ type:'TRANSLATE', card: c });
+                        }}
+                      >
                         <MiniCard card={c as any} trumpSuit={room?.state.trump?.s} />
                       </div>
                     );
                   })}
-                  {defendTarget && <p className="text-xs mt-2 opacity-70">Выберите карту для защиты атаки {defendTarget.r}{defendTarget.s}</p>}
+                  {defendTarget && <p className="text-xs mt-2 opacity-70 w-full text-center">Перетащите или нажмите карту для защиты атаки {defendTarget.r}{defendTarget.s}</p>}
                 </div>
               </div>
             )}
