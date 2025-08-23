@@ -1,6 +1,6 @@
 "use client";
 import React, { useState, useEffect, type ChangeEvent, useCallback } from 'react';
-interface LocalSettings { allowTranslation: boolean; maxPlayers: number; deckSize: 24|36|52; speed: 'slow'|'normal'|'fast'; private: boolean }
+interface LocalSettings { allowTranslation: boolean; maxPlayers: number; deckSize: 24|36|52; speed: 'slow'|'normal'|'fast'; private: boolean; [key:string]: any }
 import { getSupabase } from '@/lib/supabaseClient';
 import { useGameStore } from '@/store/gameStore';
 import { Card, TablePair } from '@/lib/durak-engine';
@@ -341,17 +341,17 @@ export default function Home(){
                 <h3 className="font-medium mb-3 hidden sm:block">Ваши карты</h3>
                 <div className="flex gap-2 flex-wrap justify-center">
                   {sortedHand.map((c, i:number)=>{
-                    const actionable = canAttackOnline(c) || canTranslateOnline(c) || (defendTarget && canDefendOnline(defendTarget, c));
+                    const actionable = canAttackOnline(c as any) || canTranslateOnline(c as any) || (!!defendTarget && canDefendOnline(defendTarget, c as any));
                     return (
                       <div key={i}
                         className={"transition-transform " + (actionable? 'cursor-move hover:-translate-y-1': 'opacity-40')}
-                        draggable={actionable}
+                        draggable={!!actionable}
                         onDragStart={onDragStart(c as any)}
                         onDragEnd={clearDrag}
                         onClick={()=>{
-                          if(defendTarget && canDefendOnline(defendTarget, c)){ sendAction({ type:'DEFEND', card: c, target: defendTarget }); setDefendTarget(null); }
-                          else if(canAttackOnline(c)) sendAction({ type:'ATTACK', card: c });
-                          else if(canTranslateOnline(c)) sendAction({ type:'TRANSLATE', card: c });
+                          if(defendTarget && canDefendOnline(defendTarget, c as any)){ sendAction({ type:'DEFEND', card: c as any, target: defendTarget }); setDefendTarget(null); }
+                          else if(canAttackOnline(c as any)) sendAction({ type:'ATTACK', card: c as any });
+                          else if(canTranslateOnline(c as any)) sendAction({ type:'TRANSLATE', card: c as any });
                         }}
                       >
                         <MiniCard card={c as any} trumpSuit={room?.state.trump?.s} />
