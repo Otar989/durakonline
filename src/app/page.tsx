@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect, type ChangeEvent, useCallback } from 'react';
+import React, { useState, useEffect, type ChangeEvent, useCallback, useMemo } from 'react';
 interface LocalSettings { allowTranslation: boolean; maxPlayers: number; deckSize: 24|36|52; speed: 'slow'|'normal'|'fast'; private: boolean; [key:string]: any }
 import { getSupabase } from '@/lib/supabaseClient';
 import { useGameStore } from '@/store/gameStore';
@@ -17,6 +17,8 @@ export default function Home(){
   const { room, connected, startGame: startRemoteGame, sendAction, addBot, updateSettings, restart, toasts, removeToast, selfId, selfHand, error: socketError, socketUrl, socket } = useSocketGame({ nickname: nickname||'Игрок', roomId: mode==='online'? roomId : null, debug: true });
   const sortedHand = [...selfHand].sort(cardClientSorter(room?.state.trump?.s) as any); // приведение типов
   const [deadlineLeft, setDeadlineLeft] = useState<number | null>(null);
+  const baseTurnMs = useMemo(()=>{ const sp = (room?.settings as any)?.speed||'normal'; return sp==='slow'?15000: sp==='fast'?6000:9000; },[room?.settings]);
+  const deadlinePct = typeof deadlineLeft==='number'? Math.min(100, Math.max(0, (100*deadlineLeft)/baseTurnMs)) : null;
 
   useEffect(()=>{
     if(!socket) return;
@@ -249,6 +251,22 @@ export default function Home(){
             </div>
             <div className="text-xs opacity-70">{connected? 'Подключено' : 'Ожидание соединения...'} <span className="opacity-50">({socketUrl})</span>{socketError && <span className="text-red-400 ml-2">{socketError}</span>}</div>
             <div className="glass-divider" />
+            {room?.state.phase==='playing' && (
+              <div className="flex flex-wrap gap-2 items-center text-xs">
+                <RoleBadge label="Атакующий" active />
+                <span>{room.players.find(p=>p.id===room.state.attacker)?.nick}</span>
+                <span className="opacity-40">→</span>
+                <RoleBadge label="Защитник" active={false} />
+                <span>{room.players.find(p=>p.id===room.state.defender)?.nick}</span>
+                <span className="opacity-50 ml-2">Трамп: {room.state.trump? `${room.state.trump.r}${room.state.trump.s}`: '-'}</span>
+                { (room.state as any).turnDefenderInitialHandCount !== undefined && (
+                  <span className="opacity-50">Лимит подкидываний: {room.state.table.length}/{Math.min(6, (room.state as any).turnDefenderInitialHandCount||6)}</span>
+                )}
+                {deadlinePct!==null && <div className="turn-progress ml-auto" aria-label="Оставшееся время">
+                  <div className="fill" style={{ width: `${deadlinePct}%` }} />
+                </div>}
+              </div>
+            )}
             {room?.state.phase==='lobby' && (
               <div className="flex flex-wrap gap-4 items-center text-xs">
                 <label className="flex items-center gap-2">Макс игроков
@@ -289,6 +307,11 @@ export default function Home(){
                   onDragOver={(e:React.DragEvent)=>{ if(dragCard) e.preventDefault(); }}
                   onDrop={handleDropAttackOnline}
                 >
+                  {deadlinePct!==null && <div className="absolute top-1 right-2 text-[10px] opacity-50">{Math.ceil((deadlineLeft||0)/1000)}s</div>}
+                  {room?.state.table.length===0 && selfId===room?.state.attacker && <Hint text="Ходите любой картой" />}
+                  {room?.state.table && room.state.table.length>0 && selfId===room?.state.attacker && room.state.table.some(p=>!p.defend) && <Hint text="Можно подкидывать ранги уже на столе" />}
+                  {selfId===room?.state.defender && room.state.table.some(p=>!p.defend) && <Hint text="Отбейте или нажмите ‘Взять’" />}
+                  {selfId===room?.state.attacker && room.state.table.length>0 && room.state.table.every(p=>p.defend) && <Hint text="Нажмите ‘Бито’ если больше не подкидываете" />}
                   {room?.state.table.map((pair:TablePair, idx:number)=> {
                     const selectable = selfId===room?.state.defender && !pair.defend;
                     return (
@@ -320,6 +343,11 @@ export default function Home(){
                     {defendTarget && <button className="btn" onClick={()=>setDefendTarget(null)}>Отмена защиты</button>}
                   </div>
                 )}
+                {room?.log?.length ? (
+                  <div className="mt-4 text-[11px] leading-relaxed max-h-40 overflow-auto space-y-1 log-panel">
+                    {room.log.slice().reverse().map((ev:any)=> <div key={ev.t} className="opacity-70"><span className="opacity-40">•</span> {formatLog(ev, room)}</div>)}
+                  </div>
+                ): null}
               </div>
 
               <div className="min-w-[200px] order-3">
@@ -475,5 +503,13 @@ function GestureLayer({ onSwipeUp, onSwipeDown, onSwipeLeft, onSwipeRight }: { o
       <div className="absolute left-1/2 -translate-x-1/2 top-1 pointer-events-none text-[10px] opacity-40 tracking-wide">Свайп ← Бито · Взять →</div>
     </div>
   );
+}
+
+function RoleBadge({ label, active=true }: { label:string; active?:boolean }){
+  return <span className={"px-2 py-0.5 rounded-md text-[10px] tracking-wide uppercase font-semibold " + (active? 'bg-sky-500/25 text-sky-300 border border-sky-400/40':'bg-white/10 text-white/60 border border-white/15')}>{label}</span>;
+}
+
+function Hint({ text }: { text:string }){
+  return <div className="absolute -top-5 left-2 text-[10px] text-sky-300/80 animate-pulse">{text}</div>;
 }
 
