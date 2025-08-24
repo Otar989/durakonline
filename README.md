@@ -16,7 +16,7 @@
 - Тесты ядра (правила + симуляции)
 
 ## Удалённый legacy
-Удалены: старый движок (`src/lib/durak-engine.ts`), store (`src/store/gameStore.ts`), legacy socket hook (`src/hooks/useSocketGame.ts`), Supabase клиент (`src/lib/supabaseClient.ts`), расширенный сервер `server/socket-server.mjs`. Оставлен упрощённый сервер `server/index.ts`.
+Удалены: zustand store (`src/store/gameStore.ts`), legacy socket hook (`src/hooks/useSocketGame.ts` -> stub), Supabase клиент (`src/lib/supabaseClient.ts` -> stub), расширенный сервер `server/socket-server.mjs`. Оставлен упрощённый сервер `server/index.ts` и минимальный движок (`src/lib/durak-engine.ts`).
 
 ## 🚀 Запуск
 
@@ -64,7 +64,7 @@ npm run dev:ws   # socket.io сервер (порт 4001)
 Планируемые улучшения: более строгая валидация цепочек переводов с несколькими участниками, антиспам задержки.
 
 ## 🗺 Стек
-Next.js (App Router), React 19, TypeScript, Tailwind CSS, Socket.io, Zustand.
+Next.js (App Router), React 19, TypeScript, Tailwind CSS, Socket.io.
 
 ## 📂 Структура (новая)
 - `game-core/` – чистые типы, `engine.ts`, `bot.ts`, тесты
