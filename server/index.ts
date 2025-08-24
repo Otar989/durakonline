@@ -88,6 +88,15 @@ io.on('connection', socket=>{
     } finally { room.busy = false; }
   });
 
+  // клиент может запросить актуальное состояние (re-sync)
+  socket.on('sync_request', ({ roomId, knownHash }: { roomId:string; knownHash?:string })=>{
+    const room = rooms.get(roomId); if(!room) return;
+    const snap = snapshot(room);
+    const currentHash = stateHash(snap.state);
+    if(knownHash && knownHash===currentHash){ socket.emit('state_sync', { upToDate:true, hash: currentHash }); }
+    else { socket.emit('state_sync', { upToDate:false, hash: currentHash, snapshot: snap }); }
+  });
+
   socket.on('disconnect', ()=>{
     for(const [id, room] of rooms){
       let removed = false;
@@ -101,6 +110,16 @@ io.on('connection', socket=>{
 
 function snapshot(room: Room){
   return { state: room.state, players: [...room.players.values()].map(p=>({ id:p.id, nick:p.nick })), bot: room.bot? { id: room.bot.id, nick: room.bot.nick }: null };
+}
+
+function stateHash(st: GameState | null): string {
+  if(!st) return 'nil';
+  // простейший хэш по ключевым числовым признакам
+  try {
+    const key = [st.attacker, st.defender, st.deck.length, st.discard.length, st.table.length, st.players.map(p=>p.id+':'+p.hand.length).join('|'), st.log?.length].join('#');
+    let h = 0; for(let i=0;i<key.length;i++){ h = (h*31 + key.charCodeAt(i))>>>0; }
+    return h.toString(16);
+  } catch { return Math.random().toString(16).slice(2); }
 }
 
 function scheduleAutoBot(room: Room){

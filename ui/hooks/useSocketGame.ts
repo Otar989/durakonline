@@ -23,6 +23,15 @@ export function useSocketGame(roomId: string | null, nick: string){
   }
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+  function computeHash(st: GameState | null){
+    if(!st) return 'nil';
+    try {
+      const key = [st.attacker, st.defender, st.deck.length, st.discard.length, st.table.length, st.players.map(p=>p.id+':'+p.hand.length).join('|'), st.log?.length].join('#');
+      let h=0; for(let i=0;i<key.length;i++){ h = (h*31 + key.charCodeAt(i))>>>0; }
+      return h.toString(16);
+    } catch { return 'x'; }
+  }
+
   const connect = useCallback(()=>{
     if(!roomId) return;
     setSocketState('RECONNECTING');
@@ -36,8 +45,11 @@ export function useSocketGame(roomId: string | null, nick: string){
     });
     s.on('room_state', (snap:Snapshot)=> setSnapshot(snap));
     s.on('game_started', (snap:Snapshot)=> setSnapshot(snap));
-  s.on('move_applied', ({ state }: { state:GameState })=> setSnapshot(prev=>({ ...prev, state })));
-  s.on('game_over', ({ state }: { state:GameState })=> setSnapshot(prev=>({ ...prev, state })));
+    s.on('move_applied', ({ state }: { state:GameState })=> setSnapshot(prev=>({ ...prev, state }))); 
+    s.on('game_over', ({ state }: { state:GameState })=> setSnapshot(prev=>({ ...prev, state }))); 
+    s.on('state_sync', (data: any)=>{
+      if(data.upToDate) return; if(data.snapshot) setSnapshot(data.snapshot);
+    });
   s.on('error', (e:unknown)=> console.warn('socket error', e));
     s.on('disconnect', ()=>{ setConnected(false); setSocketState('RECONNECTING'); });
   },[roomId, nick, connected]);
@@ -49,5 +61,7 @@ export function useSocketGame(roomId: string | null, nick: string){
   };
   const playMove = (move: Move) => { if(sref.current && roomId) sref.current.emit('play_move', { roomId, move }); };
 
-  return { snapshot, socketState, startGame, playMove };
+  const requestSync = ()=>{ if(sref.current && roomId){ const hash = computeHash(snapshot.state); sref.current.emit('sync_request', { roomId, knownHash: hash }); } };
+
+  return { snapshot, socketState, startGame, playMove, requestSync };
 }

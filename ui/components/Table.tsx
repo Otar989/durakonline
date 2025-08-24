@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Pair, Card } from '../../game-core/types';
 import { PlayingCard } from './TrumpPile';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -6,6 +6,21 @@ import { AnimatePresence, motion } from 'framer-motion';
 interface Props { table: Pair[]; trumpSuit: string; onDefend: (_target: Card, _card: Card)=>void; selectableDefend: { target: Card; defendWith: Card }[]; onAttackDrop?: (_card: Card)=>void; translationHint?: boolean }
 export const TableBoard: React.FC<Props> = ({ table, trumpSuit, onDefend, selectableDefend, onAttackDrop, translationHint }) => {
   const [flashInvalid,setFlashInvalid] = useState(false);
+  const prevTableRef = useRef<Pair[]>(table);
+  const [clearing,setClearing] = useState<Card[]>([]);
+
+  // отслеживаем момент когда стол очищён (END_TURN) и показываем анимацию исчезновения карт
+  useEffect(()=>{
+    if(table.length===0 && prevTableRef.current.length>0){
+      const cards: Card[] = [];
+      prevTableRef.current.forEach(p=>{ cards.push(p.attack); if(p.defend) cards.push(p.defend); });
+      setClearing(cards);
+      // убираем после анимации
+      const t = setTimeout(()=> setClearing([]), 700);
+      return ()=> clearTimeout(t);
+    }
+    prevTableRef.current = table;
+  },[table]);
   return (
   <div className={`flex flex-wrap gap-4 p-4 rounded-xl glass min-h-[140px] relative ${translationHint? 'ring-2 ring-fuchsia-400/60 animate-pulse':''}`}
       onDragOver={e=>{ // разрешаем дроп если либо атака возможна (пустой стол) либо защита в конкретные пары
@@ -52,6 +67,20 @@ export const TableBoard: React.FC<Props> = ({ table, trumpSuit, onDefend, select
           </motion.div>
         );
       })}
+  </AnimatePresence>
+  {/* анимация очистки (бывшие карты) */}
+  <AnimatePresence>
+    {clearing.map(c=> (
+      <motion.div key={'clr_'+c.r+c.s}
+        initial={{ opacity:1, scale:1, y:0, rotate:0 }}
+        animate={{ opacity:0, scale:0.6, y:-30, rotate:15 }}
+        exit={{ opacity:0 }}
+        transition={{ duration:0.5, ease:'easeIn' }}
+        className="absolute left-4 top-4 pointer-events-none"
+      >
+        <PlayingCard card={c} trumpSuit={trumpSuit} />
+      </motion.div>
+    ))}
   </AnimatePresence>
       {table.length===0 && <div className="text-xs opacity-50">Пока пусто</div>}
       {flashInvalid && <div className="absolute -top-5 right-2 text-[10px] text-red-400">Нельзя сюда</div>}

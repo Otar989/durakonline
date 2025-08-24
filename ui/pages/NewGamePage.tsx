@@ -11,6 +11,7 @@ import { useGamePersistence, loadPersisted } from '../../src/hooks/useGamePersis
 import { useAudio } from '../../src/hooks/useAudio';
 import { Move } from '../../game-core/types';
 import { MoveLog } from '../components/MoveLog';
+import { Avatar, ConfettiBurst } from '../components/Avatar';
 import { ToastHost, useToasts } from '../components/Toast';
 
 export const NewGamePage: React.FC = () => {
@@ -23,12 +24,16 @@ export const NewGamePage: React.FC = () => {
   const [autosort,setAutosort] = useState(true);
   const [gameEnded,setGameEnded] = useState<{ winner?:string|null; loser?:string|null }|null>(null);
   const { state: localState, start: startLocal, play: playLocal } = useLocalGame();
-  const { snapshot, socketState, startGame, playMove } = useSocketGame(roomId, nick);
+  const { snapshot, socketState, startGame, playMove, requestSync } = useSocketGame(roomId, nick);
   const { toasts, push } = useToasts();
   const { play: playSound, muted, toggleMute, volume, setVolume } = useAudio(true);
+  useEffect(()=>{ playSound('ambient'); },[playSound]);
   const [theme,setTheme] = useState<'dark'|'light'>(()=> (typeof window!=='undefined' && window.matchMedia('(prefers-color-scheme: light)').matches)? 'light':'dark');
   useEffect(()=>{ if(typeof document!=='undefined'){ document.documentElement.dataset.theme = theme; try { localStorage.setItem('durak_theme', theme);} catch{} } },[theme]);
   useEffect(()=>{ if(typeof window!=='undefined'){ try { const t = localStorage.getItem('durak_theme'); if(t==='light'||t==='dark') setTheme(t as any); } catch{} } },[]);
+
+  // авто-sync после установления ONLINE
+  useEffect(()=>{ if(socketState==='ONLINE' && snapshot.state){ const t = setTimeout(()=> requestSync(), 600); return ()=> clearTimeout(t); } },[socketState]);
 
   const gestureRef = useRef<HTMLDivElement|null>(null);
 
@@ -136,7 +141,7 @@ export const NewGamePage: React.FC = () => {
     if(!activeState) return null;
     const me = activeState.players.find(p=>p.id===myId);
     const opp = activeState.players.find(p=>p.id!==myId);
-    return (
+  return (
       <div className="flex flex-col gap-4">
         <div className="flex items-start gap-4 flex-wrap">
           <div className="flex flex-col gap-2 min-w-[160px]">
@@ -155,8 +160,8 @@ export const NewGamePage: React.FC = () => {
               </div>
               <div className="text-[10px] opacity-60">{activeState.discard.length} карт</div>
             </div>}
-            {opp && <div className="glass p-3 rounded-2xl text-xs flex flex-col gap-1">
-              <div className="font-semibold">{opp.nick}</div>
+            {opp && <div className="glass p-3 rounded-2xl text-xs flex flex-col gap-2">
+              <Avatar nick={opp.nick} />
               <div>Карты: <b>{opp.hand.length}</b></div>
             </div>}
             <div className="glass p-3 rounded-2xl text-xs flex flex-col gap-1">
@@ -210,10 +215,11 @@ export const NewGamePage: React.FC = () => {
             <button onClick={()=> setShowRules(true)} className="px-2 py-1 rounded bg-white/10 hover:bg-white/20">Правила</button>
           </div>
         </div>
-        <div className="flex gap-3 items-center">
+  <div className="flex gap-3 items-center">
           <button className="btn" disabled={!!activeState} onClick={startUnified}>Играть</button>
           {mode==='ONLINE' && roomId && <button className="text-xs underline" onClick={()=>{ try { navigator.clipboard.writeText(window.location.origin+'?room='+roomId); push('Ссылка скопирована','success'); } catch {} }}>Копировать ссылку</button>}
           {mode==='ONLINE' && roomId && <span className="text-[11px] opacity-60 select-all">{window.location.origin+'?room='+roomId}</span>}
+          {mode==='ONLINE' && roomId && <button className="text-[10px] px-2 py-1 rounded bg-white/10 hover:bg-white/20" onClick={()=> requestSync()}>SYNC</button>}
         </div>
         <StatusBar mode={socketState} turnOwner={activeState? activeState.attacker: undefined} hint={hint} allowTranslation={!!activeState?.allowTranslation} />
       </header>
@@ -232,7 +238,8 @@ export const NewGamePage: React.FC = () => {
           <div className="flex justify-end gap-2 text-xs"><button className="px-3 py-1 rounded bg-white/10" onClick={()=> setShowRules(false)}>Закрыть</button></div>
         </div>
       </div>}
-      {gameEnded && <div className="fixed inset-0 bg-black/70 backdrop-blur flex items-center justify-center z-50">
+  <ConfettiBurst show={!!gameEnded?.winner} />
+  {gameEnded && <div className="fixed inset-0 bg-black/70 backdrop-blur flex items-center justify-center z-50">
         <div className="glass p-8 rounded-2xl max-w-sm text-center space-y-4">
           <h2 className="text-xl font-semibold">{gameEnded.winner? 'Победа!':'Ничья'}</h2>
           {gameEnded.winner && <p className="text-sm">Победил: <b>{gameEnded.winner}</b>{gameEnded.loser? ` — Дурак: ${gameEnded.loser}`:''}</p>}
