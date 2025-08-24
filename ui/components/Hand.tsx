@@ -35,7 +35,7 @@ export const Hand: React.FC<Props> = React.memo(({ hand, legal, onPlay, trumpSui
   },[]);
   return <div className="flex gap-2 flex-nowrap overflow-x-auto py-3 justify-start glass rounded-xl px-4 select-none scrollbar-thin" aria-label="Рука игрока" role="list" {...(describedBy? { 'aria-describedby': describedBy }: {})}>
   <AnimatePresence initial={false}>
-  {displayHand.map(c=>{
+  {displayHand.map((c,idx)=>{
       const id = c.r+c.s;
       const attackable = legalAttack.has(id);
   const defendable = legalDef.find(m=> m.card.r===c.r && m.card.s===c.s);
@@ -44,7 +44,7 @@ export const Hand: React.FC<Props> = React.memo(({ hand, legal, onPlay, trumpSui
   const translateHover = hoverAttack && translateCards.has(id) && translateMoves.some(tm=> tm.card.r===c.r && tm.card.s===c.s && tm.card.r===hoverAttack.r);
       const data = JSON.stringify({ card:c });
       const canTranslate = translateCards.has(id);
-      const idx = displayHand.indexOf(c);
+  // idx берём из map аргумента (избавляемся от O(n^2) indexOf)
   return <motion.button key={id} data-card-id={id}
         layout
         initial={{ opacity:0, y:12, scale:0.9 }}
