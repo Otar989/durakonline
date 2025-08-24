@@ -1,30 +1,52 @@
-import { Card, Suit, Rank, GameState, Move, PlayerState } from './types';
+import { Card, Suit, Rank, GameState, Move, PlayerState, GameOptions } from './types';
 
-export const RANKS: Rank[] = ['6','7','8','9','10','J','Q','K','A'];
+// Базовые ранги для сопоставления порядка (от младшего к старшему)
+const RANKS_52: Rank[] = ['2','3','4','5','6','7','8','9','10','J','Q','K','A'];
+const RANKS_36: Rank[] = ['6','7','8','9','10','J','Q','K','A'];
+const RANKS_24: Rank[] = ['9','10','J','Q','K','A'];
+export const RANKS: Rank[] = RANKS_36; // экспорт прежнего списка для обратной совместимости существующих тестов
 export const SUITS: Suit[] = ['♠','♥','♦','♣'];
 
-export function buildDeck36(): Card[] { const d: Card[]=[]; for(const s of SUITS) for(const r of RANKS) d.push({r,s}); return d; }
+export function buildDeck(size: 24|36|52 = 36): Card[] {
+  const ranks = size===24? RANKS_24 : size===52? RANKS_52 : RANKS_36;
+  const d: Card[] = [];
+  for(const s of SUITS) for(const r of ranks) d.push({ r, s });
+  return d;
+}
+
+// legacy helper (старый код тестов использует buildDeck36)
+export function buildDeck36(): Card[] { return buildDeck(36); }
 
 function shuffle<T>(arr:T[]):T[]{ return [...arr].sort(()=>Math.random()-0.5); }
 
 export function cloneState(st: GameState): GameState { return JSON.parse(JSON.stringify(st)); }
 
-export function initGame(players: { id: string; nick: string }[], seedShuffle = true, opts?: { allowTranslation?: boolean }): GameState {
-  if(players.length!==2) throw new Error('Only 2 players supported in MVP');
-  let deck = buildDeck36();
+export function initGame(players: { id: string; nick: string }[], seedShuffle = true, opts?: GameOptions & { allowTranslation?: boolean }): GameState {
+  if(players.length < 2 || players.length > 6) throw new Error('Players must be 2–6');
+  const deckSize: 24|36|52 = (opts?.deckSize||36) as 24|36|52;
+  let deck = buildDeck(deckSize);
   if(seedShuffle) deck = shuffle(deck);
   const trump = deck[deck.length-1];
-  const ps: PlayerState[] = players.map(p=>({ id:p.id, nick:p.nick, hand: deck.splice(0,6) }));
-  // choose lowest trump owner
+  const ps: PlayerState[] = players.map(p=>({ id:p.id, nick:p.nick, hand: [] as Card[] }));
+  // начальная раздача по 6 карт
+  for(let round=0; round<6; round++){
+    for(const pl of ps){ if(deck.length) pl.hand.push(deck.shift()!); }
+  }
+  // первый ход — владелец самой младшей козырной
   const lowestInfo = findLowestTrump(ps, trump);
   const attacker = lowestInfo?.owner || ps[0].id;
-  const defender = ps.find(p=>p.id!==attacker)?.id || attacker;
-  return {
+  const attackerIndex = ps.findIndex(p=>p.id===attacker);
+  const defenderIndex = (attackerIndex+1) % ps.length;
+  const defender = ps[defenderIndex].id;
+  const gs: GameState = {
     deck, discard: [], trump, players: ps, attacker, defender, table: [], phase:'playing', loser:null, winner:null, finished:[], turnDefenderInitialHand: handOf(ps, defender).length,
     allowTranslation: !!opts?.allowTranslation,
+    options: { deckSize, allowTranslation: opts?.allowTranslation, limitFiveBeforeBeat: opts?.limitFiveBeforeBeat },
+    firstDefensePlayedThisTurn: false,
     log: [],
     meta: { firstAttacker: attacker, lowestTrump: lowestInfo?.card || trump }
   };
+  return gs;
 }
 
 function lowestTrumpOwner(players: PlayerState[], trump: Card){
@@ -65,7 +87,9 @@ export function legalMoves(st: GameState, playerId: string): Move[] {
   const isAttacker = st.attacker===playerId;
   const isDefender = st.defender===playerId;
   const tableCount = st.table.length;
-  const limit = Math.min(6, st.turnDefenderInitialHand);
+  let limit = Math.min(6, st.turnDefenderInitialHand);
+  const anyDefense = st.table.some(p=> p.defend);
+  if(st.options?.limitFiveBeforeBeat && !anyDefense) limit = Math.min(limit, 5);
   if(isAttacker){
     // End turn if all defended and >0
     if(tableCount>0 && st.table.every(p=>p.defend)) moves.push({ type:'END_TURN' });
@@ -130,6 +154,7 @@ export function applyMove(st: GameState, move: Move, playerId: string): GameStat
       const pair = st.table.find(p=> p.attack.r===move.target.r && p.attack.s===move.target.s && !p.defend);
       if(!pair) throw new Error('Target not found');
       pair.defend = move.card;
+  st.firstDefensePlayedThisTurn = true;
       pushLog();
       return st;
     }
@@ -139,8 +164,9 @@ export function applyMove(st: GameState, move: Move, playerId: string): GameStat
       for(const pair of st.table){ defHand.push(pair.attack); if(pair.defend) defHand.push(pair.defend); }
       st.table = [];
       refill(st);
-  // В подкидном 2p: атакующий сохраняется тем же; защитник остаётся тем же (после взятия снова атакует атакующий прежний, защитник не меняется).
-      st.turnDefenderInitialHand = handOf(st.players, st.defender).length;
+  // При взятии: атакующий остаётся, роли не меняются; для >2 игроков: следующий после взявшего становится новым атакующим в классических правилах, но здесь MVP удерживаем.
+  st.turnDefenderInitialHand = handOf(st.players, st.defender).length;
+  st.firstDefensePlayedThisTurn = false;
       checkEnd(st);
   pushLog();
       return st;
@@ -153,10 +179,14 @@ export function applyMove(st: GameState, move: Move, playerId: string): GameStat
       }
       st.table = [];
       refill(st);
-      // defender becomes new attacker
-      st.attacker = st.defender;
-      st.defender = st.players.find(p=>p.id!==st.attacker)!.id;
+  // defender становится новым атакующим; защитник сдвигается по кругу
+  const order = st.players.map(p=>p.id);
+  const defIdx = order.indexOf(st.defender);
+  st.attacker = st.defender;
+  const newDef = order[(defIdx+1) % order.length];
+  st.defender = newDef;
       st.turnDefenderInitialHand = handOf(st.players, st.defender).length;
+  st.firstDefensePlayedThisTurn = false;
       checkEnd(st);
   pushLog();
       return st;
@@ -165,8 +195,11 @@ export function applyMove(st: GameState, move: Move, playerId: string): GameStat
       removeCard(meHand, (move as Extract<Move,{type:'TRANSLATE'}>).card);
       st.table.push({ attack: (move as Extract<Move,{type:'TRANSLATE'}>).card });
       const oldDef = st.defender; // which is playerId
-      st.attacker = oldDef;
-      st.defender = st.players.find(p=>p.id!==st.attacker)!.id;
+  // роли сдвигаются: старый защитник теперь атакующий, новый защитник следующий по кругу
+  const order = st.players.map(p=>p.id);
+  const oldDefIdx = order.indexOf(oldDef);
+  st.attacker = oldDef;
+  st.defender = order[(oldDefIdx+1)%order.length];
   pushLog();
       return st;
     }
@@ -177,22 +210,36 @@ export function applyMove(st: GameState, move: Move, playerId: string): GameStat
 function removeCard(hand: Card[], c: Card){ const i = hand.findIndex(x=>x.r===c.r && x.s===c.s); if(i<0) throw new Error('card missing'); hand.splice(i,1); }
 
 function refill(st: GameState){
-  // order: attacker then defender up to 6
-  const attHand = handOf(st.players, st.attacker);
-  const defHand = handOf(st.players, st.defender);
-  while(attHand.length<6 && st.deck.length) attHand.push(st.deck.shift()!);
-  while(defHand.length<6 && st.deck.length) defHand.push(st.deck.shift()!);
+  // порядок добора: начиная с атакующего по часовой до защитника включительно (классическое правило — атакующие первыми, затем защитник)
+  const order = st.players.map(p=>p.id);
+  const attackerIdx = order.indexOf(st.attacker);
+  const defenderIdx = order.indexOf(st.defender);
+  // список игроков, добирающих в порядке: атакующий, далее по кругу до защитника, потом защитник в конце если ещё не добрал
+  let idx = attackerIdx;
+  const drawSequence: string[] = [];
+  while(true){
+    drawSequence.push(order[idx]);
+    if(idx===defenderIdx) break;
+    idx = (idx+1) % order.length;
+  }
+  for(const pid of drawSequence){
+    const hand = handOf(st.players, pid);
+    while(hand.length < 6 && st.deck.length) hand.push(st.deck.shift()!);
+  }
 }
 
 function checkEnd(st: GameState){
   for(const p of st.players){ if(p.hand.length===0 && !st.finished.includes(p.id)) st.finished.push(p.id); }
   if(st.deck.length===0){
-    const active = st.players.filter(p=>p.hand.length>0);
-    if(active.length===1){
+    const remaining = st.players.filter(p=> p.hand.length>0);
+    if(remaining.length===1){
       st.phase='finished';
-      st.loser = active[0].id;
-  st.winner = st.players.find(p=>p.id!==active[0].id) ?.id || null;
-    } else if(active.length===0){
+      st.loser = remaining[0].id;
+      // победитель — тот, кто ушёл первым (первый в finished) или любой без карт если один остался у проигравшего
+      const winners = st.players.filter(p=> p.hand.length===0);
+      st.winner = winners.length? winners[0].id : null;
+    } else if(remaining.length===0){
+      // ничья — все вышли одновременно
       st.phase='finished';
       st.loser = null; st.winner = null;
     }
