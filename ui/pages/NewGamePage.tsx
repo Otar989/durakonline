@@ -6,7 +6,7 @@ import { Hand } from '../components/Hand';
 import { TableBoard } from '../components/Table';
 import { ActionButtons } from '../components/ActionButtons';
 import { TrumpPile } from '../components/TrumpPile';
-import { legalMoves } from '../../game-core/engine';
+import { legalMoves, isTranslationAvailable } from '../../game-core/engine';
 import { Move } from '../../game-core/types';
 import { MoveLog } from '../components/MoveLog';
 import { ToastHost, useToasts } from '../components/Toast';
@@ -53,7 +53,8 @@ export const NewGamePage: React.FC = () => {
 
   const hasAttack = moves.some(mv=>mv.type==='ATTACK');
   const hasDefend = !hasAttack && moves.some(mv=>mv.type==='DEFEND');
-  const hint = hasAttack? 'Перетащите или кликните карту для атаки': hasDefend? 'Отбейте карту или ВЗЯТЬ':'Ждите';
+  const canTranslate = activeState && myId? isTranslationAvailable(activeState, myId): false;
+  const hint = hasAttack? 'Перетащите или кликните карту для атаки': hasDefend? (canTranslate? 'Можно перевести, или отбивайтесь / ВЗЯТЬ':'Отбейте карту или ВЗЯТЬ'):'Ждите';
   function renderContent(){
     if(!activeState) return null;
     return (
@@ -61,7 +62,7 @@ export const NewGamePage: React.FC = () => {
         <div className="flex items-start gap-6 flex-wrap">
     <TrumpPile trump={activeState.trump} deckCount={activeState.deck.length} />
           <div className="flex-1 min-w-[300px]">
-            <TableBoard table={activeState.table} trumpSuit={activeState.trump.s}
+            <TableBoard table={activeState.table} trumpSuit={activeState.trump.s} translationHint={!!canTranslate}
               onDefend={(target, card)=>{
                 const def = (moves as Move[]).find((m): m is Extract<Move,{type:'DEFEND'}>=> m.type==='DEFEND' && m.card.r===card.r && m.card.s===card.s && m.target.r===target.r && m.target.s===target.s);
                 if(def) { inOnline? playMove(def): playLocal(def); }

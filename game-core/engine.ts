@@ -85,6 +85,19 @@ export function legalMoves(st: GameState, playerId: string): Move[] {
   return moves;
 }
 
+// Helper: check if defender can translate right now (mirrors logic inside legalMoves)
+export function isTranslationAvailable(st: GameState, defenderId: string): boolean {
+  if(!st.allowTranslation) return false;
+  if(st.defender!==defenderId) return false;
+  if(st.table.length===0) return false;
+  // before any defense is placed
+  if(!st.table.every(p=> !p.defend)) return false;
+  const rank = st.table[0].attack.r;
+  if(!st.table.every(p=> p.attack.r===rank)) return false;
+  const hand = st.players.find(p=>p.id===defenderId)?.hand || [];
+  return hand.some(c=> c.r===rank);
+}
+
 export function applyMove(st: GameState, move: Move, playerId: string): GameState {
   // Validate move presence in legalMoves
   const legal = legalMoves(st, playerId).some(m=> JSON.stringify(m)===JSON.stringify(move));
