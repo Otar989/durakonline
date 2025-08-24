@@ -8,6 +8,7 @@
     "start": "node server/index.ts",
   "lint": "eslint .",
   "lint:fix": "eslint . --fix",
+  "typecheck": "tsc --noEmit",
     "dev:ws": "node server/index.ts",
     "dev:all": "concurrently -k -n WEB,WS -c magenta,cyan \"npm:dev\" \"npm:start\"",
     "test": "vitest run",
@@ -33,7 +34,14 @@
     "eslint-config-next": "15.5.0",
   "tailwindcss": "^4",
   "typescript": "^5",
-  "vitest": "^1.6.0"
+    "vitest": "^1.6.0",
+    "husky": "^9.0.0",
+    "lint-staged": "^15.2.0"
+  },
+  "lint-staged": {
+    "*.{ts,tsx,js,jsx}": ["eslint --fix"],
+    "*.{ts,tsx}": ["tsc --noEmit --pretty false --skipLibCheck true"],
+    "*.{md,css,json}": ["prettier --write"]
   },
   "engines": {
     "node": "20.x"

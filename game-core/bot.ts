@@ -1,5 +1,5 @@
 import { GameState, Move, Card } from './types';
-import { legalMoves, RANKS } from './engine';
+import { legalMoves, RANKS, cloneState, applyMove } from './engine';
 
 export function botChoose(st: GameState, botId: string): Move | null {
   const moves = legalMoves(st, botId);
@@ -9,11 +9,20 @@ export function botChoose(st: GameState, botId: string): Move | null {
   if(translateMoves.length){
     const me = st.players.find(p=>p.id===botId)!;
     const opp = st.players.find(p=>p.id!==botId)!;
-    // Simple heuristic: prefer translating if we have >=2 cards and opponent has more or equal cards (so we shift attack burden)
-    if(me.hand.length>=2 && opp.hand.length>=me.hand.length){
-      // choose lowest rank translation card to not waste high card
-      translateMoves.sort((a,b)=> RANKS.indexOf(a.card.r)-RANKS.indexOf(b.card.r));
-      return translateMoves[0];
+    // Score each translate: simulate and see resulting hand differential (we attack after translating)
+    const scored = translateMoves.map(m=>{
+      const sim = cloneState(st);
+      try { applyMove(sim, m, botId); } catch{}
+      const myHand = sim.players.find(p=>p.id===botId)!.hand.length;
+      const oppHand = sim.players.find(p=>p.id!==botId)!.hand.length;
+      // Lower myHand minus oppHand better; prefer not increasing diff; also penalize if we lose last trump early
+      const loseTrumpPenalty = m.card.s===st.trump.s? 3:0;
+      const diff = myHand - oppHand + loseTrumpPenalty;
+      return { m, diff };
+    }).sort((a,b)=> a.diff - b.diff || RANKS.indexOf(a.m.card.r)-RANKS.indexOf(b.m.card.r));
+    const best = scored[0];
+    if(best && best.diff <= 1 && me.hand.length>=2 && opp.hand.length>=me.hand.length){
+      return best.m;
     }
   }
   // DEFEND logic
