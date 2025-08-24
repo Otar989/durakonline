@@ -1,6 +1,8 @@
 "use client";
 import React, { useEffect, useState, useCallback } from 'react';
 import { useSettings } from '../context/SettingsContext';
+import LobbyCard from './LobbyCard';
+import SettingsToggles from './SettingsToggles';
 import Modal from './Modal';
 import Link from 'next/link';
 
@@ -46,44 +48,49 @@ export const Lobby: React.FC<Props> = () => {
   const copy = ()=>{ if(inviteUrl) { try { navigator.clipboard.writeText(inviteUrl); } catch{} } };
 
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-semibold">Дурак Онлайн</h1>
-      </div>
-      <div className="glass p-5 rounded-2xl flex flex-col gap-4">
-        <label className="flex flex-col gap-1 text-sm">Ник
-          <input value={nick} onChange={e=> setNick(e.target.value)} maxLength={16} className="input" placeholder="Введите ник" />
-        </label>
-        <div className="flex items-center gap-4 text-sm flex-wrap">
-          <label className="flex items-center gap-2">Режим
-            <select value={mode} onChange={e=> setMode(e.target.value as any)} className="input !p-2 w-36">
+    <div className="flex flex-col gap-8">
+      <header className="flex flex-col gap-2">
+        <h1 className="text-3xl font-bold tracking-tight">Дурак Онлайн</h1>
+        <div className="flex items-center justify-between flex-wrap gap-3">
+          <SettingsToggles />
+          <button onClick={()=> setShowRules(true)} className="px-3 py-2 rounded bg-white/10 hover:bg-white/20 text-sm">Правила</button>
+        </div>
+      </header>
+      <div className="grid gap-6 md:grid-cols-2">
+        <LobbyCard title="Игрок">
+          <label className="flex flex-col gap-1 text-sm">Ник
+            <input value={nick} onChange={e=> setNick(e.target.value)} maxLength={16} className="input" placeholder="Введите ник" />
+          </label>
+          <label className="flex flex-col gap-1 text-sm">Режим
+            <select value={mode} onChange={e=> setMode(e.target.value as any)} className="input !p-2">
               <option value="OFFLINE">OFFLINE</option>
               <option value="ONLINE">ONLINE</option>
             </select>
           </label>
-          <button onClick={toggleSound} className="px-3 py-2 rounded bg-white/10 hover:bg-white/20 text-sm" title="Звук">{sound? '🔊':'🔇'}</button>
-          <button onClick={toggleAnimations} className="px-3 py-2 rounded bg-white/10 hover:bg-white/20 text-sm" title="Анимации">{animations? '🎞️':'🚫'}</button>
-          <button onClick={()=> setTheme(theme==='dark'? 'light': theme==='light'? 'system':'dark')} className="px-3 py-2 rounded bg-white/10 hover:bg-white/20 text-sm" title="Тема: dark→light→system">
-            {theme==='system'? '🌀': theme==='dark'? '🌙':'☀️'}
-          </button>
-          <button onClick={()=> setShowRules(true)} className="px-3 py-2 rounded bg-white/10 hover:bg-white/20 text-sm">Правила</button>
-        </div>
-        <div className="flex gap-3 flex-wrap">
-          {!waiting && <button onClick={startGameFromLobby} className="btn flex-1 disabled:opacity-40" disabled={!nick.trim()}>Играть</button>}
-          {hasPersist && !waiting && <Link href="/game" className="px-4 py-2 rounded bg-white/10 hover:bg-white/20 text-sm flex items-center">Продолжить</Link>}
-        </div>
-        {waiting && mode==='ONLINE' && (
-          <div className="space-y-3 text-sm">
-            <div className="flex items-center gap-2">
-              <input readOnly value={inviteUrl} className="input text-xs flex-1" />
-              <button onClick={copy} className="px-3 py-2 rounded bg-white/10 hover:bg-white/20 text-xs">Копировать</button>
-              <Link href={`/game?room=${roomId}&nick=${encodeURIComponent(nick)}`} className="btn text-xs">В игру</Link>
-            </div>
-            <p className="opacity-70">Ожидание второго игрока... {countdown>0? `(бот через ${countdown}s)`:'бот добавлен'}</p>
+          <div className="flex gap-3 flex-wrap pt-2">
+            {!waiting && <button onClick={startGameFromLobby} className="btn flex-1 disabled:opacity-40" disabled={!nick.trim()}>Играть</button>}
+            {hasPersist && !waiting && <Link href="/game" className="px-4 py-2 rounded bg-white/10 hover:bg-white/20 text-sm flex items-center">Продолжить</Link>}
           </div>
-        )}
+        </LobbyCard>
+        <LobbyCard title={mode==='ONLINE'? 'Сессия ONLINE':'Справка'} footer={<p className="opacity-60">Если никто не подключится за 5 секунд — добавится бот.</p>}>
+          {mode==='ONLINE' && !waiting && <p className="text-xs opacity-70">После нажатия Играть появится ссылка приглашения.</p>}
+          {mode==='ONLINE' && waiting && (
+            <div className="space-y-3 text-sm">
+              <div className="flex items-center gap-2">
+                <input readOnly value={inviteUrl} className="input text-xs flex-1" />
+                <button onClick={copy} className="px-3 py-2 rounded bg-white/10 hover:bg-white/20 text-xs">Копировать</button>
+                <Link href={`/game?room=${roomId}&nick=${encodeURIComponent(nick)}`} className="btn text-xs">В игру</Link>
+              </div>
+              <p className="opacity-70">Ожидание второго игрока... {countdown>0? `(бот через ${countdown}s)`:'бот добавлен'}</p>
+            </div>
+          )}
+          {mode==='OFFLINE' && <ul className="text-xs opacity-80 leading-relaxed list-disc pl-4 space-y-1">
+            <li>Играй против бота (базовая стратегия).</li>
+            <li>Горячие клавиши помогут в партии.</li>
+            <li>Настройки (звук/тема/анимации) сохраняются.</li>
+          </ul>}
+        </LobbyCard>
       </div>
-      <p className="text-xs opacity-50 leading-relaxed">Лобби MVP. После старта ONLINE ссылка доступна для приглашения. Если никто не подключился в течение 5 секунд — автоматически добавляется бот.</p>
       <Modal open={showRules} onClose={()=> setShowRules(false)} title="Правила (кратко)" id="rules-lobby">
         <ul className="list-disc pl-5 space-y-1 text-xs">
           <li>36 карт (6–A), козырь — масть открытой карты талона.</li>
