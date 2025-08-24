@@ -49,11 +49,11 @@ export default function CreateGamePage(){
               <input value={nick} onChange={(e:ChangeEvent<HTMLInputElement>)=>setNick(e.target.value)} className="input" placeholder="Ваш ник" />
             </Field>
             <Field label="Макс игроков">
-              <Range value={settings.maxPlayers} min={2} max={6} onChange={v=>update('maxPlayers', v as any)} />
+              <Range value={settings.maxPlayers} min={2} max={6} onChange={v=>update('maxPlayers', v)} />
             </Field>
             <Field label="Размер колоды">
               <div className="flex gap-2 flex-wrap">
-                {[24,36,52].map(n=> <Chip key={n} active={settings.deckSize===n} onClick={()=>update('deckSize', n as any)}>{n}</Chip>)}
+                {[24,36,52].map(n=> <Chip key={n} active={settings.deckSize===n} onClick={()=>update('deckSize', n)}>{n}</Chip>)}
               </div>
             </Field>
           </div>

@@ -7,6 +7,7 @@ import { TableBoard } from '../components/Table';
 import { ActionButtons } from '../components/ActionButtons';
 import { TrumpPile } from '../components/TrumpPile';
 import { legalMoves } from '../../game-core/engine';
+import { Move } from '../../game-core/types';
 
 export const NewGamePage: React.FC = () => {
   const [roomId,setRoomId] = useState<string | null>(null);
@@ -36,18 +37,18 @@ export const NewGamePage: React.FC = () => {
         <div className="flex-1 min-w-[300px]">
           <TableBoard table={activeState.table} trumpSuit={activeState.trump.s}
             onDefend={(target, card)=>{
-              const def = moves.find(m=> m.type==='DEFEND' && (m as any).card.r===card.r && (m as any).card.s===card.s && (m as any).target.r===target.r && (m as any).target.s===target.s);
-              if(def) { inOnline? playMove(def as any): playLocal(def as any); }
+              const def = (moves as Move[]).find((m): m is Extract<Move,{type:'DEFEND'}>=> m.type==='DEFEND' && m.card.r===card.r && m.card.s===card.s && m.target.r===target.r && m.target.s===target.s);
+              if(def) { inOnline? playMove(def): playLocal(def); }
             }}
-            selectableDefend={moves.filter(m=> m.type==='DEFEND').map(m=> ({ target:(m as any).target, defendWith:(m as any).card }))}
+            selectableDefend={(moves.filter(m=> m.type==='DEFEND') as Extract<Move,{type:'DEFEND'}>[]).map(m=> ({ target:m.target, defendWith:m.card }))}
             onAttackDrop={(card)=>{
-              const atk = moves.find(m=> m.type==='ATTACK' && (m as any).card.r===card.r && (m as any).card.s===card.s);
-              if(atk){ inOnline? playMove(atk as any): playLocal(atk as any); }
+              const atk = (moves as Move[]).find((m): m is Extract<Move,{type:'ATTACK'}>=> m.type==='ATTACK' && m.card.r===card.r && m.card.s===card.s);
+              if(atk){ inOnline? playMove(atk): playLocal(atk); }
             }}
           />
         </div>
       </div>
-      <Hand hand={activeState.players.find(p=>p.id===myId)?.hand||[]} legal={moves} onPlay={(m)=> inOnline? playMove(m as any): playLocal(m as any)} phase={'attack'} />
+  <Hand hand={activeState.players.find(p=>p.id===myId)?.hand||[]} legal={moves} onPlay={(m)=> inOnline? playMove(m): playLocal(m)} phase={'attack'} />
       <ActionButtons legal={moves} onPlay={(m)=> inOnline? playMove(m): playLocal(m)} />
     </div>}
   </div>;
