@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev --turbopack",
-    "build": "next build --turbopack",
+  "build": "next build",
     "start": "node server/index.ts",
   "lint": "eslint .",
   "lint:fix": "eslint . --fix",
@@ -50,5 +50,10 @@
   },
   "engines": {
     "node": "20.x"
+  },
+  "sentry": {
+    "sourceMapsUploadOptions": {
+      "enabled": false
+    }
   }
 }
