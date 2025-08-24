@@ -5,6 +5,7 @@ import { StatusBar } from '../components/StatusBar';
 import { Hand } from '../components/Hand';
 import { TableBoard } from '../components/Table';
 import { ActionButtons } from '../components/ActionButtons';
+import MobileControls from '../components/MobileControls';
 import { TrumpPile, PlayingCard } from '../components/TrumpPile';
 import { legalMoves, isTranslationAvailable } from '../../game-core/engine';
 import { useGamePersistence, loadPersisted } from '../../src/hooks/useGamePersistence';
@@ -67,6 +68,7 @@ export const NewGamePage: React.FC<{ onRestart?: ()=>void; initialNick?: string;
     return ()=> window.removeEventListener('pointerdown', firstPointer);
   },[ensureAudioUnlocked, playSound]);
 
+
   // авто-sync после установления ONLINE
   useEffect(()=>{ if(socketState==='ONLINE' && snapshot.state){ const t = setTimeout(()=> requestSync(), 600); return ()=> clearTimeout(t); } },[socketState]);
 
@@ -103,6 +105,16 @@ export const NewGamePage: React.FC<{ onRestart?: ()=>void; initialNick?: string;
     prevNetRef.current = netStatus;
   },[netStatus, push]);
   const activeState = inOnline? snapshot.state : localState;
+  // Звуковые события по последнему ходу (fallback если не отыграно в onPlay)
+  useEffect(()=>{
+    const log = activeState?.log; if(!log || !log.length) return;
+    const m = log[log.length-1].move;
+    if(m.type==='ATTACK') playSound('card');
+    else if(m.type==='DEFEND') playSound('defend');
+    else if(m.type==='TAKE') playSound('take');
+    else if(m.type==='END_TURN') playSound('bito');
+    else if(m.type==='TRANSLATE') playSound('card');
+  },[activeState?.log?.length, playSound]);
   const myId = inOnline? snapshot.players[0]?.id : 'p1';
   const moves = useMemo(()=> activeState && myId? legalMoves(activeState, myId): [], [activeState, myId]);
   const lastDeckCountRef = useRef<number>(activeState?.deck.length||0);
@@ -182,7 +194,7 @@ export const NewGamePage: React.FC<{ onRestart?: ()=>void; initialNick?: string;
     function onIllegal(e: Event){ const ce = e as CustomEvent; push(ce.detail||'Нельзя','warn'); }
     document.addEventListener('durak-illegal', onIllegal as any);
     return ()=> document.removeEventListener('durak-illegal', onIllegal as any);
-  },[push]);
+  },[push, playSound]);
 
   // parse ?cfg= if present (created by create-game page) to extract options including allowTranslation
   useEffect(()=>{
@@ -299,6 +311,7 @@ export const NewGamePage: React.FC<{ onRestart?: ()=>void; initialNick?: string;
           </div>
         </div>
   <div id="hand-hint" className="sr-only">Горячие клавиши: A атака (если одна), D защита (если одна), R перевод (если одна), T взять, E бито.</div>
+  <MobileControls moves={moves as any} onPlay={(m:any)=> { inOnline? playMove(m): playLocal(m); }} className="mt-3" />
   <Hand hand={me?.hand||[]} legal={moves} trumpSuit={activeState.trump.s} autosort={autosort} describedBy="hand-hint" selectedIndex={selectedIndex} onChangeSelected={setSelectedIndex} onPlay={(m)=> { const isLegal = moves.some(x=> JSON.stringify(x)===JSON.stringify(m)); if(!isLegal){ push('Нельзя: ход недоступен','warn'); return; }
           if(m.type==='TRANSLATE'){ push('Перевод! 🔁','success'); playSound('card'); if(navigator.vibrate) navigator.vibrate(20);} else if(m.type==='ATTACK'){ playSound('card'); } else if(m.type==='DEFEND'){ playSound('defend'); } else if(m.type==='TAKE'){ playSound('take'); if(navigator.vibrate) navigator.vibrate([10,40,20]); } else if(m.type==='END_TURN'){ playSound('bito'); }
     inOnline? playMove(m): playLocal(m); }} />
