@@ -27,6 +27,8 @@ export const NewGamePage: React.FC = () => {
     if(typeof window==='undefined') return;
     const params = new URLSearchParams(window.location.search);
     const cfg = params.get('cfg');
+    const r = params.get('room');
+    if(r && !roomId) setRoomId(r);
     if(cfg){
       try {
         const raw = JSON.parse(decodeURIComponent(atob(cfg)));
@@ -38,7 +40,7 @@ export const NewGamePage: React.FC = () => {
 
   const startUnified = () => {
     if(socketState==='OFFLINE'){
-      startLocal();
+      startLocal({ allowTranslation: allowTranslationOpt });
     } else {
       const generated = roomId || 'room_'+Math.random().toString(36).slice(2,8);
       setRoomId(generated);
@@ -83,7 +85,7 @@ export const NewGamePage: React.FC = () => {
   return (
     <div className="max-w-5xl mx-auto p-6 flex flex-col gap-6">
       <h1 className="text-2xl font-semibold">Durak</h1>
-      <StatusBar mode={socketState} turnOwner={activeState? activeState.attacker: undefined} hint={hint} />
+  <StatusBar mode={socketState} turnOwner={activeState? activeState.attacker: undefined} hint={hint} allowTranslation={!!activeState?.allowTranslation} />
       <div>
         <button className="px-5 py-3 rounded-lg bg-sky-600 text-white" onClick={startUnified}>Играть</button>
         {roomId && <span className="ml-3 text-xs opacity-70 select-all">Ссылка: {typeof window!=='undefined'? window.location.origin + '?room='+roomId: roomId}</span>}

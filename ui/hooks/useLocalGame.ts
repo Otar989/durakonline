@@ -8,8 +8,8 @@ export function useLocalGame(){
   const [me] = useState('p1');
   const [mode,setMode] = useState<'idle'|'playing'|'finished'>('idle');
 
-  const start = useCallback(()=>{
-    const st = initGame([{id:'p1',nick:'Вы'},{id:'bot',nick:'Бот'}], true, { allowTranslation: false });
+  const start = useCallback((opts?: { allowTranslation?: boolean })=>{
+    const st = initGame([{id:'p1',nick:'Вы'},{id:'bot',nick:'Бот'}], true, { allowTranslation: !!opts?.allowTranslation });
     setState(st); setMode('playing');
   },[]);
 

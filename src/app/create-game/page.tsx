@@ -29,7 +29,8 @@ export default function CreateGamePage(){
 
   const handleCreate = useCallback(()=>{
     if(!nick) setNick('Гость');
-    const cfg = typeof window!=='undefined'? btoa(encodeURIComponent(JSON.stringify(settings))):'';
+    const cfgObj = { ...settings, roomId };
+    const cfg = typeof window!=='undefined'? btoa(encodeURIComponent(JSON.stringify(cfgObj))):'';
     router.push(`/?room=${roomId}&cfg=${cfg}&auto=1`);
   },[roomId, settings, nick, router]);
 
