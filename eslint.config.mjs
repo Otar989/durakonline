@@ -27,7 +27,7 @@ const eslintConfig = [
       'react-hooks/rules-of-hooks': 'error',
   'react-hooks/exhaustive-deps': 'warn',
   // JSX ложные срабатывания в условных рендерах
-  '@typescript-eslint/no-unused-expressions': 'off'
+  '@typescript-eslint/no-unused-expressions': ['warn', { allowShortCircuit: true, allowTernary: true, allowTaggedTemplates: true }]
     }
   }
 ];
