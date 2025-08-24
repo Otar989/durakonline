@@ -15,9 +15,9 @@ export function useSocketGame(roomId: string | null, nick: string){
   // load / persist clientId
   if(clientIdRef.current===''){
     if(typeof window!=='undefined'){
-      const stored = localStorage.getItem('durak_client_id');
+  const stored = typeof window!=='undefined'? localStorage.getItem('durak_client_id'): null;
       clientIdRef.current = stored || 'c_'+Math.random().toString(36).slice(2,10);
-      if(!stored) localStorage.setItem('durak_client_id', clientIdRef.current);
+  if(typeof window!=='undefined' && !stored) localStorage.setItem('durak_client_id', clientIdRef.current);
     } else {
       clientIdRef.current = 'c_'+Math.random().toString(36).slice(2,10);
     }

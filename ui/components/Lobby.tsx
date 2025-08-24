@@ -13,15 +13,15 @@ export const Lobby: React.FC<Props> = () => {
   const [showRules,setShowRules] = useState(false);
   const [waiting,setWaiting] = useState(false);
   const [countdown,setCountdown] = useState(5);
-  const [animations,setAnimations] = useState(()=> localStorage.getItem('durak_anim')!=='off');
-  const [sound,setSound] = useState(()=> localStorage.getItem('durak_sound_muted')!=='true');
-  const [theme,setTheme] = useState<'auto'|'light'|'dark'>(()=> (localStorage.getItem('durak_theme_mode') as any)||'auto');
+  const [animations,setAnimations] = useState(()=> (typeof window!=='undefined' && localStorage.getItem('durak_anim')==='off')? false:true);
+  const [sound,setSound] = useState(()=> !(typeof window!=='undefined' && localStorage.getItem('durak_sound_muted')==='true'));
+  const [theme,setTheme] = useState<'auto'|'light'|'dark'>(()=> (typeof window!=='undefined' && (localStorage.getItem('durak_theme_mode') as any)) || 'auto');
   const [hasPersist,setHasPersist] = useState(false);
 
-  useEffect(()=>{ try { if(localStorage.getItem('durak_persist')) setHasPersist(true);} catch{} },[]);
-  useEffect(()=>{ try { localStorage.setItem('durak_anim', animations? 'on':'off'); } catch{}; if(typeof document!=='undefined'){ document.body.classList.toggle('reduced-motion', !animations); } },[animations]);
-  useEffect(()=>{ try { localStorage.setItem('durak_sound_muted', sound? 'false':'true'); } catch{} },[sound]);
-  useEffect(()=>{ try { localStorage.setItem('durak_theme_mode', theme); } catch{} },[theme]);
+  useEffect(()=>{ try { if(typeof window!=='undefined' && localStorage.getItem('durak_persist')) setHasPersist(true);} catch{} },[]);
+  useEffect(()=>{ try { if(typeof window!=='undefined') localStorage.setItem('durak_anim', animations? 'on':'off'); } catch{}; if(typeof document!=='undefined'){ document.body.classList.toggle('reduced-motion', !animations); } },[animations]);
+  useEffect(()=>{ try { if(typeof window!=='undefined') localStorage.setItem('durak_sound_muted', sound? 'false':'true'); } catch{} },[sound]);
+  useEffect(()=>{ try { if(typeof window!=='undefined') localStorage.setItem('durak_theme_mode', theme); } catch{} },[theme]);
 
   const play = useCallback(()=>{
     if(!nick.trim()) return;

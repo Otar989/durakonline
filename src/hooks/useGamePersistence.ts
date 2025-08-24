@@ -16,7 +16,7 @@ const KEY = 'durak_persist_v2';
 export function loadPersisted(): PersistPayload | null {
   if (typeof window === 'undefined') return null;
   try {
-    const raw = localStorage.getItem(KEY);
+  const raw = typeof window!=='undefined'? localStorage.getItem(KEY): null;
     if (!raw) return null;
     return JSON.parse(raw) as PersistPayload;
   } catch {
@@ -31,14 +31,14 @@ export function useGamePersistence(payload: PersistPayload | null) {
     try {
       const json = JSON.stringify(payload);
       if (json !== lastJson.current) {
-        localStorage.setItem(KEY, json);
+  if(typeof window!=='undefined') localStorage.setItem(KEY, json);
         lastJson.current = json;
       }
     } catch {}
   }, [payload]);
 
   const clear = useCallback(() => {
-    try { localStorage.removeItem(KEY); } catch {}
+  try { if(typeof window!=='undefined') localStorage.removeItem(KEY); } catch {}
   }, []);
 
   return { clear };

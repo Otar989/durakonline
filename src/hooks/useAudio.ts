@@ -33,9 +33,10 @@ export function useAudio(enabled = true) {
 
   // persist user prefs
   useEffect(()=>{
+    if(typeof window==='undefined') return;
     try { const raw = localStorage.getItem('durak_audio'); if(raw){ const j = JSON.parse(raw); if(typeof j.muted==='boolean') setMuted(j.muted); if(typeof j.volume==='number') setVolume(j.volume); } } catch{}
   },[]);
-  useEffect(()=>{ try { localStorage.setItem('durak_audio', JSON.stringify({ muted, volume })); } catch{} },[muted, volume]);
+  useEffect(()=>{ if(typeof window==='undefined') return; try { localStorage.setItem('durak_audio', JSON.stringify({ muted, volume })); } catch{} },[muted, volume]);
 
   function play(key: SoundKey) {
     if (!enabled || muted) return;

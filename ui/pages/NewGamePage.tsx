@@ -64,10 +64,10 @@ export const NewGamePage: React.FC<{ onRestart?: ()=>void; initialNick?: string;
   const [theme,setTheme] = useState<'dark'|'light'|'auto'>(()=> {
     if(typeof window==='undefined') return 'dark';
     try {
-      const saved = localStorage.getItem('durak_theme_mode');
+      const saved = typeof window!=='undefined'? localStorage.getItem('durak_theme_mode'): null;
       if(saved==='dark'||saved==='light'||saved==='auto') return saved;
     } catch {}
-    return window.matchMedia('(prefers-color-scheme: light)').matches? 'light':'dark';
+    return typeof window!=='undefined' && window.matchMedia('(prefers-color-scheme: light)').matches? 'light':'dark';
   });
   const effectiveTheme = useMemo(()=>{
     if(theme==='auto'){
@@ -79,7 +79,7 @@ export const NewGamePage: React.FC<{ onRestart?: ()=>void; initialNick?: string;
   // apply theme
   useEffect(()=>{ if(typeof document!=='undefined'){ document.documentElement.dataset.theme = effectiveTheme; } },[effectiveTheme]);
   // persist raw mode
-  useEffect(()=>{ try { localStorage.setItem('durak_theme_mode', theme);} catch{} },[theme]);
+  useEffect(()=>{ try { if(typeof window!=='undefined') localStorage.setItem('durak_theme_mode', theme);} catch{} },[theme]);
   // respond to system changes when in auto
   useEffect(()=>{
     if(theme!=='auto' || typeof window==='undefined') return;
@@ -242,7 +242,7 @@ export const NewGamePage: React.FC<{ onRestart?: ()=>void; initialNick?: string;
   const [showGestures,setShowGestures] = useState(false);
   useEffect(()=>{
     if(typeof window==='undefined') return;
-    const seen = localStorage.getItem('durak_gesture_help_v1');
+  const seen = typeof window!=='undefined'? localStorage.getItem('durak_gesture_help_v1'): null;
     if(!seen){
       // показываем только на узких экранах
       if(window.innerWidth < 780){ setShowGestures(true); }
@@ -402,7 +402,7 @@ export const NewGamePage: React.FC<{ onRestart?: ()=>void; initialNick?: string;
           <li>«Бито» когда все атаки покрыты; иначе защитник может «ВЗЯТЬ».</li>
         </ul>
       </Modal>
-      {showGestures && <div role="dialog" aria-modal="true" className="fixed inset-0 z-40 flex items-end sm:items-center justify-center bg-black/60 p-4" onClick={()=>{ setShowGestures(false); try { localStorage.setItem('durak_gesture_help_v1','1'); } catch{} }}>
+  {showGestures && <div role="dialog" aria-modal="true" className="fixed inset-0 z-40 flex items-end sm:items-center justify-center bg-black/60 p-4" onClick={()=>{ setShowGestures(false); try { if(typeof window!=='undefined') localStorage.setItem('durak_gesture_help_v1','1'); } catch{} }}>
         <div className="bg-neutral-900/90 backdrop-blur rounded-2xl p-5 w-full max-w-sm text-center space-y-3 animate-in fade-in zoom-in duration-300" onClick={e=> e.stopPropagation()}>
           <h2 className="text-sm font-semibold">Жесты</h2>
           <ul className="text-[11px] text-left space-y-1 list-disc pl-4">
@@ -413,7 +413,7 @@ export const NewGamePage: React.FC<{ onRestart?: ()=>void; initialNick?: string;
             <li><b>Нажатие карты</b> — Ход выбранной ролью (атака/перевод/защита)</li>
             <li><b>Долгое удержание</b> — (будет) подсказка — скоро</li>
           </ul>
-          <button className="btn w-full" onClick={()=>{ setShowGestures(false); try { localStorage.setItem('durak_gesture_help_v1','1'); } catch{} }}>Понятно</button>
+          <button className="btn w-full" onClick={()=>{ setShowGestures(false); try { if(typeof window!=='undefined') localStorage.setItem('durak_gesture_help_v1','1'); } catch{} }}>Понятно</button>
           <p className="text-[10px] opacity-50">Нажмите вне окна чтобы закрыть</p>
         </div>
       </div>}
