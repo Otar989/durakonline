@@ -16,7 +16,12 @@ import { ToastHost, useToasts } from '../components/Toast';
 export const NewGamePage: React.FC = () => {
   const [roomId,setRoomId] = useState<string | null>(null);
   const [allowTranslationOpt,setAllowTranslationOpt] = useState<boolean|undefined>(undefined);
-  const [nick] = useState('Player');
+  const [nick,setNick] = useState('Player');
+  const [mode,setMode] = useState<'ONLINE'|'OFFLINE'>('OFFLINE');
+  const [showRules,setShowRules] = useState(false);
+  const [showLog,setShowLog] = useState(true);
+  const [autosort,setAutosort] = useState(true);
+  const [gameEnded,setGameEnded] = useState<{ winner?:string|null; loser?:string|null }|null>(null);
   const { state: localState, start: startLocal, play: playLocal } = useLocalGame();
   const { snapshot, socketState, startGame, playMove } = useSocketGame(roomId, nick);
   const { toasts, push } = useToasts();
@@ -84,13 +89,13 @@ export const NewGamePage: React.FC = () => {
   },[roomId]);
 
   const startUnified = () => {
-    if(socketState==='OFFLINE'){
+    if(mode==='OFFLINE'){
       startLocal({ allowTranslation: allowTranslationOpt });
+      push(`Первым ходит ${(localState?.meta?.firstAttacker)||'...'} (младший козырь)`,'info');
     } else {
       const generated = roomId || 'room_'+Math.random().toString(36).slice(2,8);
       setRoomId(generated);
-      setTimeout(()=> startGame({ allowTranslation: allowTranslationOpt }), 600);
-      setTimeout(()=>{ if(!snapshot.state) startLocal(); }, 7000);
+      setTimeout(()=> startGame({ allowTranslation: allowTranslationOpt, withBot:true }), 200);
     }
   };
 
@@ -100,10 +105,25 @@ export const NewGamePage: React.FC = () => {
   const hint = hasAttack? 'Перетащите или кликните карту для атаки': hasDefend? (canTranslate? 'Можно перевести, или отбивайтесь / ВЗЯТЬ':'Отбейте карту или ВЗЯТЬ'):'Ждите';
   function renderContent(){
     if(!activeState) return null;
+    const me = activeState.players.find(p=>p.id===myId);
+    const opp = activeState.players.find(p=>p.id!==myId);
     return (
       <div className="flex flex-col gap-4">
-        <div className="flex items-start gap-6 flex-wrap">
-    <TrumpPile trump={activeState.trump} deckCount={activeState.deck.length} />
+        <div className="flex items-start gap-4 flex-wrap">
+          <div className="flex flex-col gap-2 min-w-[160px]">
+            <div className="glass p-3 rounded-2xl flex flex-col gap-2 text-xs">
+              <div className="font-semibold text-sm flex items-center gap-2">Козырь <span className="text-base">{activeState.trump.s}</span></div>
+              <TrumpPile trump={activeState.trump} deckCount={activeState.deck.length} />
+            </div>
+            {opp && <div className="glass p-3 rounded-2xl text-xs flex flex-col gap-1">
+              <div className="font-semibold">{opp.nick}</div>
+              <div>Карты: <b>{opp.hand.length}</b></div>
+            </div>}
+            <div className="glass p-3 rounded-2xl text-xs flex flex-col gap-1">
+              <label className="flex items-center gap-2 cursor-pointer text-[11px]"><input type="checkbox" checked={autosort} onChange={e=> setAutosort(e.target.checked)} /> Авто-сорт</label>
+              <label className="flex items-center gap-2 cursor-pointer text-[11px]"><input type="checkbox" checked={showLog} onChange={e=> setShowLog(e.target.checked)} /> Лог</label>
+            </div>
+          </div>
           <div className="flex-1 min-w-[300px]">
             <TableBoard table={activeState.table} trumpSuit={activeState.trump.s} translationHint={!!canTranslate}
               onDefend={(target, card)=>{
@@ -116,35 +136,70 @@ export const NewGamePage: React.FC = () => {
                 if(atk){ inOnline? playMove(atk): playLocal(atk); }
               }}
             />
+            {showLog && <div className="glass rounded-xl p-3 mt-4">
+              <div className="flex items-center justify-between mb-2"><h3 className="text-xs font-semibold opacity-70">Ходы</h3><button className="text-[10px] opacity-60 hover:opacity-100" onClick={()=> setShowLog(false)}>Скрыть</button></div>
+              <MoveLog entries={activeState.log} me={myId||undefined} />
+            </div>}
+            {!showLog && <button className="text-[10px] opacity-60 hover:opacity-100 mt-2" onClick={()=> setShowLog(true)}>Показать лог</button>}
           </div>
         </div>
-  <Hand hand={activeState.players.find(p=>p.id===myId)?.hand||[]} legal={moves} onPlay={(m)=> { if(m.type==='TRANSLATE'){ push('Перевод! 🔁','success'); playSound('card'); if(navigator.vibrate) navigator.vibrate(20);} else if(m.type==='ATTACK'){ playSound('card'); } else if(m.type==='DEFEND'){ playSound('defend'); } else if(m.type==='TAKE'){ playSound('take'); if(navigator.vibrate) navigator.vibrate([10,40,20]); } else if(m.type==='END_TURN'){ playSound('bito'); }
+        <Hand hand={me?.hand||[]} legal={moves} trumpSuit={activeState.trump.s} autosort={autosort} onPlay={(m)=> { if(m.type==='TRANSLATE'){ push('Перевод! 🔁','success'); playSound('card'); if(navigator.vibrate) navigator.vibrate(20);} else if(m.type==='ATTACK'){ playSound('card'); } else if(m.type==='DEFEND'){ playSound('defend'); } else if(m.type==='TAKE'){ playSound('take'); if(navigator.vibrate) navigator.vibrate([10,40,20]); } else if(m.type==='END_TURN'){ playSound('bito'); }
     inOnline? playMove(m): playLocal(m); }} />
         <ActionButtons legal={moves} onPlay={(m)=> inOnline? playMove(m): playLocal(m)} />
-        <div className="glass rounded-xl p-3">
-          <h3 className="text-xs font-semibold mb-2 opacity-70">Ходы</h3>
-          <MoveLog entries={activeState.log} me={myId||undefined} />
-        </div>
       </div>
     );
   }
 
   return (
-  <div ref={gestureRef} className="max-w-5xl mx-auto p-6 flex flex-col gap-6">
-      <h1 className="text-2xl font-semibold">Durak</h1>
-  <StatusBar mode={socketState} turnOwner={activeState? activeState.attacker: undefined} hint={hint} allowTranslation={!!activeState?.allowTranslation} />
-      <div className="flex flex-wrap gap-4 items-center">
-        <button className="px-5 py-3 rounded-lg bg-sky-600 text-white" onClick={startUnified}>Играть</button>
-        {roomId && <span className="ml-3 text-xs opacity-70 select-all">Ссылка: {typeof window!=='undefined'? window.location.origin + '?room='+roomId: roomId}</span>}
-        <div className="flex items-center gap-2 text-xs ml-auto bg-white/5 rounded-lg px-3 py-2">
-          <button onClick={toggleMute} className="px-2 py-1 rounded bg-white/10 hover:bg-white/20">{muted? '🔇':'🔊'}</button>
-          <input type="range" min={0} max={1} step={0.05} value={volume} onChange={e=> setVolume(Number(e.target.value))} className="accent-sky-400" />
-          <button onClick={()=> setTheme(t=> t==='dark'?'light':'dark')} className="px-2 py-1 rounded bg-white/10 hover:bg-white/20">{theme==='dark'? '🌙':'☀️'}</button>
+    <div ref={gestureRef} className="max-w-6xl mx-auto p-6 flex flex-col gap-6">
+      <header className="flex flex-col gap-4">
+        <div className="flex items-center gap-4 flex-wrap">
+          <h1 className="text-2xl font-semibold">Дурак Онлайн</h1>
+          <div className="ml-auto flex gap-2 items-center text-xs">
+            <label className="flex items-center gap-1 bg-white/5 px-2 py-1 rounded"><span>Ник</span><input value={nick} onChange={e=> setNick(e.target.value)} className="bg-transparent outline-none w-24" /></label>
+            <label className="flex items-center gap-1 bg-white/5 px-2 py-1 rounded cursor-pointer"><span>Режим</span>
+              <select value={mode} onChange={e=> setMode(e.target.value as any)} className="bg-transparent outline-none">
+                <option value="OFFLINE">OFFLINE</option>
+                <option value="ONLINE">ONLINE</option>
+              </select>
+            </label>
+            <button onClick={toggleMute} className="px-2 py-1 rounded bg-white/10 hover:bg-white/20">{muted? '🔇':'🔊'}</button>
+            <input type="range" min={0} max={1} step={0.05} value={volume} onChange={e=> setVolume(Number(e.target.value))} className="accent-sky-400 w-20" />
+            <button onClick={()=> setTheme(t=> t==='dark'?'light':'dark')} className="px-2 py-1 rounded bg-white/10 hover:bg-white/20">{theme==='dark'? '🌙':'☀️'}</button>
+            <button onClick={()=> setShowRules(true)} className="px-2 py-1 rounded bg-white/10 hover:bg-white/20">Правила</button>
+          </div>
         </div>
-  </div>
-  {renderContent()}
-  <ToastHost queue={toasts} />
-  </div>
+        <div className="flex gap-3 items-center">
+          <button className="btn" disabled={!!activeState} onClick={startUnified}>Играть</button>
+          {mode==='ONLINE' && roomId && <button className="text-xs underline" onClick={()=>{ try { navigator.clipboard.writeText(window.location.origin+'?room='+roomId); push('Ссылка скопирована','success'); } catch {} }}>Копировать ссылку</button>}
+          {mode==='ONLINE' && roomId && <span className="text-[11px] opacity-60 select-all">{window.location.origin+'?room='+roomId}</span>}
+        </div>
+        <StatusBar mode={socketState} turnOwner={activeState? activeState.attacker: undefined} hint={hint} allowTranslation={!!activeState?.allowTranslation} />
+      </header>
+      {renderContent()}
+      <ToastHost queue={toasts} />
+      {showRules && <div className="fixed inset-0 bg-black/60 backdrop-blur flex items-center justify-center z-50">
+        <div className="glass p-6 rounded-2xl max-w-md text-sm space-y-3">
+          <h2 className="text-lg font-semibold">Правила (кратко)</h2>
+          <ul className="list-disc pl-5 space-y-1 text-xs">
+            <li>36 карт (6–A), козырь — масть открытой карты талона.</li>
+            <li>Первым ходит самый младший козырь.</li>
+            <li>Подкидывать только ранги на столе, всего ≤6 и не больше карт у защитника.</li>
+            <li>Перевод до первой защиты (если включено) — карта того же ранга, роли меняются.</li>
+            <li>«Бито» когда все атаки покрыты; иначе защитник может «ВЗЯТЬ».</li>
+          </ul>
+          <div className="flex justify-end gap-2 text-xs"><button className="px-3 py-1 rounded bg-white/10" onClick={()=> setShowRules(false)}>Закрыть</button></div>
+        </div>
+      </div>}
+      {gameEnded && <div className="fixed inset-0 bg-black/70 backdrop-blur flex items-center justify-center z-50">
+        <div className="glass p-8 rounded-2xl max-w-sm text-center space-y-4">
+          <h2 className="text-xl font-semibold">{gameEnded.winner? 'Победа!':'Ничья'}</h2>
+          {gameEnded.winner && <p className="text-sm">Победил: <b>{gameEnded.winner}</b>{gameEnded.loser? ` — Дурак: ${gameEnded.loser}`:''}</p>}
+          {!gameEnded.winner && <p className="text-sm">Обе руки пусты.</p>}
+          <button className="btn" onClick={()=>{ setGameEnded(null); startUnified(); }}>Новая игра</button>
+        </div>
+      </div>}
+    </div>
   );
 };
 export default NewGamePage;
