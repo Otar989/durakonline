@@ -7,8 +7,15 @@
   --accent: #5ac8fa; /* Apple style blue */
   --accent-glow: 190 100% 60%;
   --radius: 18px;
+  /* card base size (md) */
   --card-w: 70px;
   --card-h: 100px;
+  --card-w-lg: 78px;
+  --card-h-lg: 112px;
+  --card-w-sm: 62px;
+  --card-h-sm: 88px;
+  --card-w-xs: 54px;
+  --card-h-xs: 78px;
   color-scheme: dark;
 }
 
@@ -176,9 +183,11 @@ body {
 
 
 /* Mobile tuning */
-@media (max-width: 1000px){ :root { --card-w:62px; --card-h:88px; } }
-@media (max-width: 780px){ :root { --card-w:58px; --card-h:82px; } }
-@media (max-width: 640px){ :root { --card-w:54px; --card-h:78px; }
+/* upscale on very large viewports */
+@media (min-width: 1500px){ :root { --card-w: var(--card-w-lg); --card-h: var(--card-h-lg); } }
+@media (max-width: 1000px){ :root { --card-w: var(--card-w-sm); --card-h: var(--card-h-sm); } }
+@media (max-width: 780px){ :root { --card-w: 58px; --card-h: 82px; } }
+@media (max-width: 640px){ :root { --card-w: var(--card-w-xs); --card-h: var(--card-h-xs); }
   .playing-card { padding:4px 4px 3px; }
   .playing-card .rank { font-size:13px; }
   .playing-card .suit { font-size:16px; }

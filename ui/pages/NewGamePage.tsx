@@ -269,7 +269,11 @@ export const NewGamePage: React.FC = () => {
           <div className="ml-auto flex gap-2 items-center text-xs">
             <label className="flex items-center gap-1 bg-white/5 px-2 py-1 rounded"><span>Ник</span><input value={nick} onChange={e=> setNick(e.target.value)} className="bg-transparent outline-none w-24" /></label>
             <label className="flex items-center gap-1 bg-white/5 px-2 py-1 rounded cursor-pointer"><span>Режим</span>
-              <select value={mode} onChange={e=> setMode(e.target.value as any)} className="bg-transparent outline-none">
+              <select value={mode} onChange={e=> {
+                const val = e.target.value as 'ONLINE'|'OFFLINE';
+                setMode(val);
+                if(val==='ONLINE' && !roomId){ setRoomId('room_'+Math.random().toString(36).slice(2,8)); }
+              }} className="bg-transparent outline-none">
                 <option value="OFFLINE">OFFLINE</option>
                 <option value="ONLINE">ONLINE</option>
               </select>
@@ -285,9 +289,9 @@ export const NewGamePage: React.FC = () => {
         </div>
   <div className="flex gap-3 items-center">
           <button className="btn" disabled={!!activeState} onClick={startUnified}>{activeState? 'В игре':'Играть'}</button>
-          {mode==='ONLINE' && roomId && <button className="text-xs underline" onClick={()=>{ try { navigator.clipboard.writeText(window.location.origin+'?room='+roomId); push('Ссылка скопирована','success'); } catch {} }}>Копировать ссылку</button>}
-          {mode==='ONLINE' && roomId && <span className="text-[11px] opacity-60 select-all">{window.location.origin+'?room='+roomId}</span>}
-          {mode==='ONLINE' && roomId && <button className="text-[10px] px-2 py-1 rounded bg-white/10 hover:bg-white/20" onClick={()=> requestSync()}>SYNC</button>}
+          {mode==='ONLINE' && roomId && !activeState && <button className="text-xs underline" onClick={()=>{ try { navigator.clipboard.writeText(window.location.origin+'?room='+roomId); push('Ссылка скопирована','success'); } catch {} }}>Пригласить</button>}
+          {mode==='ONLINE' && roomId && !activeState && <span className="text-[11px] opacity-60 select-all">{window.location.origin+'?room='+roomId}</span>}
+          {mode==='ONLINE' && roomId && activeState && <button className="text-[10px] px-2 py-1 rounded bg-white/10 hover:bg-white/20" onClick={()=> requestSync()}>SYNC</button>}
         </div>
         <StatusBar mode={socketState} turnOwner={activeState? activeState.attacker: undefined} hint={hint} allowTranslation={!!activeState?.allowTranslation}
           attackerNick={activeState? activeState.players.find(p=>p.id===activeState.attacker)?.nick: undefined}
