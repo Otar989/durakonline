@@ -81,7 +81,8 @@ io.on('connection', socket=>{
           setTimeout(()=>{
             if(!room.state) return; try {
               const lm = legalMoves(room.state!, room.bot!.id);
-              const pick = lm[0]; if(pick){ applyMove(room.state!, pick, room.bot!.id); io.to(room.id).emit('move_applied', { state: room.state, lastMove: pick }); if(room.state.phase==='finished'){ io.to(room.id).emit('game_over', { state: room.state, winner: room.state.winner, loser: room.state.loser }); } }
+              const pick = pickBotMove(room.state!, lm, room.bot!.id);
+              if(pick){ applyMove(room.state!, pick, room.bot!.id); io.to(room.id).emit('move_applied', { state: room.state, lastMove: pick }); if(room.state.phase==='finished'){ io.to(room.id).emit('game_over', { state: room.state, winner: room.state.winner, loser: room.state.loser }); } }
             } catch{} }, 550);
         }
       }
@@ -167,9 +168,45 @@ function tryBotTurn(room: Room){
   setTimeout(()=>{
     if(!room.state) return; try {
       const lm = legalMoves(room.state!, room.bot!.id);
-      const pick = lm[0]; if(pick){ applyMove(room.state!, pick, room.bot!.id); io.to(room.id).emit('move_applied', { state: room.state, lastMove: pick }); if(room.state.phase==='finished'){ io.to(room.id).emit('game_over', { state: room.state, winner: room.state.winner, loser: room.state.loser }); } tryBotTurn(room); }
+      const pick = pickBotMove(room.state!, lm, room.bot!.id); if(pick){ applyMove(room.state!, pick, room.bot!.id); io.to(room.id).emit('move_applied', { state: room.state, lastMove: pick }); if(room.state.phase==='finished'){ io.to(room.id).emit('game_over', { state: room.state, winner: room.state.winner, loser: room.state.loser }); } tryBotTurn(room); }
     } catch{}
   }, 550);
+}
+
+// Simple heuristic bot move picker
+function pickBotMove(state: GameState, moves: Move[], pid: string): Move | undefined {
+  if(!moves.length) return undefined;
+  // prefer: TRANSLATE if it reduces own hand size advantageously and defender has many cards
+  const me = state.players.find(p=>p.id===pid);
+  const opp = state.players.find(p=>p.id!==pid);
+  if(me && opp){
+    const translate = moves.filter(m=> m.type==='TRANSLATE');
+    if(translate.length && opp.hand.length >= me.hand.length && me.hand.length>2){
+      // pick lowest rank translate
+      return translate.sort((a,b)=> rankOrder(a.card.r)-rankOrder(b.card.r))[0];
+    }
+  }
+  // defense: choose minimal card that wins, prioritize non-trump
+  const defend = moves.filter(m=> m.type==='DEFEND');
+  if(defend.length){
+    return defend.sort((a,b)=> compareCard(a.card,b.card,state.trump.s))[0];
+  }
+  // attack: pick lowest non-trump, then trump
+  const attack = moves.filter(m=> m.type==='ATTACK');
+  if(attack.length){
+    attack.sort((a,b)=> compareCard(a.card,b.card,state.trump.s));
+    return attack[0];
+  }
+  // else take / end turn fallback
+  return moves[0];
+}
+
+const RANKS = ['6','7','8','9','10','J','Q','K','A'];
+function rankOrder(r: string){ return RANKS.indexOf(r); }
+function compareCard(a: any, b: any, trump: string){
+  const at = a.s===trump, bt = b.s===trump;
+  if(at!==bt) return at? 1:-1; // non-trump first
+  return rankOrder(a.r)-rankOrder(b.r);
 }
 
 const port = Number(process.env.PORT||4001);
