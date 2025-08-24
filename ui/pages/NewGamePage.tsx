@@ -18,12 +18,14 @@ import { FlipProvider, useFlip } from '../components/FlipLayer';
 import { ToastHost, useToasts } from '../components/Toast';
 import { useHotkeys } from '../hooks/useHotkeys';
 import Modal from '../components/Modal';
+import Sidebar from '../components/Sidebar';
+import { useNetStatus } from '../hooks/useNetStatus';
 
 const LiveRegion: React.FC<{ message: string }> = ({ message }) => (
   <div aria-live="polite" aria-atomic="true" className="sr-only" role="status">{message}</div>
 );
 
-export const NewGamePage: React.FC = () => {
+export const NewGamePage: React.FC<{ onRestart?: ()=>void }> = ({ onRestart }) => {
   const [roomId,setRoomId] = useState<string | null>(null);
   const [allowTranslationOpt,setAllowTranslationOpt] = useState<boolean|undefined>(undefined);
   const [nick,setNick] = useState('Player');
@@ -92,6 +94,7 @@ export const NewGamePage: React.FC = () => {
   useGamePersistence(persistPayload);
 
   const inOnline = socketState==='ONLINE' && snapshot.state;
+  const netStatus = useNetStatus({ socketState, offlineMode: mode==='OFFLINE' });
   const activeState = inOnline? snapshot.state : localState;
   const myId = inOnline? snapshot.players[0]?.id : 'p1';
   const moves = useMemo(()=> activeState && myId? legalMoves(activeState, myId): [], [activeState, myId]);
@@ -225,22 +228,22 @@ export const NewGamePage: React.FC = () => {
     { combo:'d', handler:()=>{ const defs = (moves as Move[]).filter(m=>m.type==='DEFEND'); if(defs.length===1){ inOnline? playMove(defs[0]): playLocal(defs[0]); } } },
     { combo:'t', handler:()=>{ const take = (moves as Move[]).find(m=>m.type==='TAKE'); if(take){ inOnline? playMove(take): playLocal(take); } } },
     { combo:'e', handler:()=>{ const end = (moves as Move[]).find(m=>m.type==='END_TURN'); if(end){ inOnline? playMove(end): playLocal(end); } } },
-    { combo:'r', handler:()=>{ const tr = (moves as Move[]).filter(m=>m.type==='TRANSLATE'); if(tr.length===1){ inOnline? playMove(tr[0]): playLocal(tr[0]); } } }
+  { combo:'r', handler:()=>{ const tr = (moves as Move[]).filter(m=>m.type==='TRANSLATE'); if(tr.length===1){ inOnline? playMove(tr[0]): playLocal(tr[0]); } } },
+  { combo:'b', handler:()=>{ const end = (moves as Move[]).find(m=>m.type==='END_TURN'); if(end){ inOnline? playMove(end): playLocal(end); } } }, // БИТО
+  { combo:'v', handler:()=>{ const take = (moves as Move[]).find(m=>m.type==='TAKE'); if(take){ inOnline? playMove(take): playLocal(take); } } }, // ВЗЯТЬ
+  // стрелки и Enter: для простоты сейчас фокус на первой легальной атаке/защите; TODO: internal selection state
+  { combo:'enter', handler:()=>{ const first = (moves as Move[])[0]; if(first){ inOnline? playMove(first): playLocal(first); } } },
+  { combo:'escape', handler:()=>{ if(confirm('Выйти в меню?')) window.location.href='/'; } }
   ], !!activeState);
   function renderContent(){
     if(!activeState) return null;
     const me = activeState.players.find(p=>p.id===myId);
     const opp = activeState.players.find(p=>p.id!==myId);
   return (
-      <div className="flex flex-col gap-4">
-        <div className="flex items-start gap-4 flex-wrap">
-          <div className="flex flex-col gap-2 min-w-[160px]">
-            <div className="glass p-3 rounded-2xl flex flex-col gap-2 text-xs">
-              <div className="font-semibold text-sm flex items-center gap-2">Козырь <span className="text-base">{activeState.trump.s}</span></div>
-              <div data-deck-origin><TrumpPile trump={activeState.trump} deckCount={activeState.deck.length} /></div>
-            </div>
-            <DiscardPanel discard={activeState.discard} />
-            {opp && <OpponentPanel nick={opp.nick} handCount={opp.hand.length} />}
+      <div className="flex flex-col gap-4 lg:flex-row">
+        <div className="flex items-start gap-4 flex-wrap flex-1">
+          <Sidebar trump={activeState.trump} deckCount={activeState.deck.length} discard={activeState.discard} opponent={opp? { nick: opp.nick, handCount: opp.hand.length }: null} />
+          <div className="flex flex-col gap-2 min-w-[160px] flex-1">
             <div className="glass p-3 rounded-2xl text-xs flex flex-col gap-1">
               <label className="flex items-center gap-2 cursor-pointer text-[11px]"><input type="checkbox" checked={autosort} onChange={e=> setAutosort(e.target.checked)} /> Авто-сорт</label>
               <label className="flex items-center gap-2 cursor-pointer text-[11px]"><input type="checkbox" checked={showLog} onChange={e=> setShowLog(e.target.checked)} /> Лог</label>
@@ -323,7 +326,7 @@ export const NewGamePage: React.FC = () => {
           {mode==='ONLINE' && roomId && !activeState && <span className="text-[11px] opacity-60 select-all">{window.location.origin+'?room='+roomId}</span>}
           {mode==='ONLINE' && roomId && activeState && <button className="text-[10px] px-2 py-1 rounded bg-white/10 hover:bg-white/20" onClick={()=> requestSync()}>SYNC</button>}
         </div>
-        <StatusBar mode={socketState} turnOwner={activeState? activeState.attacker: undefined} hint={hint} allowTranslation={!!activeState?.allowTranslation}
+  <StatusBar mode={netStatus} turnOwner={activeState? activeState.attacker: undefined} hint={hint} allowTranslation={!!activeState?.allowTranslation}
           attackerNick={activeState? activeState.players.find(p=>p.id===activeState.attacker)?.nick: undefined}
           defenderNick={activeState? activeState.players.find(p=>p.id===activeState.defender)?.nick: undefined}
         />
@@ -344,7 +347,10 @@ export const NewGamePage: React.FC = () => {
     <div className="text-center space-y-3">
       {gameEnded?.winner && <p className="text-sm">Победил: <b>{gameEnded.winner}</b>{gameEnded.loser? ` — Дурак: ${gameEnded.loser}`:''}</p>}
       {!gameEnded?.winner && <p className="text-sm">Обе руки пусты.</p>}
-      <div className="flex justify-center"><button className="btn" onClick={()=>{ setGameEnded(null); startUnified(); }}>Новая игра</button></div>
+      <div className="flex justify-center gap-2">
+        <button className="btn" onClick={()=>{ setGameEnded(null); startUnified(); }}>Новая</button>
+        {onRestart && <button className="px-4 py-2 rounded bg-white/10 hover:bg-white/20 text-sm" onClick={()=>{ setGameEnded(null); onRestart(); }}>Сброс</button>}
+      </div>
     </div>
   </Modal>
   </div>

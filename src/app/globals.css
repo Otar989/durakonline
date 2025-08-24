@@ -142,6 +142,7 @@ body {
 .playing-card:hover { transform: translateY(-8px) rotate3d(1,0,0,10deg); }
 .playing-card .rank { font-size:16px; }
 .playing-card .suit { font-size:18px; }
+button[disabled] .playing-card { cursor:not-allowed !important; filter:grayscale(.3) brightness(.8); }
 
 /* Animations */
 @keyframes cardIn {
@@ -177,6 +178,13 @@ body {
 }
 .playable-card .playing-card { box-shadow:0 0 0 2px rgba(56,189,248,.8),0 0 10px -2px rgba(56,189,248,.8),0 6px 18px -4px rgba(0,0,0,.5); animation: playablePulse 1.4s ease-in-out infinite; }
 @keyframes playablePulse { 0%,100% { filter:brightness(1); } 50% { filter:brightness(1.25); } }
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce){
+  * { animation-duration:0.001ms !important; animation-iteration-count:1 !important; transition:none !important; }
+  .playing-card:hover { transform:none; }
+}
+.reduced-motion * { animation-duration:0.001ms !important; animation-iteration-count:1 !important; transition:none !important; }
 
 /* Log panel */
 .log-panel { background:rgba(0,0,0,.15); border:1px solid rgba(255,255,255,.1); padding:6px 10px; border-radius:10px; }
