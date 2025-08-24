@@ -54,10 +54,11 @@ export default function RootLayout({
         />
       </head>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+        <a href="#main-content" className="skip-link">Перейти к основному содержимому</a>
         <script dangerouslySetInnerHTML={{ __html: `(()=>{try{var t=localStorage.getItem('durak_theme_mode')||'system';var m=t==='system'? (matchMedia('(prefers-color-scheme: light)').matches?'light':'dark'):t;document.documentElement.dataset.theme=m;}catch{}})();` }} />
         <ErrorBoundary>
           <SettingsProvider>
-            {children}
+            <main id="main-content" tabIndex={-1}>{children}</main>
           </SettingsProvider>
         </ErrorBoundary>
         <script dangerouslySetInnerHTML={{ __html: `if('serviceWorker' in navigator){window.addEventListener('load',()=>{navigator.serviceWorker.register('/sw.js').catch(()=>{});});}` }} />

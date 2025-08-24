@@ -36,6 +36,12 @@ body {
   animation: bgMove 28s ease-in-out infinite;
 }
 
+/* Accessibility helpers */
+.skip-link { position:absolute; left:8px; top:-60px; background:#0b0f14; color:#fff; padding:8px 14px; border-radius:10px; z-index:200; transition:top .3s; box-shadow:0 4px 16px -2px rgba(0,0,0,.5); }
+.skip-link:focus { top:8px; outline:2px solid #38bdf8; }
+
+*:focus-visible { outline:2px solid #38bdf8; outline-offset:2px; }
+
 /* Table texture & UI custom controls */
 .table-surface {
   background: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.08), rgba(255,255,255,0) 65%), url('/table-texture.svg');
