@@ -1,17 +1,1 @@
--- Документация по RLS для raw_games.
--- Исполняемый SQL теперь лежит в: ../migrations/0001_rls_raw_games.sql
--- Если нужно обновить политику:
--- 1. Правим файл миграции (добавляя новый номер например 0002_... )
--- 2. Выполняем в Supabase SQL Editor.
--- 3. Этот файл служит только справкой и не содержит активного кода.
--- 4. Если видите ошибки синтаксиса от расширения MSSQL: файл насильно
---    ассоциирован как PostgreSQL в .vscode/settings.json (raw_games_policies.sql → postgresql).
---    Перезагрузите окно VS Code после изменения настроек.
-
--- Политика (резюме):
---  - ENABLE RLS на таблице raw_games
---  - SELECT: только роль authenticated (аноним не видит)
---  - INSERT/UPDATE/DELETE отсутствуют -> только service role (сервер) пишет
---  - Опциональный view game_stats для публичной (anon) агрегации
-
--- См. файл миграции для полного текста.
+-- Removed legacy Supabase policy file. Intentionally left blank.

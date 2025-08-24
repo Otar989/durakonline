@@ -16,7 +16,7 @@
 - Тесты ядра (правила + симуляции)
 
 ## Удалённый legacy
-Удалены: zustand store (`src/store/gameStore.ts`), legacy socket hook (`src/hooks/useSocketGame.ts` -> stub), Supabase клиент (`src/lib/supabaseClient.ts` -> stub), расширенный сервер `server/socket-server.mjs`. Оставлен упрощённый сервер `server/index.ts` и минимальный движок (`src/lib/durak-engine.ts`).
+Удалены: legacy zustand store, legacy socket hook, Supabase клиент и расширенный сервер. Оставлен минимальный сервер `server/index.ts` и минимальный движок (`game-core/*`, `src/lib/durak-engine.ts`). Все прежние заглушки удалены.
 
 ## 🚀 Запуск
 
