@@ -13,6 +13,7 @@ interface SettingsState {
   toggleAnimations: ()=>void;
   ready: boolean;
   ensureAudioUnlocked: ()=>Promise<void>;
+  play: (name:string)=>void;
 }
 
 const SettingsCtx = createContext<SettingsState|undefined>(undefined);
@@ -34,7 +35,7 @@ class SoundManager {
     if(this.pendingPreload.length){ const list = [...this.pendingPreload]; this.pendingPreload=[]; list.forEach(n=> this.load(n)); }
   }
   setVolume(v:number){ if(this.gain) this.gain.gain.value = v; }
-  mute(m:boolean){ if(this.gain) this.gain.gain.value = m? 0: this.gain.gain.value || 0.7; }
+  mute(m:boolean){ if(this.gain){ if(m){ this.gain.gain.value = 0; } } }
   async load(name:string){
     if(!this.ctx){ this.pendingPreload.push(name); return; }
     if(this.buffers.has(name)) return;
@@ -99,9 +100,11 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const setTheme = useCallback((t:ThemeMode)=> setThemeState(t),[]);
   const toggleSound = useCallback(()=> setSound(s=> !s),[]);
   const toggleAnimations = useCallback(()=> setAnimations(a=> !a),[]);
-  const ensureAudioUnlocked = useCallback(async()=>{ await soundManager.unlock(); soundManager.setVolume(sound? volume: 0); },[volume,sound]);
+  const ensureAudioUnlocked = useCallback(async()=>{ await soundManager.unlock(); soundManager.setVolume(sound? volume: 0); if(!sound) soundManager.mute(true); },[volume,sound]);
+  const play = useCallback((name:string)=>{ if(!sound) return; soundManager.play(name); },[sound]);
+  useEffect(()=>{ if(sound){ soundManager.setVolume(volume); } else { soundManager.mute(true); } },[sound,volume]);
 
-  const value: SettingsState = { theme, sound, volume, animations, setTheme, toggleSound, setVolume, toggleAnimations, ready, ensureAudioUnlocked };
+  const value: SettingsState = { theme, sound, volume, animations, setTheme, toggleSound, setVolume, toggleAnimations, ready, ensureAudioUnlocked, play };
   return <SettingsCtx.Provider value={value}>{children}</SettingsCtx.Provider>;
 };
 

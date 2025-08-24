@@ -8,7 +8,8 @@ import { ActionButtons } from '../components/ActionButtons';
 import { TrumpPile, PlayingCard } from '../components/TrumpPile';
 import { legalMoves, isTranslationAvailable } from '../../game-core/engine';
 import { useGamePersistence, loadPersisted } from '../../src/hooks/useGamePersistence';
-import { useAudio } from '../../src/hooks/useAudio';
+// (legacy useAudio removed) -> migrated to SettingsContext
+import { useSettings } from '../context/SettingsContext';
 import { Move } from '../../game-core/types';
 import { MoveLog } from '../components/MoveLog';
 import { Avatar, ConfettiBurst } from '../components/Avatar';
@@ -58,36 +59,13 @@ export const NewGamePage: React.FC<{ onRestart?: ()=>void; initialNick?: string;
   const { state: localState, start: startLocal, play: playLocal } = useLocalGame();
   const { snapshot, socketState, startGame, playMove, requestSync } = useSocketGame(roomId, nick);
   const { toasts, push } = useToasts();
-  const { play: playSound, muted, toggleMute, volume, setVolume } = useAudio(true);
-  useEffect(()=>{ playSound('ambient'); },[playSound]);
-  // theme: dark | light | auto (system)
-  const [theme,setTheme] = useState<'dark'|'light'|'auto'>(()=> {
-    if(typeof window==='undefined') return 'dark';
-    try {
-      const saved = typeof window!=='undefined'? localStorage.getItem('durak_theme_mode'): null;
-      if(saved==='dark'||saved==='light'||saved==='auto') return saved;
-    } catch {}
-    return typeof window!=='undefined' && window.matchMedia('(prefers-color-scheme: light)').matches? 'light':'dark';
-  });
-  const effectiveTheme = useMemo(()=>{
-    if(theme==='auto'){
-      if(typeof window!=='undefined') return window.matchMedia('(prefers-color-scheme: light)').matches? 'light':'dark';
-      return 'dark';
-    }
-    return theme;
-  },[theme]);
-  // apply theme
-  useEffect(()=>{ if(typeof document!=='undefined'){ document.documentElement.dataset.theme = effectiveTheme; } },[effectiveTheme]);
-  // persist raw mode
-  useEffect(()=>{ try { if(typeof window!=='undefined') localStorage.setItem('durak_theme_mode', theme);} catch{} },[theme]);
-  // respond to system changes when in auto
+  const { play: playSound, sound, toggleSound, volume, setVolume, theme, setTheme, ensureAudioUnlocked } = useSettings();
+  // Разблокируем аудио по первому жесту пользователя и запускаем ambient один раз
   useEffect(()=>{
-    if(theme!=='auto' || typeof window==='undefined') return;
-    const mm = window.matchMedia('(prefers-color-scheme: light)');
-    const handler = ()=>{ document.documentElement.dataset.theme = mm.matches? 'light':'dark'; };
-    mm.addEventListener('change', handler);
-    return ()=> mm.removeEventListener('change', handler);
-  },[theme]);
+    function firstPointer(){ ensureAudioUnlocked().then(()=> playSound('ambient')); }
+    window.addEventListener('pointerdown', firstPointer, { once:true });
+    return ()=> window.removeEventListener('pointerdown', firstPointer);
+  },[ensureAudioUnlocked, playSound]);
 
   // авто-sync после установления ONLINE
   useEffect(()=>{ if(socketState==='ONLINE' && snapshot.state){ const t = setTimeout(()=> requestSync(), 600); return ()=> clearTimeout(t); } },[socketState]);
@@ -165,7 +143,7 @@ export const NewGamePage: React.FC<{ onRestart?: ()=>void; initialNick?: string;
   useEffect(()=>{
     if(activeState && activeState.phase==='finished' && !gameEnded){
       setGameEnded({ winner: activeState.winner, loser: activeState.loser });
-      playSound('win'); if(navigator.vibrate) navigator.vibrate([40,60,40]);
+  playSound('win'); if(navigator.vibrate) navigator.vibrate([40,60,40]);
     }
   },[activeState, gameEnded, playSound]);
 
@@ -364,11 +342,11 @@ export const NewGamePage: React.FC<{ onRestart?: ()=>void; initialNick?: string;
                 <option value="ONLINE">ONLINE</option>
               </select>
             </label>
-            <button onClick={toggleMute} className="px-2 py-1 rounded bg-white/10 hover:bg-white/20">{muted? '🔇':'🔊'}</button>
+            <button onClick={toggleSound} className="px-2 py-1 rounded bg-white/10 hover:bg-white/20">{sound? '�':'�'}</button>
             <MotionControls />
             <input type="range" min={0} max={1} step={0.05} value={volume} onChange={e=> setVolume(Number(e.target.value))} className="accent-sky-400 w-20" />
-            <button onClick={()=> setTheme(t=> t==='dark'?'light': t==='light'?'auto':'dark')} className="px-2 py-1 rounded bg-white/10 hover:bg-white/20" title="Тема: тёмная / светлая / авто">
-              {theme==='auto'? '🌀': theme==='dark'? '🌙':'☀️'}
+            <button onClick={()=> setTheme(theme==='dark'? 'light': theme==='light'? 'system':'dark')} className="px-2 py-1 rounded bg-white/10 hover:bg-white/20" title="Тема: тёмная / светлая / системная">
+              {theme==='system'? '🌀': theme==='dark'? '🌙':'☀️'}
             </button>
             <button onClick={()=> setShowRules(true)} className="px-2 py-1 rounded bg-white/10 hover:bg-white/20">Правила</button>
           </div>

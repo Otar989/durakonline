@@ -1,4 +1,6 @@
 "use client";
+// LEGACY: Этот хук устарел после внедрения SettingsContext (Web Audio).
+// Использовать useSettings().play / toggleSound / setVolume.
 import { useEffect, useRef, useState, useCallback } from 'react';
 
 type SoundKey = 'card' | 'defend' | 'take' | 'bito' | 'win' | 'ambient';
@@ -12,7 +14,7 @@ const manifest: Record<SoundKey, string> = {
   ambient: '/sounds/ambient.mp3'
 };
 
-export function useAudio(enabled = true) {
+export function useAudio(enabled = true) { // deprecated
   const buffers = useRef<Map<SoundKey, HTMLAudioElement>>(new Map());
   const pools = useRef<Map<SoundKey, HTMLAudioElement[]>>(new Map());
   const [muted,setMuted] = useState(false);
