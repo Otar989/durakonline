@@ -366,12 +366,15 @@ export default function Home(){
                   onSwipeRight={()=>{ if(selfId===room?.state.defender) sendAction({ type:'TAKE' }); }}
                 />
                 <h3 className="font-medium mb-3 hidden sm:block">Ваши карты</h3>
-                <div className="flex gap-2 flex-wrap justify-center">
+                <div className={"hand-fan "+ (sortedHand.length>7? 'compact':'')+" flex-wrap justify-center"}>
                   {sortedHand.map((c, i:number)=>{
                     const actionable = canAttackOnline(c as any) || (!!defendTarget && canDefendOnline(defendTarget, c as any));
+                    const style: any = {};
+                    if(sortedHand.length>7){ style.marginLeft = i===0? 0 : '-40px'; }
                     return (
                       <div key={i}
-                        className={"transition-transform " + (actionable? 'cursor-move hover:-translate-y-1': 'opacity-40')}
+                        style={style}
+                        className={"card-wrapper "+(actionable? 'playable-card cursor-pointer':'opacity-40')}
                         draggable={!!actionable}
                         onDragStart={onDragStart(c as any)}
                         onDragEnd={clearDrag}
@@ -384,8 +387,8 @@ export default function Home(){
                       </div>
                     );
                   })}
-                  {defendTarget && <p className="text-xs mt-2 opacity-70 w-full text-center">Перетащите или нажмите карту для защиты атаки {defendTarget.r}{defendTarget.s}</p>}
                 </div>
+                {defendTarget && <p className="text-xs mt-2 opacity-70 w-full text-center">Выберите карту для защиты {defendTarget.r}{defendTarget.s}</p>}
               </div>
             )}
 
