@@ -38,30 +38,34 @@ export default function RootLayout({
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         {/* Preload fonts */}
-        <link
+  <link
           rel="preload"
           href="https://fonts.gstatic.com/s/geist/v1/Geist-Variable.woff2"
           as="font"
           type="font/woff2"
           crossOrigin="anonymous"
         />
-        <link
+  <link
           rel="preload"
           href="https://fonts.gstatic.com/s/geistmono/v1/GeistMono-Variable.woff2"
           as="font"
           type="font/woff2"
           crossOrigin="anonymous"
         />
+  <link rel="preload" href="/table-texture.svg" as="image" />
+  <link rel="preload" href="/globe.svg" as="image" />
       </head>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         <a href="#main-content" className="skip-link">Перейти к основному содержимому</a>
         <script dangerouslySetInnerHTML={{ __html: `(()=>{try{var t=localStorage.getItem('durak_theme_mode')||'system';var m=t==='system'? (matchMedia('(prefers-color-scheme: light)').matches?'light':'dark'):t;document.documentElement.dataset.theme=m;}catch{}})();` }} />
+  <script dangerouslySetInnerHTML={{ __html: `if(window.requestIdleCallback){requestIdleCallback(()=>{['card','defend','take','bito','win','ambient','illegal','translate'].forEach(n=>{var l=document.createElement('link');l.rel='prefetch';l.as='audio';l.href='/sounds/'+n+'.mp3';document.head.appendChild(l);});});}` }} />
         <ErrorBoundary>
           <SettingsProvider>
             <main id="main-content" tabIndex={-1}>{children}</main>
           </SettingsProvider>
         </ErrorBoundary>
-        <script dangerouslySetInnerHTML={{ __html: `if('serviceWorker' in navigator){window.addEventListener('load',()=>{navigator.serviceWorker.register('/sw.js').catch(()=>{});});}` }} />
+  <script dangerouslySetInnerHTML={{ __html: `if('serviceWorker' in navigator){window.addEventListener('load',()=>{setTimeout(()=>navigator.serviceWorker.register('/sw.js').catch(()=>{}),1500);});}` }} />
+  <script dangerouslySetInnerHTML={{ __html: `window.__durak_perf_marks=[];performance.mark('app_hydration_start');document.addEventListener('DOMContentLoaded',()=>performance.mark('dom_content_loaded'));` }} />
       </body>
     </html>
   );

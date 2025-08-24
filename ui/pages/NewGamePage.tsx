@@ -12,7 +12,9 @@ import { useGamePersistence, loadPersisted } from '../../src/hooks/useGamePersis
 // (legacy useAudio removed) -> migrated to SettingsContext
 import { useSettings } from '../context/SettingsContext';
 import { Move } from '../../game-core/types';
-import { MoveLog } from '../components/MoveLog';
+import dynamic from 'next/dynamic';
+// Ленивая загрузка MoveLog для снижения initial bundle
+const MoveLog = dynamic(()=> import('../components/MoveLog').then(m=> m.MoveLog), { ssr:false, loading: ()=> <div className="text-xs opacity-60">Загрузка лога...</div> });
 import { Avatar, ConfettiBurst } from '../components/Avatar';
 import { OpponentPanel } from '../components/OpponentPanel';
 import { DiscardPanel } from '../components/DiscardPanel';
