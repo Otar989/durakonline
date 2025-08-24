@@ -11,8 +11,8 @@ export const useFlip = ()=> useContext(FlipContext);
 
 export const FlipProvider: React.FC<{ children: React.ReactNode }>=({ children })=>{
   const [flights,setFlights] = useState<Flight[]>([]);
-  const [reduced,setReduced] = useState(false);
-  const [speed,setSpeed] = useState(1); // множитель скорости (1 = нормально)
+  const [reduced,setReduced] = useState(()=>{ if(typeof window==='undefined') return false; try { return localStorage.getItem('durak_fx_disabled')==='1'; } catch { return false; } });
+  const [speed,setSpeed] = useState(()=>{ if(typeof window==='undefined') return 1; try { const v = parseFloat(localStorage.getItem('durak_fx_speed')||'1'); return isFinite(v)&&v>=0.25&&v<=3? v:1; } catch { return 1; } }); // множитель скорости (1 = нормально)
   const queueRef = useRef<Flight[]>([]);
   const frameRef = useRef<number|null>(null);
 
@@ -37,7 +37,7 @@ export const FlipProvider: React.FC<{ children: React.ReactNode }>=({ children }
   }
 
   return (
-    <FlipContext.Provider value={{ flyCard, reduced, toggleReduced: ()=> setReduced(r=>!r), speed, setSpeed }}>
+  <FlipContext.Provider value={{ flyCard, reduced, toggleReduced: ()=> setReduced(r=>{ const nr = !r; try { localStorage.setItem('durak_fx_disabled', nr? '1':'0'); } catch{} return nr; }), speed, setSpeed:(v:number)=>{ setSpeed(v); try { localStorage.setItem('durak_fx_speed', String(v)); } catch{} } }}>
       {children}
       {typeof document!=='undefined' && createPortal(
         <div className="pointer-events-none fixed inset-0 z-[110]">
