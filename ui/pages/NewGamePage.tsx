@@ -28,7 +28,8 @@ export const NewGamePage: React.FC = () => {
   const hasAttack = moves.some(mv=>mv.type==='ATTACK');
   const hasDefend = !hasAttack && moves.some(mv=>mv.type==='DEFEND');
   const hint = hasAttack? 'Перетащите или кликните карту для атаки': hasDefend? 'Отбейте карту или ВЗЯТЬ':'Ждите';
-  const content = !activeState ? null : (
+  const content: React.ReactNode = !activeState ? null : (
+    <>
     <div className="flex flex-col gap-4">
       <div className="flex items-start gap-6 flex-wrap">
         <TrumpPile trump={activeState.trump} deckCount={activeState.deck.length} />
@@ -52,7 +53,8 @@ export const NewGamePage: React.FC = () => {
         <h3 className="text-xs font-semibold mb-2 opacity-70">Ходы</h3>
         <MoveLog entries={activeState.log} me={myId||undefined} />
       </div>
-    </div>
+  </div>
+  </>
   );
 
   return (
