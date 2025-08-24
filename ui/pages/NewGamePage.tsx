@@ -9,6 +9,7 @@ import { TrumpPile } from '../components/TrumpPile';
 import { legalMoves } from '../../game-core/engine';
 import { Move } from '../../game-core/types';
 import { MoveLog } from '../components/MoveLog';
+import { ToastHost, useToasts } from '../components/Toast';
 
 export const NewGamePage: React.FC = () => {
   const [roomId,setRoomId] = useState<string | null>(null);
@@ -16,6 +17,7 @@ export const NewGamePage: React.FC = () => {
   const [nick] = useState('Player');
   const { state: localState, start: startLocal, play: playLocal } = useLocalGame();
   const { snapshot, socketState, startGame, playMove } = useSocketGame(roomId, nick);
+  const { toasts, push } = useToasts();
 
   const inOnline = socketState==='ONLINE' && snapshot.state;
   const activeState = inOnline? snapshot.state : localState;
@@ -72,7 +74,7 @@ export const NewGamePage: React.FC = () => {
             />
           </div>
         </div>
-  <Hand hand={activeState.players.find(p=>p.id===myId)?.hand||[]} legal={moves} onPlay={(m)=> inOnline? playMove(m): playLocal(m)} />
+  <Hand hand={activeState.players.find(p=>p.id===myId)?.hand||[]} legal={moves} onPlay={(m)=> { if(m.type==='TRANSLATE') push('Перевод! 🔁','success'); inOnline? playMove(m): playLocal(m); }} />
         <ActionButtons legal={moves} onPlay={(m)=> inOnline? playMove(m): playLocal(m)} />
         <div className="glass rounded-xl p-3">
           <h3 className="text-xs font-semibold mb-2 opacity-70">Ходы</h3>
@@ -91,7 +93,8 @@ export const NewGamePage: React.FC = () => {
         {roomId && <span className="ml-3 text-xs opacity-70 select-all">Ссылка: {typeof window!=='undefined'? window.location.origin + '?room='+roomId: roomId}</span>}
   </div>
   {renderContent()}
-    </div>
+  <ToastHost queue={toasts} />
+  </div>
   );
 };
 export default NewGamePage;

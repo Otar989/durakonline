@@ -9,20 +9,23 @@ export const Hand: React.FC<Props> = ({ hand, legal, onPlay }) => {
       .map(m=> m.card.r+m.card.s)
   );
   const legalDef = legal.filter(m=>m.type==='DEFEND') as Extract<Move,{type:'DEFEND'}>[];
+  const translateCards = new Set((legal.filter(m=>m.type==='TRANSLATE') as Extract<Move,{type:'TRANSLATE'}>[]).map(m=> m.card.r+m.card.s));
   return <div className="flex gap-2 flex-wrap py-3 justify-center glass rounded-xl px-4">
   {hand.map(c=>{
       const id = c.r+c.s;
       const attackable = legalAttack.has(id);
       const defendable = legalDef.find(m=> m.card.r===c.r && m.card.s===c.s);
       const data = JSON.stringify({ card:c });
+      const canTranslate = translateCards.has(id);
       return <button key={id}
-        disabled={!attackable && !defendable}
-        draggable={attackable || !!defendable}
+        disabled={!attackable && !defendable && !canTranslate}
+        draggable={attackable || !!defendable || canTranslate}
         onDragStart={e=>{ e.dataTransfer.setData('application/x-card', data); }}
-        onClick={()=>{ if(attackable) onPlay({ type:'ATTACK', card: c }); else if(defendable) onPlay(defendable); }}
-        className={`transition-transform hover:-translate-y-1 disabled:opacity-30 rounded relative ${attackable? 'ring-2 ring-emerald-400': defendable? 'ring-2 ring-sky-400':''}`}>
+        onClick={()=>{ if(attackable) onPlay({ type:'ATTACK', card: c }); else if(defendable) onPlay(defendable); else if(canTranslate) onPlay({ type:'TRANSLATE', card: c } as Move); }}
+        className={`transition-transform hover:-translate-y-1 disabled:opacity-30 rounded relative ${attackable? 'ring-2 ring-emerald-400': defendable? 'ring-2 ring-sky-400': canTranslate? 'ring-2 ring-fuchsia-400 animate-pulse':''}`}>
         <PlayingCard card={c} trumpSuit={undefined} dim={false} />
         {defendable && <span className="absolute -top-1 -right-1 text-[10px] bg-sky-500 text-white px-1 rounded">D</span>}
+        {canTranslate && <span className="absolute -bottom-1 -right-1 text-[10px] bg-fuchsia-600 text-white px-1 rounded">TR</span>}
       </button>;
     })}
   </div>;
