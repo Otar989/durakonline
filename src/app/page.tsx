@@ -27,6 +27,55 @@ export default function Home(){
     return set;
   },[room, defendTarget, selfHand]);
 
+  // --- Анимации сброса / взятия стола ---
+  interface FlyAnim { id: string; card: Card; type: 'discard'|'take'; style: React.CSSProperties }
+  const [flyAnims,setFlyAnims] = useState<FlyAnim[]>([]);
+  const prevTableRef = React.useRef<TablePair[]>([]);
+  const lastPositionsRef = React.useRef<Record<string, DOMRect>>({});
+  const lastLogAction = room?.log && room.log.length ? room.log[room.log.length-1].a : null;
+
+  // Сбор позиций карт на столе (каждый рендер, когда есть карта на столе)
+  useEffect(()=>{
+    if(!room?.state.table?.length) return;
+    const map: Record<string, DOMRect> = {};
+    document.querySelectorAll('.table-board [data-card-id]').forEach(el=>{
+      const id = (el as HTMLElement).dataset.cardId!;
+      map[id] = el.getBoundingClientRect();
+    });
+    lastPositionsRef.current = map;
+  },[room?.state.table]);
+
+  // Реакция на очистку стола
+  useEffect(()=>{
+    const prev = prevTableRef.current;
+    const cur = room?.state.table || [];
+    if(prev.length>0 && cur.length===0 && (lastLogAction==='END_TURN' || lastLogAction==='TAKE')){
+      const type = lastLogAction==='END_TURN'? 'discard':'take';
+      const anims: FlyAnim[] = [];
+      for(const pair of prev){
+        const ids: Card[] = [pair.attack]; if(pair.defend) ids.push(pair.defend);
+        for(const card of ids){
+          const key = card.r+card.s;
+          const rect = lastPositionsRef.current[key];
+          if(!rect) continue;
+          const style: React.CSSProperties = {
+            position:'fixed', left: rect.left, top: rect.top, width: rect.width, height: rect.height
+          };
+            anims.push({ id: key+'_'+Date.now(), card, type, style });
+        }
+      }
+      if(anims.length) setFlyAnims(a=>[...a, ...anims]);
+    }
+    prevTableRef.current = cur.map(p=>({ ...p }));
+  },[room?.state.table, lastLogAction]);
+
+  // Очистка завершившихся анимаций
+  useEffect(()=>{
+    if(!flyAnims.length) return;
+    const t = setTimeout(()=> setFlyAnims(a=> a.slice(-20).filter(x=> Date.now() - Number(x.id.split('_').pop()) < 650 )), 680);
+    return ()=> clearTimeout(t);
+  },[flyAnims]);
+
   useEffect(()=>{
     if(!socket) return;
     const tick = () => {
@@ -339,6 +388,11 @@ export default function Home(){
                   onDragOver={(e:React.DragEvent)=>{ if(dragCard) e.preventDefault(); }}
                   onDrop={handleDropAttackOnline}
                 >
+                  {flyAnims.map(f=> (
+                    <div key={f.id} className={"fly-card "+f.type} style={f.style} data-fly>
+                      <MiniCard card={f.card} trumpSuit={room?.state.trump?.s} />
+                    </div>
+                  ))}
                   {deadlinePct!==null && <div className="absolute top-1 right-2 text-[10px] opacity-50">{Math.ceil((deadlineLeft||0)/1000)}s</div>}
                   {room?.state.table.length===0 && selfId===room?.state.attacker && <Hint text="Ваш ход: перетащите любую карту" />}
                   {room?.state.table && room.state.table.length>0 && selfId===room?.state.attacker && room.state.table.some(p=>!p.defend) && <Hint text="Подкиньте ту же рангу" />}
@@ -349,9 +403,9 @@ export default function Home(){
                     return (
                       <div key={idx} className={"table-pair " + (selectable? 'selectable':'')} onClick={()=>{ if(selectable) setDefendTarget(pair.attack); }} onDragOver={(e:React.DragEvent)=>{ if(dragCard && !pair.defend) e.preventDefault(); }} onDrop={handleDropDefendOnline(pair.attack)}>
                         <div className="pair-inner">
-                          <div className="attack animate-card-in"><MiniCard card={pair.attack} trumpSuit={room?.state.trump?.s} /></div>
+                          <div className="attack animate-card-in" data-card-id={pair.attack.r+pair.attack.s}><MiniCard card={pair.attack} trumpSuit={room?.state.trump?.s} /></div>
                           {pair.defend ? (
-                            <div className="defense animate-defend-in"><MiniCard card={pair.defend} trumpSuit={room?.state.trump?.s} /></div>
+                            <div className="defense animate-defend-in" data-card-id={pair.defend.r+pair.defend.s}><MiniCard card={pair.defend} trumpSuit={room?.state.trump?.s} /></div>
                           ) : selectable ? (
                             <div className="defense-slot" />
                           ) : null}

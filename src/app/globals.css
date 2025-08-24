@@ -202,6 +202,12 @@ body {
   .seat-ring { display:none; }
 }
 
+/* Fly animations for discard/take */
+.fly-card { pointer-events:none; z-index:80; animation: flyDiscard .65s cubic-bezier(.3,.8,.3,1) forwards; }
+.fly-card.take { animation-name: flyTake; }
+@keyframes flyDiscard { 0% { opacity:1; transform:translate(0,0) scale(1); } 90% { opacity:.9; } 100% { opacity:0; transform:translate(160px,-140px) scale(.4) rotate(25deg); } }
+@keyframes flyTake { 0% { opacity:1; transform:translate(0,0) scale(1); } 100% { opacity:0; transform:translate(0,180px) scale(.55) rotate(12deg); } }
+
 /* Scrollbar minimal */
 ::-webkit-scrollbar { width:10px; height:10px; }
 ::-webkit-scrollbar-track { background: transparent; }
