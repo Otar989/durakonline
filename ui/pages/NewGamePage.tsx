@@ -222,6 +222,21 @@ export const NewGamePage: React.FC = () => {
     );
   }
 
+  const MotionControls: React.FC = () => {
+    const flip = useFlip();
+    if(!flip) return null;
+    return (
+      <div className="flex items-center gap-2">
+        <button onClick={flip.toggleReduced} className="px-2 py-1 rounded bg-white/10 hover:bg-white/20" title="Reduced motion">RM</button>
+        <label className="flex items-center gap-1 text-[10px] opacity-80">
+          <span>Speed</span>
+          <input type="range" min={0.5} max={2} step={0.25} value={flip.speed} onChange={e=> flip.setSpeed(Number(e.target.value))} className="accent-fuchsia-400 w-20" />
+          <span className="tabular-nums w-8 text-right">{flip.speed.toFixed(2)}x</span>
+        </label>
+      </div>
+    );
+  };
+
   return (
   <FlipProvider>
   <div ref={gestureRef} className="max-w-6xl mx-auto p-6 flex flex-col gap-6">
@@ -237,7 +252,7 @@ export const NewGamePage: React.FC = () => {
               </select>
             </label>
             <button onClick={toggleMute} className="px-2 py-1 rounded bg-white/10 hover:bg-white/20">{muted? '🔇':'🔊'}</button>
-            <button onClick={()=> (useFlip as any)?.().toggleReduced()} className="px-2 py-1 rounded bg-white/10 hover:bg-white/20" title="Reduced motion">RM</button>
+            <MotionControls />
             <input type="range" min={0} max={1} step={0.05} value={volume} onChange={e=> setVolume(Number(e.target.value))} className="accent-sky-400 w-20" />
             <button onClick={()=> setTheme(t=> t==='dark'?'light':'dark')} className="px-2 py-1 rounded bg-white/10 hover:bg-white/20">{theme==='dark'? '🌙':'☀️'}</button>
             <button onClick={()=> setShowRules(true)} className="px-2 py-1 rounded bg-white/10 hover:bg-white/20">Правила</button>
