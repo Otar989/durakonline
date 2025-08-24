@@ -81,6 +81,7 @@ export const TableBoard: React.FC<Props> = ({ table, trumpSuit, onDefend, select
   const draggedDefendCard = dragCard && dragCard.roles?.defend? dragCard.card: null;
   return (
   <div ref={containerRef} className={`flex flex-wrap gap-4 p-4 rounded-xl glass min-h-[140px] relative ${translationHint? 'ring-2 ring-fuchsia-400/60 animate-pulse':''} ${dragCard && canAttackWithDragged? 'ring-2 ring-emerald-400/60': dragCard? 'ring-2 ring-red-500/40':''}`}
+      role="region" aria-label="Стол" aria-live="polite"
       onDragOver={e=>{ // разрешаем дроп если либо атака возможна (пустой стол) либо защита в конкретные пары
         e.preventDefault();
       }}
@@ -107,6 +108,7 @@ export const TableBoard: React.FC<Props> = ({ table, trumpSuit, onDefend, select
             exit={{ opacity:0, scale:0.85, y:-6 }}
             transition={{ type:'spring', stiffness:260, damping:22, mass:0.6 }}
             className={`relative w-28 h-24 flex items-center justify-center rounded transition-colors ${droppable? 'ring-1 ring-sky-500/40': ''} ${highlightDefend? 'ring-2 ring-emerald-400 shadow-[0_0_0_3px_rgba(16,185,129,0.25)]':''} ${flashInvalid? 'animate-pulse ring-red-500':''}`}
+            role="group" aria-label={`Пара ${pair.attack.r}${pair.attack.s}${pair.defend? ' покрыта':''}`}
             onMouseEnter={()=>{ if(!pair.defend){ try { document.dispatchEvent(new CustomEvent('durak-hover-attack',{ detail:{ card: pair.attack } })); } catch{} } }}
             onMouseLeave={()=>{ if(!pair.defend){ try { document.dispatchEvent(new CustomEvent('durak-hover-attack-end',{ detail:{ card: pair.attack } })); } catch{} } }}
             onDragOver={(e: React.DragEvent)=>{ if(droppable) e.preventDefault(); }}
@@ -121,10 +123,19 @@ export const TableBoard: React.FC<Props> = ({ table, trumpSuit, onDefend, select
                 else { setFlashInvalid(true); setTimeout(()=>setFlashInvalid(false), 450); document.dispatchEvent(new CustomEvent('durak-illegal',{ detail:'Нельзя защитить этой картой'})); }
               } catch{}
             }}
-          >
+            >
             <div className="absolute left-0 top-2" data-card-id={pair.attack.r+pair.attack.s}><PlayingCard card={pair.attack} trumpSuit={trumpSuit} /></div>
             {pair.defend && <div className={`absolute left-6 top-4 rotate-6 ${flashDefendIds.includes(pair.defend.r+pair.defend.s)? 'animate-[pulse_0.7s_ease-out] ring-2 ring-emerald-400 rounded':''}`} data-card-id={pair.defend.r+pair.defend.s}><PlayingCard card={pair.defend} trumpSuit={trumpSuit} /></div>}
-            {!pair.defend && droppable && <div className="absolute inset-0 bg-sky-400/10 rounded pointer-events-none" />}
+            {!pair.defend && droppable && <button
+              type="button"
+              className="absolute inset-0 bg-sky-400/10 rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400"
+              aria-label={`Покрыть атаку ${pair.attack.r}${pair.attack.s}`}
+              onClick={()=>{
+                // если есть единственный вариант защиты запускаем его
+                if(defendOptions.length===1){ onDefend(defendOptions[0].target, defendOptions[0].defendWith); }
+              }}
+              onKeyDown={e=>{ if(e.key==='Enter'|| e.key===' '){ e.preventDefault(); if(defendOptions.length===1){ onDefend(defendOptions[0].target, defendOptions[0].defendWith); } } }}
+            />}
           </motion.div>
         );
       })}
