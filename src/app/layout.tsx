@@ -33,6 +33,11 @@ export default function RootLayout({
       <head>
         <link rel="manifest" href="/manifest.json" />
   <meta name="theme-color" content="#0b0f14" />
+  {/* Font preconnects to reduce latency */}
+  <link rel="preconnect" href="https://fonts.googleapis.com" crossOrigin="anonymous" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+  <link rel="dns-prefetch" href="https://fonts.googleapis.com" />
+  <link rel="dns-prefetch" href="https://fonts.gstatic.com" />
         {/* Preload fonts */}
         <link
           rel="preload"

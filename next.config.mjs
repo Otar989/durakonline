@@ -32,4 +32,17 @@ const sentryWebpackPluginOptions = {
   disable: !process.env.SENTRY_AUTH_TOKEN,
 };
 
-export default withSentryConfig(nextConfig, sentryWebpackPluginOptions);
+const finalConfig = withSentryConfig(nextConfig, sentryWebpackPluginOptions);
+
+// Sentry плагин (или старая логика) инжектит experimental.instrumentationHook, который больше не нужен и вызывает warning.
+if (finalConfig?.experimental && 'instrumentationHook' in finalConfig.experimental) {
+  // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+  // @ts-ignore - динамическое удаление поля
+  delete finalConfig.experimental.instrumentationHook;
+  // Если объект experimental пустой после удаления — убираем его.
+  if (Object.keys(finalConfig.experimental).length === 0) {
+    delete finalConfig.experimental;
+  }
+}
+
+export default finalConfig;
