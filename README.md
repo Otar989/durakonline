@@ -16,7 +16,7 @@
 - Тесты ядра (правила + симуляции)
 
 ## Удалённый legacy
-Удалены: старый движок (`src/lib/durak-engine.ts`), store (`src/store/gameStore.ts`), старый socket hook, Supabase клиент, расширенный `socket-server.mjs`. Оставлен упрощённый сервер `server/index.ts`.
+Удалены: старый движок (`src/lib/durak-engine.ts`), store (`src/store/gameStore.ts`), legacy socket hook (`src/hooks/useSocketGame.ts`), Supabase клиент (`src/lib/supabaseClient.ts`), расширенный сервер `server/socket-server.mjs`. Оставлен упрощённый сервер `server/index.ts`.
 
 ## 🚀 Запуск
 
