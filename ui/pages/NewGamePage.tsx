@@ -7,6 +7,8 @@ import { TableBoard } from '../components/Table';
 import { ActionButtons } from '../components/ActionButtons';
 import { TrumpPile } from '../components/TrumpPile';
 import { legalMoves, isTranslationAvailable } from '../../game-core/engine';
+import { useGamePersistence, loadPersisted } from '../../hooks/useGamePersistence';
+import { useAudio } from '../../hooks/useAudio';
 import { Move } from '../../game-core/types';
 import { MoveLog } from '../components/MoveLog';
 import { ToastHost, useToasts } from '../components/Toast';
@@ -18,6 +20,28 @@ export const NewGamePage: React.FC = () => {
   const { state: localState, start: startLocal, play: playLocal } = useLocalGame();
   const { snapshot, socketState, startGame, playMove } = useSocketGame(roomId, nick);
   const { toasts, push } = useToasts();
+  const { play: playSound } = useAudio(true);
+
+  // load persisted offline state (basic) – if no active state present yet
+  useEffect(()=>{
+    const p = loadPersisted();
+    if(p && !snapshot.state && !localState && p.offlineState){
+      // naive restore into local game start
+      // (could implement hydrate in engine; placeholder for now)
+      startLocal({ allowTranslation: p.allowTranslation });
+    }
+  },[snapshot.state, localState, startLocal]);
+
+  const persistPayload = useMemo(()=>{
+    if(localState){
+      return { mode: 'OFFLINE' as const, ts: Date.now(), offlineState: localState, roomId, allowTranslation: localState.allowTranslation };
+    }
+    if(snapshot.state){
+      return { mode: socketState as 'ONLINE'|'OFFLINE', ts: Date.now(), roomId, allowTranslation: snapshot.state.allowTranslation };
+    }
+    return null;
+  },[localState, snapshot.state, socketState, roomId]);
+  useGamePersistence(persistPayload);
 
   const inOnline = socketState==='ONLINE' && snapshot.state;
   const activeState = inOnline? snapshot.state : localState;
@@ -75,7 +99,8 @@ export const NewGamePage: React.FC = () => {
             />
           </div>
         </div>
-  <Hand hand={activeState.players.find(p=>p.id===myId)?.hand||[]} legal={moves} onPlay={(m)=> { if(m.type==='TRANSLATE') push('Перевод! 🔁','success'); inOnline? playMove(m): playLocal(m); }} />
+  <Hand hand={activeState.players.find(p=>p.id===myId)?.hand||[]} legal={moves} onPlay={(m)=> { if(m.type==='TRANSLATE'){ push('Перевод! 🔁','success'); playSound('card'); if(navigator.vibrate) navigator.vibrate(20);} else if(m.type==='ATTACK'){ playSound('card'); } else if(m.type==='DEFEND'){ playSound('defend'); } else if(m.type==='TAKE'){ playSound('take'); if(navigator.vibrate) navigator.vibrate([10,40,20]); } else if(m.type==='END_TURN'){ playSound('bito'); }
+    inOnline? playMove(m): playLocal(m); }} />
         <ActionButtons legal={moves} onPlay={(m)=> inOnline? playMove(m): playLocal(m)} />
         <div className="glass rounded-xl p-3">
           <h3 className="text-xs font-semibold mb-2 opacity-70">Ходы</h3>
