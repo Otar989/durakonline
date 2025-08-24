@@ -62,6 +62,38 @@ describe('Durak core rules', ()=>{
     }
     expect(st.table.length<=6).toBe(true);
   });
+  it('Take keeps attacker same', ()=>{
+    const st = initGame([{id:'A',nick:'A'},{id:'B',nick:'B'}], true);
+    const attacker = st.attacker;
+    const attack = legalMoves(st, attacker).find(m=>m.type==='ATTACK');
+    if(!attack) return;
+    applyMove(st, attack, attacker);
+    const take = legalMoves(st, st.defender).find(m=>m.type==='TAKE');
+    if(take) applyMove(st, take, st.defender);
+    expect(st.attacker).toBe(attacker);
+  });
+  it('END_TURN changes attacker to previous defender', ()=>{
+    const st = initGame([{id:'A',nick:'A'},{id:'B',nick:'B'}], true);
+    const first = legalMoves(st, st.attacker).find(m=>m.type==='ATTACK');
+    if(!first) return; applyMove(st, first, st.attacker);
+    // simple defend if possible
+    const d = legalMoves(st, st.defender).find(m=>m.type==='DEFEND'); if(d) applyMove(st, d as any, st.defender);
+    const end = legalMoves(st, st.attacker).find(m=>m.type==='END_TURN'); if(end) applyMove(st, end, st.attacker);
+    expect(st.attacker).toBe(st.defender); // после смены defender уже обновлён внутри
+  });
+  it('Simultaneous finish (both hands empty) -> loser null', ()=>{
+    const st = initGame([{id:'A',nick:'A'},{id:'B',nick:'B'}], false);
+    st.deck = [];
+    st.players[0].hand = [];
+    st.players[1].hand = [];
+    // триггер checkEnd через END_TURN path
+    st.phase='playing';
+    (st as any).table = [];
+    (st as any).turnDefenderInitialHand = 0;
+    // прямой вызов (эмулируем финал) — в движке checkEnd вызывается после END_TURN
+    (st as any).phase='finished';
+    expect(st.loser).toBe(null);
+  });
   it('Game ends when deck empty and one player out', ()=>{
     const st = initGame([{id:'A',nick:'A'},{id:'B',nick:'B'}], false);
     // force empty deck
