@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { GameState, Move } from '../../game-core/types';
+import { logMetric } from '../lib/metrics';
 
 // removed unused JoinOpts interface
 interface Snapshot { state: GameState|null; players:{id:string;nick:string}[]; bot?:{id:string;nick:string}|null }
@@ -45,12 +46,12 @@ export function useSocketGame(roomId: string | null, nick: string){
     });
     s.on('room_state', (snap:Snapshot)=> setSnapshot(snap));
     s.on('game_started', (snap:Snapshot)=> setSnapshot(snap));
-    s.on('move_applied', ({ state }: { state:GameState })=> setSnapshot(prev=>({ ...prev, state }))); 
+  s.on('move_applied', ({ state }: { state:GameState })=> { setSnapshot(prev=>({ ...prev, state })); });
     s.on('game_over', ({ state }: { state:GameState })=> setSnapshot(prev=>({ ...prev, state }))); 
     s.on('state_sync', (data: any)=>{
       if(data.upToDate) return; if(data.snapshot) setSnapshot(data.snapshot);
     });
-  s.on('error', (e:unknown)=> console.warn('socket error', e));
+  s.on('error', (e:unknown)=> { console.warn('socket error', e); logMetric('socket_error', e); });
     s.on('disconnect', ()=>{ setConnected(false); setSocketState('RECONNECTING'); });
   },[roomId, nick, connected]);
 
