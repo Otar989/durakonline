@@ -4,8 +4,8 @@ import { Card, Move } from '../../game-core/types';
 import { PlayingCard } from './TrumpPile';
 import { setPendingFlight } from '../lib/flightBus';
 
-interface Props { hand: Card[]; legal: Move[]; onPlay: (_m:Move)=>void; trumpSuit?: string; autosort?: boolean; onSelectCard?: (c:Card|null)=>void; }
-export const Hand: React.FC<Props> = React.memo(({ hand, legal, onPlay, trumpSuit, autosort, onSelectCard }) => {
+interface Props { hand: Card[]; legal: Move[]; onPlay: (_m:Move)=>void; trumpSuit?: string; autosort?: boolean; onSelectCard?: (c:Card|null)=>void; describedBy?: string }
+export const Hand: React.FC<Props> = React.memo(({ hand, legal, onPlay, trumpSuit, autosort, onSelectCard, describedBy }) => {
   const legalAttack = new Set(
     (legal.filter(m=>m.type==='ATTACK') as Extract<Move,{type:'ATTACK'}>[])
       .map(m=> m.card.r+m.card.s)
@@ -24,7 +24,7 @@ export const Hand: React.FC<Props> = React.memo(({ hand, legal, onPlay, trumpSui
       return orderRank.indexOf(a.r)-orderRank.indexOf(b.r);
     });
   },[hand, autosort, trumpSuit]);
-  return <div className="flex gap-2 flex-nowrap overflow-x-auto py-3 justify-start glass rounded-xl px-4 select-none scrollbar-thin" aria-label="Рука игрока" role="list">
+  return <div className="flex gap-2 flex-nowrap overflow-x-auto py-3 justify-start glass rounded-xl px-4 select-none scrollbar-thin" aria-label="Рука игрока" role="list" {...(describedBy? { 'aria-describedby': describedBy }: {})}>
   <AnimatePresence initial={false}>
   {displayHand.map(c=>{
       const id = c.r+c.s;

@@ -16,6 +16,7 @@ import { OpponentPanel } from '../components/OpponentPanel';
 import { DiscardPanel } from '../components/DiscardPanel';
 import { FlipProvider, useFlip } from '../components/FlipLayer';
 import { ToastHost, useToasts } from '../components/Toast';
+import { useHotkeys } from '../hooks/useHotkeys';
 
 export const NewGamePage: React.FC = () => {
   const [roomId,setRoomId] = useState<string | null>(null);
@@ -199,6 +200,15 @@ export const NewGamePage: React.FC = () => {
   const hasDefend = !hasAttack && moves.some(mv=>mv.type==='DEFEND');
   const canTranslate = activeState && myId? isTranslationAvailable(activeState, myId): false;
   const hint = hasAttack? 'Перетащите или кликните карту для атаки': hasDefend? (canTranslate? 'Можно перевести, или отбивайтесь / ВЗЯТЬ':'Отбейте карту или ВЗЯТЬ'):'Ждите';
+
+  // hotkeys: A=single attack, D=single defend, T=take, E=end turn, R=translate (если одна опция)
+  useHotkeys([
+    { combo:'a', handler:()=>{ const atks = (moves as Move[]).filter(m=>m.type==='ATTACK'); if(atks.length===1){ inOnline? playMove(atks[0]): playLocal(atks[0]); } } },
+    { combo:'d', handler:()=>{ const defs = (moves as Move[]).filter(m=>m.type==='DEFEND'); if(defs.length===1){ inOnline? playMove(defs[0]): playLocal(defs[0]); } } },
+    { combo:'t', handler:()=>{ const take = (moves as Move[]).find(m=>m.type==='TAKE'); if(take){ inOnline? playMove(take): playLocal(take); } } },
+    { combo:'e', handler:()=>{ const end = (moves as Move[]).find(m=>m.type==='END_TURN'); if(end){ inOnline? playMove(end): playLocal(end); } } },
+    { combo:'r', handler:()=>{ const tr = (moves as Move[]).filter(m=>m.type==='TRANSLATE'); if(tr.length===1){ inOnline? playMove(tr[0]): playLocal(tr[0]); } } }
+  ], !!activeState);
   function renderContent(){
     if(!activeState) return null;
     const me = activeState.players.find(p=>p.id===myId);
@@ -237,7 +247,8 @@ export const NewGamePage: React.FC = () => {
             {!showLog && <button className="text-[10px] opacity-60 hover:opacity-100 mt-2" onClick={()=> setShowLog(true)}>Показать лог</button>}
           </div>
         </div>
-        <Hand hand={me?.hand||[]} legal={moves} trumpSuit={activeState.trump.s} autosort={autosort} onPlay={(m)=> { const isLegal = moves.some(x=> JSON.stringify(x)===JSON.stringify(m)); if(!isLegal){ push('Нельзя: ход недоступен','warn'); return; }
+  <div id="hand-hint" className="sr-only">Горячие клавиши: A атака (если одна), D защита (если одна), R перевод (если одна), T взять, E бито.</div>
+  <Hand hand={me?.hand||[]} legal={moves} trumpSuit={activeState.trump.s} autosort={autosort} describedBy="hand-hint" onPlay={(m)=> { const isLegal = moves.some(x=> JSON.stringify(x)===JSON.stringify(m)); if(!isLegal){ push('Нельзя: ход недоступен','warn'); return; }
           if(m.type==='TRANSLATE'){ push('Перевод! 🔁','success'); playSound('card'); if(navigator.vibrate) navigator.vibrate(20);} else if(m.type==='ATTACK'){ playSound('card'); } else if(m.type==='DEFEND'){ playSound('defend'); } else if(m.type==='TAKE'){ playSound('take'); if(navigator.vibrate) navigator.vibrate([10,40,20]); } else if(m.type==='END_TURN'){ playSound('bito'); }
     inOnline? playMove(m): playLocal(m); }} />
         <ActionButtons legal={moves} onPlay={(m)=> inOnline? playMove(m): playLocal(m)} />
