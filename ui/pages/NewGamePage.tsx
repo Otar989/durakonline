@@ -113,7 +113,7 @@ export const NewGamePage: React.FC<{ onRestart?: ()=>void; initialNick?: string;
     else if(m.type==='DEFEND') playSound('defend');
     else if(m.type==='TAKE') playSound('take');
     else if(m.type==='END_TURN') playSound('bito');
-    else if(m.type==='TRANSLATE') playSound('card');
+  else if(m.type==='TRANSLATE') playSound('translate');
   },[activeState?.log?.length, playSound]);
   const myId = inOnline? snapshot.players[0]?.id : 'p1';
   const moves = useMemo(()=> activeState && myId? legalMoves(activeState, myId): [], [activeState, myId]);
@@ -191,7 +191,7 @@ export const NewGamePage: React.FC<{ onRestart?: ()=>void; initialNick?: string;
 
   // глобальные кастомные события (нелегальный dnd)
   useEffect(()=>{
-    function onIllegal(e: Event){ const ce = e as CustomEvent; push(ce.detail||'Нельзя','warn'); }
+  function onIllegal(e: Event){ const ce = e as CustomEvent; push(ce.detail||'Нельзя','warn'); playSound('illegal'); }
     document.addEventListener('durak-illegal', onIllegal as any);
     return ()=> document.removeEventListener('durak-illegal', onIllegal as any);
   },[push, playSound]);
@@ -313,7 +313,7 @@ export const NewGamePage: React.FC<{ onRestart?: ()=>void; initialNick?: string;
   <div id="hand-hint" className="sr-only">Горячие клавиши: A атака (если одна), D защита (если одна), R перевод (если одна), T взять, E бито.</div>
   <MobileControls moves={moves as any} onPlay={(m:any)=> { inOnline? playMove(m): playLocal(m); }} className="mt-3" />
   <Hand hand={me?.hand||[]} legal={moves} trumpSuit={activeState.trump.s} autosort={autosort} describedBy="hand-hint" selectedIndex={selectedIndex} onChangeSelected={setSelectedIndex} onPlay={(m)=> { const isLegal = moves.some(x=> JSON.stringify(x)===JSON.stringify(m)); if(!isLegal){ push('Нельзя: ход недоступен','warn'); return; }
-          if(m.type==='TRANSLATE'){ push('Перевод! 🔁','success'); playSound('card'); if(navigator.vibrate) navigator.vibrate(20);} else if(m.type==='ATTACK'){ playSound('card'); } else if(m.type==='DEFEND'){ playSound('defend'); } else if(m.type==='TAKE'){ playSound('take'); if(navigator.vibrate) navigator.vibrate([10,40,20]); } else if(m.type==='END_TURN'){ playSound('bito'); }
+          if(m.type==='TRANSLATE'){ push('Перевод! 🔁','success'); playSound('translate'); if(navigator.vibrate) navigator.vibrate(20);} else if(m.type==='ATTACK'){ playSound('card'); } else if(m.type==='DEFEND'){ playSound('defend'); } else if(m.type==='TAKE'){ playSound('take'); if(navigator.vibrate) navigator.vibrate([10,40,20]); } else if(m.type==='END_TURN'){ playSound('bito'); }
     inOnline? playMove(m): playLocal(m); }} />
         <ActionButtons legal={moves} onPlay={(m)=> inOnline? playMove(m): playLocal(m)} />
       </div>

@@ -25,7 +25,7 @@ class SoundManager {
   private buffers: Map<string, AudioBuffer> = new Map();
   private pendingPreload: string[] = [];
   private unlocked = false;
-  private manifest = ['card','defend','take','bito','win','ambient'];
+  private manifest = ['card','defend','take','bito','win','ambient','illegal','translate'];
 
   async unlock(){
     if(typeof window==='undefined') return;
@@ -50,7 +50,13 @@ class SoundManager {
   }
   async play(name:string){
     if(!this.ctx || !this.unlocked) return;
-    const buf = this.buffers.get(name); if(!buf){ this.load(name); return; }
+    let buf = this.buffers.get(name);
+    if(!buf){
+      // попытка lazy-загрузки; если нет — fallback на card
+      this.load(name);
+      buf = this.buffers.get('card');
+      if(!buf) return;
+    }
     const src = this.ctx.createBufferSource(); src.buffer = buf; src.connect(this.gain!); try { src.start(0); } catch{}
   }
 }
