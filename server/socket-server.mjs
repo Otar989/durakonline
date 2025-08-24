@@ -211,6 +211,10 @@ io.on('connection', (socket) => {
       broadcast(roomId, `${nick} присоединился`);
       emitRoom(roomId);
     }
+    // Если создатель комнаты ещё не в игре и сейчас лобби — авто seat
+    if(room.creatorId===realId && room.state.phase==='lobby' && !room.state.players[realId]){
+      room.state.players[realId] = { id: realId, nick, hand: [] };
+    }
   });
 
   // startGame handler
@@ -218,6 +222,11 @@ io.on('connection', (socket) => {
     const room = rooms.get(roomId);
     if(!room) return;
     if(room.state.phase!=='lobby') return;
+    // Убедиться, что создатель в списке игроков (если был зрителем)
+    if(room.creatorId && !room.players.has(room.creatorId) && room.players.size + room.bots.size < room.settings.maxPlayers){
+      room.players.set(room.creatorId, { id: room.creatorId, nick: 'Создатель', socketId: null });
+      if(!room.state.players[room.creatorId]) room.state.players[room.creatorId] = { id: room.creatorId, nick: 'Создатель', hand: [] };
+    }
     // merge settings (без allowTranslation)
     if(options && typeof options==='object'){
       // allowTranslation игнорируем — классический режим
@@ -365,7 +374,9 @@ function serializeRoom(room){
     publicPlayers.push({ id: p.id, nick: p.nick, handCount: ps? ps.hand.length: 0 });
   }
   const log = room.turnLog.slice(-30);
-  return { players: publicPlayers, spectators: [...room.spectators.values()].map(p=>({ id: p.id, nick: p.nick })), settings: room.settings, state: { ...room.state, players: undefined }, log, deadline: room.turnDeadline };
+  // Добавляем creatorId и порядок сидений (для визуального расположения игроков на клиенте)
+  const order = seatingOrder(room);
+  return { players: publicPlayers, spectators: [...room.spectators.values()].map(p=>({ id: p.id, nick: p.nick })), settings: room.settings, state: { ...room.state, players: undefined }, log, deadline: room.turnDeadline, creatorId: room.creatorId, order };
 }
 
 function emitRoom(roomOrId){

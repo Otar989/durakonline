@@ -10,6 +10,8 @@ export interface RemoteRoomPayload {
   settings: Record<string, unknown>;
   state: GameState; // c серверными расширениями (loser, finished) приходят, но мы их не типизируем жёстко
   log?: { t: number; a: string; by: string; card?: any; target?: any }[];
+  creatorId?: string;
+  order?: string[]; // порядок сидений
 }
 
 interface UseSocketGameOptions {

@@ -14,6 +14,9 @@ export interface GameState {
   defender: string | null;
   phase: 'lobby'|'playing'|'finished';
   winner?: string;
+  loser?: string | null;
+  finished?: string[];
+  turnDefenderInitialHandCount?: number; // для сервера и унификации клиента
 }
 
 export type Action =
@@ -31,7 +34,7 @@ export function buildDeck(): Card[] { const d: Card[]=[]; for(const s of suits){
 
 export function shuffle<T>(arr: T[]): T[] { return [...arr].sort(()=>Math.random()-0.5); }
 
-export function initialState(): GameState { return { deck: [], discard: [], trump: null, players: {}, table: [], attacker: null, defender: null, phase: 'lobby' }; }
+export function initialState(): GameState { return { deck: [], discard: [], trump: null, players: {}, table: [], attacker: null, defender: null, phase: 'lobby', loser: null, finished: [], turnDefenderInitialHandCount: 0 }; }
 
 export function startGame(st: GameState) {
   st.phase = 'playing';
@@ -45,6 +48,7 @@ export function startGame(st: GameState) {
   }
   st.attacker = attacker || Object.keys(st.players)[0];
   st.defender = Object.keys(st.players).find(id=>id!==st.attacker) || st.attacker;
+  st.turnDefenderInitialHandCount = st.players[st.defender!]?.hand.length || 0;
 }
 
 export function canBeat(a: Card, d: Card, trump: Suit): boolean {

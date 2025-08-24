@@ -20,6 +20,12 @@ export default function Home(){
   const [deadlineLeft, setDeadlineLeft] = useState<number | null>(null);
   const baseTurnMs = useMemo(()=>{ const sp = (room?.settings as any)?.speed||'normal'; return sp==='slow'?15000: sp==='fast'?6000:9000; },[room?.settings]);
   const deadlinePct = typeof deadlineLeft==='number'? Math.min(100, Math.max(0, (100*deadlineLeft)/baseTurnMs)) : null;
+  const defendableSet = useMemo(()=>{
+    if(!room || !defendTarget) return new Set<string>();
+    const set = new Set<string>();
+    for(const c of selfHand){ if(canDefendOnline(defendTarget, c as any)) set.add(c.r+c.s); }
+    return set;
+  },[room, defendTarget, selfHand]);
 
   useEffect(()=>{
     if(!socket) return;
@@ -301,6 +307,33 @@ export default function Home(){
 
               <div className="flex-1 min-w-[280px] order-1 sm:order-2">
                 <h3 className="font-medium mb-2">Стол</h3>
+                <div className="relative mb-3">
+                  {/* Seat ring */}
+                  {room && room.order && room.order.length>1 && (
+                    <div className="seat-ring">
+                      {(room.order||[]).map((pid, idx)=>{
+                        const p = room.players.find(pp=>pp.id===pid);
+                        if(!p) return null;
+                        const total = room.order ? room.order.length : 1;
+                        const angle = (360/total)*idx - 90; // начнем сверху
+                        const radius = 135;
+                        const x = radius * Math.cos(angle*Math.PI/180);
+                        const y = radius * Math.sin(angle*Math.PI/180);
+                        const isSelf = pid===selfId;
+                        const isAttacker = room.state.attacker===pid;
+                        const isDefender = room.state.defender===pid;
+                        return (
+                          <div key={pid} className={"seat " + (isSelf? 'self ':'') + (isAttacker? 'attacker ':'') + (isDefender? 'defender ':'')}
+                            style={{ transform:`translate(-50%, -50%) translate(${x}px, ${y}px)` }}
+                          >
+                            <div className="nick text-[10px] font-medium truncate max-w-[90px]">{p.nick}</div>
+                            <div className="hand-count text-[10px] opacity-70">{p.handCount}</div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
                 <div
                   className="relative table-surface rounded-xl p-3 md:p-4 table-board"
                   onDragOver={(e:React.DragEvent)=>{ if(dragCard) e.preventDefault(); }}
@@ -339,6 +372,7 @@ export default function Home(){
                     <button className="btn" onClick={()=>sendAction({ type:'END_TURN' })} disabled={!selfId || room.state.attacker!==selfId || room.state.table.some((p:TablePair)=>!p.defend)}>Бито</button>
                     <button className="btn" onClick={()=>sendAction({ type:'TAKE' })} disabled={!selfId || room.state.defender!==selfId}>Взять</button>
                     <button className="btn" onClick={()=>setShowHelp(true)}>Правила</button>
+                    <button className="btn" onClick={()=>reconnect()} disabled={connected && !socketError}>Связь</button>
                     {defendTarget && <button className="btn" onClick={()=>setDefendTarget(null)}>Отмена защиты</button>}
                   </div>
                 )}
@@ -368,13 +402,14 @@ export default function Home(){
                 <h3 className="font-medium mb-3 hidden sm:block">Ваши карты</h3>
                 <div className={"hand-fan "+ (sortedHand.length>7? 'compact':'')+" flex-wrap justify-center"}>
                   {sortedHand.map((c, i:number)=>{
-                    const actionable = canAttackOnline(c as any) || (!!defendTarget && canDefendOnline(defendTarget, c as any));
+          const canDef = !!defendTarget && canDefendOnline(defendTarget, c as any);
+          const actionable = canAttackOnline(c as any) || canDef;
                     const style: any = {};
                     if(sortedHand.length>7){ style.marginLeft = i===0? 0 : '-40px'; }
                     return (
                       <div key={i}
                         style={style}
-                        className={"card-wrapper "+(actionable? 'playable-card cursor-pointer':'opacity-40')}
+            className={"card-wrapper "+(actionable? 'playable-card cursor-pointer':'opacity-40')+ (canDef? ' defend-choice':'')}
                         draggable={!!actionable}
                         onDragStart={onDragStart(c as any)}
                         onDragEnd={clearDrag}
