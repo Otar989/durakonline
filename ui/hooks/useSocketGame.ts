@@ -33,7 +33,9 @@ export function useSocketGame(roomId: string | null, nick: string){
 
   useEffect(()=>{ if(roomId) connect(); return ()=>{ if(sref.current) sref.current.disconnect(); if(timeoutRef.current) clearTimeout(timeoutRef.current); }; },[roomId, connect]);
 
-  const startGame = () => { if(sref.current && roomId) sref.current.emit('start_game', { roomId }); };
+  const startGame = (opts?: { withBot?: boolean; allowTranslation?: boolean }) => {
+    if(sref.current && roomId) sref.current.emit('start_game', { roomId, withBot: opts?.withBot, allowTranslation: opts?.allowTranslation });
+  };
   const playMove = (move: Move) => { if(sref.current && roomId) sref.current.emit('play_move', { roomId, move }); };
 
   return { snapshot, socketState, startGame, playMove };
