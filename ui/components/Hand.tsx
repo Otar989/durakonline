@@ -17,8 +17,9 @@ export const Hand: React.FC<Props> = ({ hand, legal, onPlay, phase }) => {
         draggable={attackable || !!defendable}
         onDragStart={e=>{ e.dataTransfer.setData('application/x-card', data); }}
         onClick={()=>{ if(attackable) onPlay({ type:'ATTACK', card: c }); else if(defendable) onPlay(defendable); }}
-        className="transition-transform hover:-translate-y-1 disabled:opacity-30">
+        className={`transition-transform hover:-translate-y-1 disabled:opacity-30 rounded relative ${attackable? 'ring-2 ring-emerald-400': defendable? 'ring-2 ring-sky-400':''}`}>
         <PlayingCard card={c} trumpSuit={undefined} dim={false} />
+        {defendable && <span className="absolute -top-1 -right-1 text-[10px] bg-sky-500 text-white px-1 rounded">D</span>}
       </button>;
     })}
   </div>;
