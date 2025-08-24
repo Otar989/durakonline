@@ -1,5 +1,6 @@
 "use client";
 import React, { useEffect, useState, useCallback } from 'react';
+import { useSettings } from '../context/SettingsContext';
 import Modal from './Modal';
 import Link from 'next/link';
 
@@ -13,17 +14,13 @@ export const Lobby: React.FC<Props> = () => {
   const [showRules,setShowRules] = useState(false);
   const [waiting,setWaiting] = useState(false);
   const [countdown,setCountdown] = useState(5);
-  const [animations,setAnimations] = useState(()=> (typeof window!=='undefined' && localStorage.getItem('durak_anim')==='off')? false:true);
-  const [sound,setSound] = useState(()=> !(typeof window!=='undefined' && localStorage.getItem('durak_sound_muted')==='true'));
-  const [theme,setTheme] = useState<'auto'|'light'|'dark'>(()=> (typeof window!=='undefined' && (localStorage.getItem('durak_theme_mode') as any)) || 'auto');
+  const { theme, setTheme, sound, toggleSound, animations, toggleAnimations, ensureAudioUnlocked, play } = useSettings() as any;
   const [hasPersist,setHasPersist] = useState(false);
+  useEffect(()=>{ try { if(typeof window!=='undefined' && localStorage.getItem('durak_persist_v2')) setHasPersist(true);} catch{} },[]);
+  // одноразовый unlock + ambient
+  useEffect(()=>{ function first(){ ensureAudioUnlocked().then(()=> play('ambient')); } window.addEventListener('pointerdown', first, { once:true }); return ()=> window.removeEventListener('pointerdown', first); },[ensureAudioUnlocked, play]);
 
-  useEffect(()=>{ try { if(typeof window!=='undefined' && localStorage.getItem('durak_persist')) setHasPersist(true);} catch{} },[]);
-  useEffect(()=>{ try { if(typeof window!=='undefined') localStorage.setItem('durak_anim', animations? 'on':'off'); } catch{}; if(typeof document!=='undefined'){ document.body.classList.toggle('reduced-motion', !animations); } },[animations]);
-  useEffect(()=>{ try { if(typeof window!=='undefined') localStorage.setItem('durak_sound_muted', sound? 'false':'true'); } catch{} },[sound]);
-  useEffect(()=>{ try { if(typeof window!=='undefined') localStorage.setItem('durak_theme_mode', theme); } catch{} },[theme]);
-
-  const play = useCallback(()=>{
+  const startGameFromLobby = useCallback(()=>{
     if(!nick.trim()) return;
     if(mode==='OFFLINE'){
       // перенаправление сразу
@@ -64,23 +61,15 @@ export const Lobby: React.FC<Props> = () => {
               <option value="ONLINE">ONLINE</option>
             </select>
           </label>
-          <label className="flex items-center gap-2 cursor-pointer select-none" title="Звук">
-            <input type="checkbox" checked={sound} onChange={e=> setSound(e.target.checked)} /> Звук
-          </label>
-          <label className="flex items-center gap-2 cursor-pointer select-none" title="Усиленные анимации">
-            <input type="checkbox" checked={animations} onChange={e=> setAnimations(e.target.checked)} /> Анимации
-          </label>
-          <label className="flex items-center gap-2">Тема
-            <select value={theme} onChange={e=> setTheme(e.target.value as any)} className="input !p-2 w-28">
-              <option value="auto">auto</option>
-              <option value="dark">dark</option>
-              <option value="light">light</option>
-            </select>
-          </label>
+          <button onClick={toggleSound} className="px-3 py-2 rounded bg-white/10 hover:bg-white/20 text-sm" title="Звук">{sound? '🔊':'🔇'}</button>
+          <button onClick={toggleAnimations} className="px-3 py-2 rounded bg-white/10 hover:bg-white/20 text-sm" title="Анимации">{animations? '🎞️':'🚫'}</button>
+          <button onClick={()=> setTheme(theme==='dark'? 'light': theme==='light'? 'system':'dark')} className="px-3 py-2 rounded bg-white/10 hover:bg-white/20 text-sm" title="Тема: dark→light→system">
+            {theme==='system'? '🌀': theme==='dark'? '🌙':'☀️'}
+          </button>
           <button onClick={()=> setShowRules(true)} className="px-3 py-2 rounded bg-white/10 hover:bg-white/20 text-sm">Правила</button>
         </div>
         <div className="flex gap-3 flex-wrap">
-          {!waiting && <button onClick={play} className="btn flex-1 disabled:opacity-40" disabled={!nick.trim()}>Играть</button>}
+          {!waiting && <button onClick={startGameFromLobby} className="btn flex-1 disabled:opacity-40" disabled={!nick.trim()}>Играть</button>}
           {hasPersist && !waiting && <Link href="/game" className="px-4 py-2 rounded bg-white/10 hover:bg-white/20 text-sm flex items-center">Продолжить</Link>}
         </div>
         {waiting && mode==='ONLINE' && (

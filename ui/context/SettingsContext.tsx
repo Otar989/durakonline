@@ -25,14 +25,16 @@ class SoundManager {
   private buffers: Map<string, AudioBuffer> = new Map();
   private pendingPreload: string[] = [];
   private unlocked = false;
+  private manifest = ['card','defend','take','bito','win','ambient'];
 
   async unlock(){
     if(typeof window==='undefined') return;
     if(!this.ctx){ this.ctx = new (window.AudioContext || (window as any).webkitAudioContext)(); this.gain = this.ctx.createGain(); this.gain.connect(this.ctx.destination); }
     if(this.ctx.state==='suspended'){ try { await this.ctx.resume(); } catch{} }
     this.unlocked = true;
-    // preload queued
-    if(this.pendingPreload.length){ const list = [...this.pendingPreload]; this.pendingPreload=[]; list.forEach(n=> this.load(n)); }
+  // preload queued + manifest
+  if(this.pendingPreload.length){ const list = [...this.pendingPreload]; this.pendingPreload=[]; list.forEach(n=> this.load(n)); }
+  this.manifest.forEach(n=> this.load(n));
   }
   setVolume(v:number){ if(this.gain) this.gain.gain.value = v; }
   mute(m:boolean){ if(this.gain){ if(m){ this.gain.gain.value = 0; } } }
