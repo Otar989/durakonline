@@ -6,7 +6,7 @@ interface Props { table: Pair[]; trumpSuit: string; onDefend: (target: Card, car
 export const TableBoard: React.FC<Props> = ({ table, trumpSuit, onDefend, selectableDefend, onAttackDrop }) => {
   const [flashInvalid,setFlashInvalid] = useState(false);
   return (
-    <div className="flex flex-wrap gap-4 p-4 rounded-xl bg-white/5 border border-white/10 min-h-[140px] relative"
+  <div className="flex flex-wrap gap-4 p-4 rounded-xl glass min-h-[140px] relative"
       onDragOver={e=>{ // разрешаем дроп если либо атака возможна (пустой стол) либо защита в конкретные пары
         e.preventDefault();
       }}

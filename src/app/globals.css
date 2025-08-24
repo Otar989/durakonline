@@ -158,6 +158,15 @@ body {
 .turn-progress .fill { position:absolute; inset:0; background:linear-gradient(90deg,#23a6ff,#0b6bff); transition:width .25s linear; box-shadow:0 0 0 1px rgba(255,255,255,.2) inset; }
 
 /* Playable card pulse */
+@keyframes card-pop { from { transform: translateY(8px) scale(.96); opacity:0;} to { transform: translateY(0) scale(1); opacity:1; } }
+.card-enter { animation: card-pop .25s ease; }
+.glass {
+  background: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.15), rgba(255,255,255,0.04));
+  backdrop-filter: blur(20px) saturate(160%);
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
+  border: 1px solid rgba(255,255,255,0.15);
+  box-shadow: 0 4px 24px -4px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.08) inset;
+}
 .playable-card .playing-card { box-shadow:0 0 0 2px rgba(56,189,248,.8),0 0 10px -2px rgba(56,189,248,.8),0 6px 18px -4px rgba(0,0,0,.5); animation: playablePulse 1.4s ease-in-out infinite; }
 @keyframes playablePulse { 0%,100% { filter:brightness(1); } 50% { filter:brightness(1.25); } }
 
