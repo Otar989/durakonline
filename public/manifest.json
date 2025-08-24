@@ -1,12 +1,16 @@
 {
   "name": "Durak Online",
   "short_name": "Durak",
-  "display": "standalone",
   "start_url": "/",
-  "background_color": "#0b1220",
-  "theme_color": "#14b8a6",
-  "description": "Подкидной Дурак онлайн и офлайн с красивыми анимациями",
+  "display": "standalone",
+  "background_color": "#0b0f14",
+  "theme_color": "#0b0f14",
+  "description": "Подкидной / переводной Дурак онлайн и офлайн с ботом и анимациями",
   "icons": [
-    { "src": "/favicon.ico", "sizes": "64x64 32x32 16x16", "type": "image/x-icon" }
+    { "src": "/favicon.ico", "sizes": "64x64 32x32 16x16", "type": "image/x-icon" },
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/icons/maskable-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "/icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ]
 }

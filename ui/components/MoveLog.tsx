@@ -1,18 +1,35 @@
-import React from 'react';
+import React, { useMemo, useRef, useState, useEffect } from 'react';
 import { Move } from '../../game-core/types';
 
 interface Entry { by:string; move: Move; t: number }
 export const MoveLog: React.FC<{ entries: Entry[]|undefined; me?: string }> = ({ entries, me }) => {
   if(!entries || !entries.length) return null;
-  const last = entries.slice(-20).reverse();
-  return <div className="text-xs space-y-1 max-h-48 overflow-auto pr-1 font-mono">
-    {last.map(e=>{
-      return <div key={e.t+e.by} className="flex gap-2 items-center">
+  // virtualization (simple window based)
+  const containerRef = useRef<HTMLDivElement|null>(null);
+  const [range, setRange] = useState({ start: 0, end: 40 });
+  const itemHeight = 18; // px approximate
+  const total = entries.length;
+  const handleScroll = () => {
+    const el = containerRef.current; if(!el) return;
+    const scrollBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+    // always show latest; position from bottom
+    const visibleCount = Math.ceil(el.clientHeight / itemHeight) + 10;
+    const endIndex = total;
+    const startIndex = Math.max(0, endIndex - visibleCount);
+    setRange({ start: startIndex, end: endIndex });
+  };
+  useEffect(()=>{ handleScroll(); }, [total]);
+  const slice = entries.slice(range.start, range.end);
+  return <div ref={containerRef} onScroll={handleScroll} className="text-xs max-h-48 overflow-auto pr-1 font-mono relative" aria-label="Журнал ходов" role="log" aria-live="polite">
+    <div style={{ height: range.start * itemHeight }} />
+    {slice.map(e=>{
+      return <div key={e.t+e.by} className="flex gap-2 items-center h-[18px]">
         <span className={`font-semibold ${e.by===me? 'text-emerald-300':'text-sky-300'}`}>{e.by}</span>
         <MoveBadge move={e.move} />
         <span className="opacity-40">{new Date(e.t).toLocaleTimeString(undefined,{ minute:'2-digit', second:'2-digit'})}</span>
       </div>;
     })}
+    <div style={{ height: (total - range.end) * itemHeight }} />
   </div>;
 };
 
