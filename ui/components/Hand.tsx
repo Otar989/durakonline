@@ -4,7 +4,10 @@ import { PlayingCard } from './TrumpPile';
 
 interface Props { hand: Card[]; legal: Move[]; onPlay: (m:Move)=>void; phase: 'attack'|'defend'|'idle'; defendTarget?: Card|null; }
 export const Hand: React.FC<Props> = ({ hand, legal, onPlay, phase }) => {
-  const legalAttack = new Set(legal.filter(m=>m.type==='ATTACK').map(m=> (m as any).card.r+(m as any).card.s));
+  const legalAttack = new Set(
+    (legal.filter(m=>m.type==='ATTACK') as Extract<Move,{type:'ATTACK'}>[])
+      .map(m=> m.card.r+m.card.s)
+  );
   const legalDef = legal.filter(m=>m.type==='DEFEND') as Extract<Move,{type:'DEFEND'}>[];
   return <div className="flex gap-2 flex-wrap py-3 justify-center glass rounded-xl px-4">
     {hand.map(c=>{

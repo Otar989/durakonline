@@ -9,7 +9,7 @@ function shuffle<T>(arr:T[]):T[]{ return [...arr].sort(()=>Math.random()-0.5); }
 
 export function cloneState(st: GameState): GameState { return JSON.parse(JSON.stringify(st)); }
 
-export function initGame(players: { id: string; nick: string }[], seedShuffle = true): GameState {
+export function initGame(players: { id: string; nick: string }[], seedShuffle = true, opts?: { allowTranslation?: boolean }): GameState {
   if(players.length!==2) throw new Error('Only 2 players supported in MVP');
   let deck = buildDeck36();
   if(seedShuffle) deck = shuffle(deck);
@@ -19,7 +19,9 @@ export function initGame(players: { id: string; nick: string }[], seedShuffle = 
   const attacker = lowestTrumpOwner(ps, trump) || ps[0].id;
   const defender = ps.find(p=>p.id!==attacker)?.id || attacker;
   return {
-    deck, discard: [], trump, players: ps, attacker, defender, table: [], phase:'playing', loser:null, winner:null, finished:[], turnDefenderInitialHand: handOf(ps, defender).length
+    deck, discard: [], trump, players: ps, attacker, defender, table: [], phase:'playing', loser:null, winner:null, finished:[], turnDefenderInitialHand: handOf(ps, defender).length,
+    allowTranslation: !!opts?.allowTranslation,
+    log: []
   };
 }
 
@@ -69,6 +71,13 @@ export function legalMoves(st: GameState, playerId: string): Move[] {
         for(const c of meHand){ if(canBeat(pair.attack, c, st.trump.s)) moves.push({ type:'DEFEND', card: c, target: pair.attack }); }
       }
       moves.push({ type:'TAKE' });
+      // Translation: only before any defense played; all current attacks must be same rank; defender holds same rank card
+      if(st.allowTranslation && st.table.length>0 && st.table.every(p=>!p.defend)){
+        const rank = st.table[0].attack.r;
+        if(st.table.every(p=> p.attack.r===rank)){
+          for(const c of meHand){ if(c.r===rank) moves.push({ type:'TRANSLATE', card: c }); }
+        }
+      }
     } else {
       // all defended but defender cannot END_TURN, only attacker
     }
@@ -83,10 +92,12 @@ export function applyMove(st: GameState, move: Move, playerId: string): GameStat
   const legal = legalMoves(st, playerId).some(m=> JSON.stringify(m)===JSON.stringify(move));
   if(!legal) throw new Error('Illegal move');
   const meHand = handOf(st.players, playerId);
+  const pushLog = () => { st.log && st.log.push({ by: playerId, move, t: Date.now() }); };
   switch(move.type){
     case 'ATTACK':{
       removeCard(meHand, move.card);
       st.table.push({ attack: move.card });
+      pushLog();
       return st;
     }
     case 'DEFEND':{
@@ -94,9 +105,10 @@ export function applyMove(st: GameState, move: Move, playerId: string): GameStat
       const pair = st.table.find(p=> p.attack.r===move.target.r && p.attack.s===move.target.s && !p.defend);
       if(!pair) throw new Error('Target not found');
       pair.defend = move.card;
+      pushLog();
       return st;
     }
-    case 'TAKE':{
+  case 'TAKE':{
       // defender takes all cards
       const defHand = handOf(st.players, st.defender);
       for(const pair of st.table){ defHand.push(pair.attack); if(pair.defend) defHand.push(pair.defend); }
@@ -105,19 +117,32 @@ export function applyMove(st: GameState, move: Move, playerId: string): GameStat
   // В подкидном 2p: атакующий сохраняется тем же; защитник остаётся тем же (после взятия снова атакует атакующий прежний, защитник не меняется).
       st.turnDefenderInitialHand = handOf(st.players, st.defender).length;
       checkEnd(st);
+  pushLog();
       return st;
     }
     case 'END_TURN':{
       // move beaten cards to discard
-      for(const pair of st.table){ st.discard.push(pair.attack); if(pair.defend) st.discard.push(pair.defend); }
+      for(const pair of st.table){
+        st.discard.push(pair.attack);
+        if(pair.defend) st.discard.push(pair.defend);
+      }
       st.table = [];
       refill(st);
       // defender becomes new attacker
-      const prevAtt = st.attacker;
       st.attacker = st.defender;
       st.defender = st.players.find(p=>p.id!==st.attacker)!.id;
       st.turnDefenderInitialHand = handOf(st.players, st.defender).length;
       checkEnd(st);
+  pushLog();
+      return st;
+    }
+    case 'TRANSLATE':{
+      removeCard(meHand, (move as Extract<Move,{type:'TRANSLATE'}>).card);
+      st.table.push({ attack: (move as Extract<Move,{type:'TRANSLATE'}>).card });
+      const oldDef = st.defender; // which is playerId
+      st.attacker = oldDef;
+      st.defender = st.players.find(p=>p.id!==st.attacker)!.id;
+  pushLog();
       return st;
     }
   }

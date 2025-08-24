@@ -36,4 +36,4 @@ function attackScore(st: GameState, c: Card){
   return c.s===trumpSuit? base + 150 : base; // трампы дороже -> позже
 }
 
-function rankOrder(r: string){ return RANKS.indexOf(r as any); }
+// rankOrder removed (unused)

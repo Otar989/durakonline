@@ -20,13 +20,16 @@ export interface GameState {
   winner?: string|null;
   finished: string[];      // players who emptied hand (for simultaneous finish detection)
   turnDefenderInitialHand: number; // limit for attacks this turn (<=6)
+  allowTranslation?: boolean; // optional: permit defender to translate before defending when ranks align
+  log?: { by: string; move: Move; t: number }[]; // minimal chronological log
 }
 
 export type Move =
   | { type:'ATTACK'; card: Card }
   | { type:'DEFEND'; card: Card; target: Card }
   | { type:'TAKE' }
-  | { type:'END_TURN' };
+  | { type:'END_TURN' }
+  | { type:'TRANSLATE'; card: Card }; // defender adds same-rank card, roles rotate
 
 export interface TurnInfo { attacker: string; defender: string; limit: number; tableCount: number; }
 
