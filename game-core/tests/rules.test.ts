@@ -53,4 +53,14 @@ describe('Durak core rules', ()=>{
     // либо есть, либо нет — просто проверим что не падает
     expect(Array.isArray(trans)).toBe(true);
   });
+  it('Defender can TRANSLATE when has same rank', ()=>{
+    const st = initGame([{id:'A',nick:'A'},{id:'B',nick:'B'}], true, { allowTranslation: true });
+    const first = legalMoves(st, st.attacker).find(m=>m.type==='ATTACK'); if(!first) return;
+    applyMove(st, first, st.attacker);
+    const rank = first.card.r;
+    const def = st.players.find(p=>p.id===st.defender)!;
+    if(!def.hand.some(c=>c.r===rank)) def.hand.push({ r: rank, s: def.hand[0]?.s==='♠'?'♥':'♠' });
+    const lm = legalMoves(st, st.defender);
+    expect(lm.some(m=>m.type==='TRANSLATE')).toBe(true);
+  });
 });

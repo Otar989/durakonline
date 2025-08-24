@@ -25,9 +25,12 @@ export const NewGamePage: React.FC = () => {
     if(socketState==='OFFLINE'){ startLocal(); } else { const generated = 'room_'+Math.random().toString(36).slice(2,8); setRoomId(generated); setTimeout(()=> startGame(), 600); setTimeout(()=>{ if(!snapshot.state) startLocal(); }, 7000); }
   };
 
+  const hasAttack = moves.some(mv=>mv.type==='ATTACK');
+  const hasDefend = !hasAttack && moves.some(mv=>mv.type==='DEFEND');
+  const hint = hasAttack? 'Перетащите или кликните карту для атаки': hasDefend? 'Отбейте карту или ВЗЯТЬ':'Ждите';
   return <div className="max-w-5xl mx-auto p-6 flex flex-col gap-6">
     <h1 className="text-2xl font-semibold">Durak</h1>
-  {(() => { const hasAttack = moves.some(mv=>mv.type==='ATTACK'); const hasDefend = !hasAttack && moves.some(mv=>mv.type==='DEFEND'); const hint = hasAttack? 'Перетащите или кликните карту для атаки': hasDefend? 'Отбейте карту или ВЗЯТЬ':'Ждите'; return <StatusBar mode={socketState} turnOwner={activeState? activeState.attacker: undefined} hint={hint} />; })()}
+    <StatusBar mode={socketState} turnOwner={activeState? activeState.attacker: undefined} hint={hint} />
     <div>
       <button className="px-5 py-3 rounded-lg bg-sky-600 text-white" onClick={startUnified}>Играть</button>
       {roomId && <span className="ml-3 text-xs opacity-70 select-all">Ссылка: {typeof window!=='undefined'? window.location.origin + '?room='+roomId: roomId}</span>}

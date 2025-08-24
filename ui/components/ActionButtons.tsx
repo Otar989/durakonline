@@ -1,6 +1,6 @@
 import React from 'react';
 import { Move } from '../../game-core/types';
-interface Props { legal: Move[]; onPlay: (m:Move)=>void; }
+interface Props { legal: Move[]; onPlay: (_m:Move)=>void; }
 export const ActionButtons: React.FC<Props> = ({ legal, onPlay }) => {
   const take = legal.find((mv)=>mv.type==='TAKE');
   const end = legal.find((mv)=>mv.type==='END_TURN');

@@ -2,7 +2,7 @@ import React from 'react';
 import { Card, Move } from '../../game-core/types';
 import { PlayingCard } from './TrumpPile';
 
-interface Props { hand: Card[]; legal: Move[]; onPlay: (m:Move)=>void; }
+interface Props { hand: Card[]; legal: Move[]; onPlay: (_m:Move)=>void; }
 export const Hand: React.FC<Props> = ({ hand, legal, onPlay }) => {
   const legalAttack = new Set(
     (legal.filter(m=>m.type==='ATTACK') as Extract<Move,{type:'ATTACK'}>[])
