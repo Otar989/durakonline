@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useFlip } from './FlipLayer';
 import { consumePendingFlight } from '../lib/flightBus';
 import { Pair, Card } from '../../game-core/types';
@@ -63,8 +63,19 @@ export const TableBoard: React.FC<Props> = ({ table, trumpSuit, onDefend, select
     }
     prevTableRef.current = table;
   },[table, flyCard, trumpSuit]);
+  const attackRanks = useMemo(()=> Array.from(new Set(table.flatMap(p=> [p.attack.r, p.defend?.r].filter(Boolean) as string[]))), [table]);
+  const [dragCard,setDragCard] = useState<{ id:string; card:Card; roles?: { attack:boolean; defend:boolean; translate:boolean } }|null>(null);
+  useEffect(()=>{
+    function onDrag(e: any){ setDragCard(e.detail); }
+    function onDragEnd(){ setDragCard(null); }
+    document.addEventListener('durak-drag-card', onDrag as any);
+    document.addEventListener('durak-drag-card-end', onDragEnd as any);
+    return ()=>{ document.removeEventListener('durak-drag-card', onDrag as any); document.removeEventListener('durak-drag-card-end', onDragEnd as any); };
+  },[]);
+  const canAttackWithDragged = dragCard? (dragCard.roles?.attack && (table.length===0 || attackRanks.includes(dragCard.card.r))) : false;
+  const draggedDefendCard = dragCard && dragCard.roles?.defend? dragCard.card: null;
   return (
-  <div ref={containerRef} className={`flex flex-wrap gap-4 p-4 rounded-xl glass min-h-[140px] relative ${translationHint? 'ring-2 ring-fuchsia-400/60 animate-pulse':''}`}
+  <div ref={containerRef} className={`flex flex-wrap gap-4 p-4 rounded-xl glass min-h-[140px] relative ${translationHint? 'ring-2 ring-fuchsia-400/60 animate-pulse':''} ${dragCard && canAttackWithDragged? 'ring-2 ring-emerald-400/60': dragCard? 'ring-2 ring-red-500/40':''}`}
       onDragOver={e=>{ // разрешаем дроп если либо атака возможна (пустой стол) либо защита в конкретные пары
         e.preventDefault();
       }}
@@ -81,7 +92,8 @@ export const TableBoard: React.FC<Props> = ({ table, trumpSuit, onDefend, select
   <AnimatePresence initial={false}>
   {table.map((pair,i)=> {
         const defendOptions = selectableDefend.filter(s=> s.target.r===pair.attack.r && s.target.s===pair.attack.s);
-        const droppable = !pair.defend && defendOptions.length>0;
+  const droppable = !pair.defend && defendOptions.length>0;
+  const highlightDefend = draggedDefendCard && droppable && defendOptions.some(o=> o.defendWith.r===draggedDefendCard.r && o.defendWith.s===draggedDefendCard.s);
         return (
           <motion.div key={pair.attack.r+pair.attack.s}
             layout
@@ -89,7 +101,9 @@ export const TableBoard: React.FC<Props> = ({ table, trumpSuit, onDefend, select
             animate={{ opacity:1, scale:1, y:0 }}
             exit={{ opacity:0, scale:0.85, y:-6 }}
             transition={{ type:'spring', stiffness:260, damping:22, mass:0.6 }}
-            className={`relative w-28 h-24 flex items-center justify-center rounded transition-colors ${droppable? 'ring-1 ring-sky-500/40': ''} ${flashInvalid? 'animate-pulse ring-red-500':''}`}
+            className={`relative w-28 h-24 flex items-center justify-center rounded transition-colors ${droppable? 'ring-1 ring-sky-500/40': ''} ${highlightDefend? 'ring-2 ring-emerald-400 shadow-[0_0_0_3px_rgba(16,185,129,0.25)]':''} ${flashInvalid? 'animate-pulse ring-red-500':''}`}
+            onMouseEnter={()=>{ if(!pair.defend){ try { document.dispatchEvent(new CustomEvent('durak-hover-attack',{ detail:{ card: pair.attack } })); } catch{} } }}
+            onMouseLeave={()=>{ if(!pair.defend){ try { document.dispatchEvent(new CustomEvent('durak-hover-attack-end',{ detail:{ card: pair.attack } })); } catch{} } }}
             onDragOver={(e: React.DragEvent)=>{ if(droppable) e.preventDefault(); }}
             onDrop={(e: React.DragEvent)=>{
               if(!droppable) return;
@@ -111,8 +125,9 @@ export const TableBoard: React.FC<Props> = ({ table, trumpSuit, onDefend, select
       })}
   </AnimatePresence>
   <div className="discard-anchor absolute -right-6 -top-6 w-8 h-8" />
-      {table.length===0 && <div className="text-xs opacity-50">Пока пусто</div>}
+  {table.length===0 && <div className={`text-xs opacity-60 italic ${dragCard? (canAttackWithDragged? 'text-emerald-300':'text-red-400'):''}`}>{dragCard? (canAttackWithDragged? 'Бросьте для атаки':'Нельзя атаковать этим рангом'): 'Пока пусто'}</div>}
       {flashInvalid && <div className="absolute -top-5 right-2 text-[10px] text-red-400">Нельзя сюда</div>}
+  {dragCard && <div className="pointer-events-none absolute inset-0 rounded-xl bg-gradient-to-br from-white/5 to-white/0" />}
     </div>
   );
 };

@@ -21,6 +21,27 @@ import Modal from '../components/Modal';
 import Sidebar from '../components/Sidebar';
 import { useNetStatus } from '../hooks/useNetStatus';
 
+// Live drag announcer
+const DragLive: React.FC = ()=> {
+  const [msg,setMsg] = React.useState('');
+  React.useEffect(()=>{
+    function onDrag(e:any){
+      const d = e.detail; if(!d) return;
+      let roles = [] as string[];
+      if(d.roles?.attack) roles.push('атака');
+      if(d.roles?.defend) roles.push('защита');
+      if(d.roles?.translate) roles.push('перевод');
+      setMsg(`Вы перетаскиваете карту: ${roles.join(', ')||'нельзя ходить'}`);
+    }
+    function onEnd(){ setMsg(''); }
+    document.addEventListener('durak-drag-card', onDrag as any);
+    document.addEventListener('durak-drag-card-end', onEnd as any);
+    return ()=> { document.removeEventListener('durak-drag-card', onDrag as any); document.removeEventListener('durak-drag-card-end', onEnd as any); };
+  },[]);
+  if(!msg) return null;
+  return <div aria-live="polite" className="sr-only" role="status">{msg}</div>;
+};
+
 const LiveRegion: React.FC<{ message: string }> = ({ message }) => (
   <div aria-live="polite" aria-atomic="true" className="sr-only" role="status">{message}</div>
 );
@@ -95,6 +116,14 @@ export const NewGamePage: React.FC<{ onRestart?: ()=>void; initialNick?: string;
 
   const inOnline = socketState==='ONLINE' && snapshot.state;
   const netStatus = useNetStatus({ socketState, offlineMode: mode==='OFFLINE' });
+  const prevNetRef = React.useRef(netStatus);
+  useEffect(()=>{
+    if(prevNetRef.current==='RECONNECTING' && netStatus==='ONLINE'){
+      push('Соединение восстановлено','success');
+      setAriaAnnounce('Соединение восстановлено');
+    }
+    prevNetRef.current = netStatus;
+  },[netStatus, push]);
   const activeState = inOnline? snapshot.state : localState;
   const myId = inOnline? snapshot.players[0]?.id : 'p1';
   const moves = useMemo(()=> activeState && myId? legalMoves(activeState, myId): [], [activeState, myId]);
@@ -207,9 +236,18 @@ export const NewGamePage: React.FC<{ onRestart?: ()=>void; initialNick?: string;
   const hasAttack = moves.some(mv=>mv.type==='ATTACK');
   const hasDefend = !hasAttack && moves.some(mv=>mv.type==='DEFEND');
   const canTranslate = activeState && myId? isTranslationAvailable(activeState, myId): false;
-  const hint = hasAttack? 'Перетащите или кликните карту для атаки': hasDefend? (canTranslate? 'Можно перевести, или отбивайтесь / ВЗЯТЬ':'Отбейте карту или ВЗЯТЬ'):'Ждите';
+  const hint = hasAttack? 'Перетащите/кликните карту для атаки': hasDefend? 'Отбейте карту или нажмите ВЗЯТЬ':'Ждите';
   const [ariaAnnounce, setAriaAnnounce] = useState('');
   const [selectedIndex,setSelectedIndex] = useState(0);
+  const [showGestures,setShowGestures] = useState(false);
+  useEffect(()=>{
+    if(typeof window==='undefined') return;
+    const seen = localStorage.getItem('durak_gesture_help_v1');
+    if(!seen){
+      // показываем только на узких экранах
+      if(window.innerWidth < 780){ setShowGestures(true); }
+    }
+  },[]);
   useEffect(()=>{
     const last = activeState?.log?.[activeState.log.length-1];
     if(!last) return;
@@ -222,6 +260,17 @@ export const NewGamePage: React.FC<{ onRestart?: ()=>void; initialNick?: string;
     else if(m.type==='TRANSLATE') msg = `${last.by} перевод ${m.card.r}${m.card.s}`;
     setAriaAnnounce(msg);
   },[activeState?.log?.length]);
+
+  // анонс смены ролей (атакующий / защитник)
+  const prevRoles = useRef<{ a?:string; d?:string }>({});
+  useEffect(()=>{
+    if(!activeState) return;
+    const a = activeState.attacker; const d = activeState.defender;
+    if(prevRoles.current.a && (prevRoles.current.a!==a || prevRoles.current.d!==d)){
+      setAriaAnnounce(`Атакует ${a}, защищается ${d}`);
+    }
+    prevRoles.current = { a, d };
+  },[activeState?.attacker, activeState?.defender]);
 
   // hotkeys: A=single attack, D=single defend, T=take, E=end turn, R=translate (если одна опция)
   useHotkeys([
@@ -245,7 +294,7 @@ export const NewGamePage: React.FC<{ onRestart?: ()=>void; initialNick?: string;
   return (
       <div className="flex flex-col gap-4 lg:flex-row">
         <div className="flex items-start gap-4 flex-wrap flex-1">
-          <Sidebar trump={activeState.trump} deckCount={activeState.deck.length} discard={activeState.discard} opponent={opp? { nick: opp.nick, handCount: opp.hand.length }: null} />
+          <Sidebar trump={activeState.trump} deckCount={activeState.deck.length} discard={activeState.discard} opponent={opp? { nick: opp.nick, handCount: opp.hand.length, isBot: (opp as any).bot || (opp.nick||'').toLowerCase().includes('bot'), isOffline: (opp as any).offline }: null} />
           <div className="flex flex-col gap-2 min-w-[160px] flex-1">
             <div className="glass p-3 rounded-2xl text-xs flex flex-col gap-1">
               <label className="flex items-center gap-2 cursor-pointer text-[11px]"><input type="checkbox" checked={autosort} onChange={e=> setAutosort(e.target.checked)} /> Авто-сорт</label>
@@ -299,6 +348,7 @@ export const NewGamePage: React.FC<{ onRestart?: ()=>void; initialNick?: string;
   <FlipProvider>
   <div ref={gestureRef} className="max-w-6xl mx-auto p-6 flex flex-col gap-6">
   <LiveRegion message={ariaAnnounce} />
+  <DragLive />
       <header className="flex flex-col gap-4">
         <div className="flex items-center gap-4 flex-wrap">
           <h1 className="text-2xl font-semibold">Дурак Онлайн</h1>
@@ -352,6 +402,21 @@ export const NewGamePage: React.FC<{ onRestart?: ()=>void; initialNick?: string;
           <li>«Бито» когда все атаки покрыты; иначе защитник может «ВЗЯТЬ».</li>
         </ul>
       </Modal>
+      {showGestures && <div role="dialog" aria-modal="true" className="fixed inset-0 z-40 flex items-end sm:items-center justify-center bg-black/60 p-4" onClick={()=>{ setShowGestures(false); try { localStorage.setItem('durak_gesture_help_v1','1'); } catch{} }}>
+        <div className="bg-neutral-900/90 backdrop-blur rounded-2xl p-5 w-full max-w-sm text-center space-y-3 animate-in fade-in zoom-in duration-300" onClick={e=> e.stopPropagation()}>
+          <h2 className="text-sm font-semibold">Жесты</h2>
+          <ul className="text-[11px] text-left space-y-1 list-disc pl-4">
+            <li><b>Вправо</b> — ВЗЯТЬ (если доступно)</li>
+            <li><b>Влево</b> — Атака единственной картой или БИТО</li>
+            <li><b>Вверх</b> — Защита единственной картой</li>
+            <li><b>Вниз</b> — ВЗЯТЬ</li>
+            <li><b>Нажатие карты</b> — Ход выбранной ролью (атака/перевод/защита)</li>
+            <li><b>Долгое удержание</b> — (будет) подсказка — скоро</li>
+          </ul>
+          <button className="btn w-full" onClick={()=>{ setShowGestures(false); try { localStorage.setItem('durak_gesture_help_v1','1'); } catch{} }}>Понятно</button>
+          <p className="text-[10px] opacity-50">Нажмите вне окна чтобы закрыть</p>
+        </div>
+      </div>}
   <ConfettiBurst show={!!gameEnded?.winner} />
   <Modal open={!!gameEnded} onClose={()=> setGameEnded(null)} title={gameEnded?.winner? 'Результат партии':'Ничья'} id="result-modal">
     <div className="text-center space-y-3">

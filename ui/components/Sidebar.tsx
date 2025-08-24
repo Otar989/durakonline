@@ -8,7 +8,7 @@ interface Props {
   trump: Card;
   deckCount: number;
   discard: Card[];
-  opponent?: { nick: string; handCount: number } | null;
+  opponent?: { nick: string; handCount: number; isBot?: boolean; isOffline?: boolean } | null;
 }
 
 export const Sidebar: React.FC<Props> = ({ trump, deckCount, discard, opponent }) => {
@@ -25,7 +25,7 @@ export const Sidebar: React.FC<Props> = ({ trump, deckCount, discard, opponent }
         <DiscardPanel discard={discard} />
         <div className="text-[11px] opacity-70">Бито: {discard.length}</div>
       </div>
-      {opponent && <OpponentPanel nick={opponent.nick} handCount={opponent.handCount} />}
+  {opponent && <OpponentPanel nick={opponent.nick} handCount={opponent.handCount} isBot={opponent.isBot} isOffline={opponent.isOffline} />}
     </aside>
   );
 };
