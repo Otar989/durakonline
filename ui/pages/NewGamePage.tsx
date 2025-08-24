@@ -29,9 +29,34 @@ export const NewGamePage: React.FC = () => {
   const { toasts, push } = useToasts();
   const { play: playSound, muted, toggleMute, volume, setVolume } = useAudio(true);
   useEffect(()=>{ playSound('ambient'); },[playSound]);
-  const [theme,setTheme] = useState<'dark'|'light'>(()=> (typeof window!=='undefined' && window.matchMedia('(prefers-color-scheme: light)').matches)? 'light':'dark');
-  useEffect(()=>{ if(typeof document!=='undefined'){ document.documentElement.dataset.theme = theme; try { localStorage.setItem('durak_theme', theme);} catch{} } },[theme]);
-  useEffect(()=>{ if(typeof window!=='undefined'){ try { const t = localStorage.getItem('durak_theme'); if(t==='light'||t==='dark') setTheme(t as any); } catch{} } },[]);
+  // theme: dark | light | auto (system)
+  const [theme,setTheme] = useState<'dark'|'light'|'auto'>(()=> {
+    if(typeof window==='undefined') return 'dark';
+    try {
+      const saved = localStorage.getItem('durak_theme_mode');
+      if(saved==='dark'||saved==='light'||saved==='auto') return saved;
+    } catch {}
+    return window.matchMedia('(prefers-color-scheme: light)').matches? 'light':'dark';
+  });
+  const effectiveTheme = useMemo(()=>{
+    if(theme==='auto'){
+      if(typeof window!=='undefined') return window.matchMedia('(prefers-color-scheme: light)').matches? 'light':'dark';
+      return 'dark';
+    }
+    return theme;
+  },[theme]);
+  // apply theme
+  useEffect(()=>{ if(typeof document!=='undefined'){ document.documentElement.dataset.theme = effectiveTheme; } },[effectiveTheme]);
+  // persist raw mode
+  useEffect(()=>{ try { localStorage.setItem('durak_theme_mode', theme);} catch{} },[theme]);
+  // respond to system changes when in auto
+  useEffect(()=>{
+    if(theme!=='auto' || typeof window==='undefined') return;
+    const mm = window.matchMedia('(prefers-color-scheme: light)');
+    const handler = ()=>{ document.documentElement.dataset.theme = mm.matches? 'light':'dark'; };
+    mm.addEventListener('change', handler);
+    return ()=> mm.removeEventListener('change', handler);
+  },[theme]);
 
   // авто-sync после установления ONLINE
   useEffect(()=>{ if(socketState==='ONLINE' && snapshot.state){ const t = setTimeout(()=> requestSync(), 600); return ()=> clearTimeout(t); } },[socketState]);
@@ -104,7 +129,11 @@ export const NewGamePage: React.FC = () => {
     }
   },[activeState, gameEnded, playSound]);
 
-  // swipe gestures (mobile): right=TAKE, left=END_TURN, up=single DEFEND (если одна опция), down=TAKE
+  // swipe gestures (mobile):
+  //  right => TAKE
+  //  left => if single ATTACK option then ATTACK; else END_TURN (fallback)
+  //  up => single DEFEND (если единственная опция)
+  //  down => TAKE
   useEffect(()=>{
     const el = gestureRef.current; if(!el) return;
     let startX=0, startY=0;
@@ -113,8 +142,13 @@ export const NewGamePage: React.FC = () => {
       const t = e.changedTouches[0]; const dx = t.clientX-startX; const dy = t.clientY-startY;
       const absX = Math.abs(dx); const absY = Math.abs(dy);
       if(absX>60 && absY<50){
-        if(dx>0){ const take = (moves as Move[]).find(m=>m.type==='TAKE'); if(take){ inOnline? playMove(take): playLocal(take); } }
-        else { const end = (moves as Move[]).find(m=>m.type==='END_TURN'); if(end){ inOnline? playMove(end): playLocal(end); } }
+        if(dx>0){ // right
+          const take = (moves as Move[]).find(m=>m.type==='TAKE'); if(take){ inOnline? playMove(take): playLocal(take); }
+        } else { // left
+          const atks = (moves as Move[]).filter(m=>m.type==='ATTACK');
+          if(atks.length===1){ inOnline? playMove(atks[0]): playLocal(atks[0]); }
+          else { const end = (moves as Move[]).find(m=>m.type==='END_TURN'); if(end){ inOnline? playMove(end): playLocal(end); } }
+        }
       } else if(absY>60 && absX<60){
         if(dy<0){ const defs = (moves as Move[]).filter(m=>m.type==='DEFEND') as Extract<Move,{type:'DEFEND'}>[]; if(defs.length===1){ inOnline? playMove(defs[0]): playLocal(defs[0]); } }
         else { const take = (moves as Move[]).find(m=>m.type==='TAKE'); if(take){ inOnline? playMove(take): playLocal(take); } }
@@ -254,7 +288,9 @@ export const NewGamePage: React.FC = () => {
             <button onClick={toggleMute} className="px-2 py-1 rounded bg-white/10 hover:bg-white/20">{muted? '🔇':'🔊'}</button>
             <MotionControls />
             <input type="range" min={0} max={1} step={0.05} value={volume} onChange={e=> setVolume(Number(e.target.value))} className="accent-sky-400 w-20" />
-            <button onClick={()=> setTheme(t=> t==='dark'?'light':'dark')} className="px-2 py-1 rounded bg-white/10 hover:bg-white/20">{theme==='dark'? '🌙':'☀️'}</button>
+            <button onClick={()=> setTheme(t=> t==='dark'?'light': t==='light'?'auto':'dark')} className="px-2 py-1 rounded bg-white/10 hover:bg-white/20" title="Тема: тёмная / светлая / авто">
+              {theme==='auto'? '🌀': theme==='dark'? '🌙':'☀️'}
+            </button>
             <button onClick={()=> setShowRules(true)} className="px-2 py-1 rounded bg-white/10 hover:bg-white/20">Правила</button>
           </div>
         </div>
@@ -264,7 +300,10 @@ export const NewGamePage: React.FC = () => {
           {mode==='ONLINE' && roomId && <span className="text-[11px] opacity-60 select-all">{window.location.origin+'?room='+roomId}</span>}
           {mode==='ONLINE' && roomId && <button className="text-[10px] px-2 py-1 rounded bg-white/10 hover:bg-white/20" onClick={()=> requestSync()}>SYNC</button>}
         </div>
-        <StatusBar mode={socketState} turnOwner={activeState? activeState.attacker: undefined} hint={hint} allowTranslation={!!activeState?.allowTranslation} />
+        <StatusBar mode={socketState} turnOwner={activeState? activeState.attacker: undefined} hint={hint} allowTranslation={!!activeState?.allowTranslation}
+          attackerNick={activeState? activeState.players.find(p=>p.id===activeState.attacker)?.nick: undefined}
+          defenderNick={activeState? activeState.players.find(p=>p.id===activeState.defender)?.nick: undefined}
+        />
       </header>
       {renderContent()}
       <ToastHost queue={toasts} />
