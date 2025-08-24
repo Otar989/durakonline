@@ -101,4 +101,4 @@ function scheduleAutoBot(room: Room){
 }
 
 const port = Number(process.env.PORT||4001);
-httpServer.listen(port, ()=> console.log('Socket server on', port));
+httpServer.listen(port, ()=> console.warn('Socket server on', port));

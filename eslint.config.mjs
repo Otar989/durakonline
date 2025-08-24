@@ -25,7 +25,11 @@ const eslintConfig = [
       'no-unused-vars': ['warn',{ argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
       '@typescript-eslint/no-explicit-any': 'warn',
       'react-hooks/rules-of-hooks': 'error',
-  'react-hooks/exhaustive-deps': 'warn',
+  'react-hooks/exhaustive-deps': 'error',
+      'prefer-const': ['warn',{ destructuring: 'all' }],
+      'eqeqeq': ['warn','smart'],
+      'no-console': ['warn',{ allow: ['warn','error'] }],
+      'no-constant-binary-expression': 'warn',
   // JSX ложные срабатывания в условных рендерах
   '@typescript-eslint/no-unused-expressions': ['warn', { allowShortCircuit: true, allowTernary: true, allowTaggedTemplates: true }]
     }
