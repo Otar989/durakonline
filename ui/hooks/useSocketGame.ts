@@ -26,7 +26,8 @@ export function useSocketGame(roomId: string | null, nick: string){
     });
     s.on('room_state', (snap:Snapshot)=> setSnapshot(snap));
     s.on('game_started', (snap:Snapshot)=> setSnapshot(snap));
-    s.on('move_applied', ({ state }: { state:GameState })=> setSnapshot(prev=>({ ...prev, state })));
+  s.on('move_applied', ({ state }: { state:GameState })=> setSnapshot(prev=>({ ...prev, state })));
+  s.on('game_over', ({ state }: { state:GameState })=> setSnapshot(prev=>({ ...prev, state })));
   s.on('error', (e:unknown)=> console.warn('socket error', e));
     s.on('disconnect', ()=>{ setConnected(false); setSocketState('RECONNECTING'); });
   },[roomId, nick, connected]);

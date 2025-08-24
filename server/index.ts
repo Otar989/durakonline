@@ -71,6 +71,9 @@ io.on('connection', socket=>{
       applyMove(room.state, move, pid);
       touch(room);
       io.to(roomId).emit('move_applied', { state: room.state, lastMove: move });
+      if(room.state.phase==='finished'){
+        io.to(roomId).emit('game_over', { state: room.state, winner: room.state.winner, loser: room.state.loser });
+      }
       // если бот участвует и его очередь — сделать ход спустя задержку
       if(room.bot && room.state.phase==='playing'){
         const needBot = room.state.attacker===room.bot.id || room.state.defender===room.bot.id;
@@ -78,7 +81,7 @@ io.on('connection', socket=>{
           setTimeout(()=>{
             if(!room.state) return; try {
               const lm = legalMoves(room.state!, room.bot!.id);
-              const pick = lm[0]; if(pick){ applyMove(room.state!, pick, room.bot!.id); io.to(roomId).emit('move_applied', { state: room.state, lastMove: pick }); }
+              const pick = lm[0]; if(pick){ applyMove(room.state!, pick, room.bot!.id); io.to(room.id).emit('move_applied', { state: room.state, lastMove: pick }); if(room.state.phase==='finished'){ io.to(room.id).emit('game_over', { state: room.state, winner: room.state.winner, loser: room.state.loser }); } }
             } catch{} }, 550);
         }
       }
