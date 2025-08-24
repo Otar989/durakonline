@@ -22,7 +22,7 @@ export default function CreateGamePage(){
   const [roomId,setRoomId] = useState(randomId());
   const [nick,setNick] = useState('');
   const [settings,setSettings] = useState<CreateSettings>({ maxPlayers:6, deckSize:36, speed:'normal', allowTranslation:true, private:false });
-  const update = <K extends keyof CreateSettings>(k:K,v:CreateSettings[K])=> setSettings((s:CreateSettings)=>({...s,[k]:v}));
+  const update = <K extends keyof CreateSettings>(k:K,v:CreateSettings[K])=> setSettings(s=>({...s,[k]:v}));
 
   useEffect(()=>{ if(typeof window!=='undefined'){ const saved = localStorage.getItem('durak_nick'); if(saved) setNick(saved); } },[]);
   useEffect(()=>{ if(typeof window!=='undefined' && nick) localStorage.setItem('durak_nick', nick); },[nick]);
@@ -49,7 +49,7 @@ export default function CreateGamePage(){
               <input value={nick} onChange={(e:ChangeEvent<HTMLInputElement>)=>setNick(e.target.value)} className="input" placeholder="Ваш ник" />
             </Field>
             <Field label="Макс игроков">
-              <Range value={settings.maxPlayers} min={2} max={6} onChange={v=>update('maxPlayers', v)} />
+              <Range value={settings.maxPlayers} min={2} max={6} onChange={(val:number)=>update('maxPlayers', val)} />
             </Field>
             <Field label="Размер колоды">
               <div className="flex gap-2 flex-wrap">

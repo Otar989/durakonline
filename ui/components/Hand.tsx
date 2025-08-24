@@ -2,15 +2,15 @@ import React from 'react';
 import { Card, Move } from '../../game-core/types';
 import { PlayingCard } from './TrumpPile';
 
-interface Props { hand: Card[]; legal: Move[]; onPlay: (m:Move)=>void; phase: 'attack'|'defend'|'idle'; defendTarget?: Card|null; }
-export const Hand: React.FC<Props> = ({ hand, legal, onPlay, phase }) => {
+interface Props { hand: Card[]; legal: Move[]; onPlay: (m:Move)=>void; }
+export const Hand: React.FC<Props> = ({ hand, legal, onPlay }) => {
   const legalAttack = new Set(
     (legal.filter(m=>m.type==='ATTACK') as Extract<Move,{type:'ATTACK'}>[])
       .map(m=> m.card.r+m.card.s)
   );
   const legalDef = legal.filter(m=>m.type==='DEFEND') as Extract<Move,{type:'DEFEND'}>[];
   return <div className="flex gap-2 flex-wrap py-3 justify-center glass rounded-xl px-4">
-    {hand.map(c=>{
+  {hand.map(c=>{
       const id = c.r+c.s;
       const attackable = legalAttack.has(id);
       const defendable = legalDef.find(m=> m.card.r===c.r && m.card.s===c.s);

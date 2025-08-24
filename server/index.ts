@@ -71,7 +71,7 @@ io.on('connection', socket=>{
             if(!room.state) return; try {
               const lm = legalMoves(room.state!, room.bot!.id);
               const pick = lm[0]; if(pick){ applyMove(room.state!, pick, room.bot!.id); io.to(roomId).emit('move_applied', { state: room.state, lastMove: pick }); }
-            } catch(_err){} }, 550);
+            } catch{} }, 550);
         }
       }
     } finally { room.busy = false; }

@@ -20,7 +20,7 @@ export const TableBoard: React.FC<Props> = ({ table, trumpSuit, onDefend, select
         } catch{}
       }}
     >
-      {table.map((pair,i)=> {
+  {table.map((pair,i)=> {
         const defendOptions = selectableDefend.filter(s=> s.target.r===pair.attack.r && s.target.s===pair.attack.s);
         const droppable = !pair.defend && defendOptions.length>0;
         return (

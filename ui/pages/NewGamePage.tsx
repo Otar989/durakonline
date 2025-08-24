@@ -27,7 +27,7 @@ export const NewGamePage: React.FC = () => {
 
   return <div className="max-w-5xl mx-auto p-6 flex flex-col gap-6">
     <h1 className="text-2xl font-semibold">Durak</h1>
-    <StatusBar mode={socketState} turnOwner={activeState? activeState.attacker: undefined} hint={moves.find(m=>m.type==='ATTACK')? 'Перетащите или кликните карту для атаки': moves.find(m=>m.type==='DEFEND')? 'Отбейте карту или ВЗЯТЬ':'Ждите'} />
+  {(() => { const hasAttack = moves.some(mv=>mv.type==='ATTACK'); const hasDefend = !hasAttack && moves.some(mv=>mv.type==='DEFEND'); const hint = hasAttack? 'Перетащите или кликните карту для атаки': hasDefend? 'Отбейте карту или ВЗЯТЬ':'Ждите'; return <StatusBar mode={socketState} turnOwner={activeState? activeState.attacker: undefined} hint={hint} />; })()}
     <div>
       <button className="px-5 py-3 rounded-lg bg-sky-600 text-white" onClick={startUnified}>Играть</button>
       {roomId && <span className="ml-3 text-xs opacity-70 select-all">Ссылка: {typeof window!=='undefined'? window.location.origin + '?room='+roomId: roomId}</span>}
@@ -49,7 +49,7 @@ export const NewGamePage: React.FC = () => {
           />
         </div>
       </div>
-      <Hand hand={activeState.players.find(p=>p.id===myId)?.hand||[]} legal={moves} onPlay={(m)=> inOnline? playMove(m): playLocal(m)} phase={'attack'} />
+  <Hand hand={activeState.players.find(p=>p.id===myId)?.hand||[]} legal={moves} onPlay={(m)=> inOnline? playMove(m): playLocal(m)} />
       <ActionButtons legal={moves} onPlay={(m)=> inOnline? playMove(m): playLocal(m)} />
       <div className="glass rounded-xl p-3">
         <h3 className="text-xs font-semibold mb-2 opacity-70">Ходы</h3>

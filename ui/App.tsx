@@ -7,7 +7,7 @@ export function App(){
   const [mode,setMode] = useState<'idle'|'offline'|'online'>('idle');
   const [state,setState] = useState<GameState | null>(null);
   const [me,setMe] = useState<string>('p1');
-  const [status,setStatus] = useState<'OFFLINE'|'ONLINE'|'RECONNECTING'>('OFFLINE');
+  // status placeholder removed (unused)
 
   const startOffline = () => {
     const st = initGame([{id:'p1',nick:'Вы'},{id:'bot',nick:'Бот'}]);

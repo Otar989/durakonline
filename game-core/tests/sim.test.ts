@@ -10,13 +10,13 @@ function randomPlay(){
     const attMoves = legalMoves(st, current);
     if(attMoves.length===0) break;
     const mvA = attMoves[Math.floor(Math.random()*attMoves.length)];
-  try { applyMove(st, mvA, current); } catch(_err){/* ignore */}
+  try { applyMove(st, mvA, current); } catch{/* ignore */}
     // defender reacts if still playing and there is something to defend
     if(st.phase==='playing' && st.table.some(p=>!p.defend)){
       const defMoves = legalMoves(st, st.defender);
       if(defMoves.length){
         const mvD = defMoves[Math.floor(Math.random()*defMoves.length)];
-  try { applyMove(st, mvD, st.defender); } catch(_err){/* ignore */}
+  try { applyMove(st, mvD, st.defender); } catch{/* ignore */}
       }
     }
     guard++;
