@@ -22,6 +22,7 @@ export interface GameState {
   turnDefenderInitialHand: number; // limit for attacks this turn (<=6)
   allowTranslation?: boolean; // optional: permit defender to translate before defending when ranks align
   log?: { by: string; move: Move; t: number }[]; // minimal chronological log
+  meta?: { firstAttacker: string; lowestTrump: Card }; // стартовая информация (для UX тостов)
 }
 
 export type Move =

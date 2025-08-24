@@ -16,12 +16,14 @@ export function initGame(players: { id: string; nick: string }[], seedShuffle = 
   const trump = deck[deck.length-1];
   const ps: PlayerState[] = players.map(p=>({ id:p.id, nick:p.nick, hand: deck.splice(0,6) }));
   // choose lowest trump owner
-  const attacker = lowestTrumpOwner(ps, trump) || ps[0].id;
+  const lowestInfo = findLowestTrump(ps, trump);
+  const attacker = lowestInfo?.owner || ps[0].id;
   const defender = ps.find(p=>p.id!==attacker)?.id || attacker;
   return {
     deck, discard: [], trump, players: ps, attacker, defender, table: [], phase:'playing', loser:null, winner:null, finished:[], turnDefenderInitialHand: handOf(ps, defender).length,
     allowTranslation: !!opts?.allowTranslation,
-    log: []
+    log: [],
+    meta: { firstAttacker: attacker, lowestTrump: lowestInfo?.card || trump }
   };
 }
 
@@ -35,6 +37,18 @@ function lowestTrumpOwner(players: PlayerState[], trump: Card){
     }
   }
   return owner;
+}
+
+function findLowestTrump(players: PlayerState[], trump: Card){
+  let lowest: Card|undefined; let owner: string|undefined;
+  for(const p of players){
+    for(const c of p.hand){
+      if(c.s===trump.s){
+        if(!lowest || RANKS.indexOf(c.r) < RANKS.indexOf(lowest.r)){ lowest=c; owner=p.id; }
+      }
+    }
+  }
+  return lowest && owner? { card: lowest, owner }: null;
 }
 
 function handOf(ps: PlayerState[], id: string){ const p = ps.find(p=>p.id===id); if(!p) throw new Error('player not found'); return p.hand; }
