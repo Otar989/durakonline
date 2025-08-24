@@ -2,6 +2,7 @@ import React, { useCallback, useRef } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Card, Move } from '../../game-core/types';
 import { PlayingCard } from './TrumpPile';
+import { setPendingFlight } from '../lib/flightBus';
 
 interface Props { hand: Card[]; legal: Move[]; onPlay: (_m:Move)=>void; trumpSuit?: string; autosort?: boolean; onSelectCard?: (c:Card|null)=>void; }
 export const Hand: React.FC<Props> = ({ hand, legal, onPlay, trumpSuit, autosort, onSelectCard }) => {
@@ -40,7 +41,11 @@ export const Hand: React.FC<Props> = ({ hand, legal, onPlay, trumpSuit, autosort
         disabled={!attackable && !defendable && !canTranslate}
         draggable={attackable || !!defendable || canTranslate}
   onDragStart={(e: React.DragEvent)=>{ e.dataTransfer.setData('application/x-card', data); }}
-  onClick={()=>{ if(attackable) onPlay({ type:'ATTACK', card: c }); else if(defendable) onPlay(defendable); else if(canTranslate) onPlay({ type:'TRANSLATE', card: c } as Move); else { onSelectCard?.(c); } }}
+  onClick={(e)=>{ if(attackable || defendable || canTranslate){
+            const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+            setPendingFlight({ id, from:{ x:rect.x, y:rect.y, w:rect.width, h:rect.height }, trumpSuit });
+            if(attackable) onPlay({ type:'ATTACK', card: c }); else if(defendable) onPlay(defendable); else if(canTranslate) onPlay({ type:'TRANSLATE', card: c } as Move);
+          } else { onSelectCard?.(c); } }}
         className={`transition-all disabled:opacity-30 rounded relative focus:outline-none focus:ring-2 focus:ring-sky-300 ${attackable? 'ring-2 ring-emerald-400': defendable? 'ring-2 ring-sky-400': canTranslate? 'ring-2 ring-fuchsia-400 animate-pulse':''}`}>
         <PlayingCard card={c} trumpSuit={undefined} dim={false} />
         {defendable && <span className="absolute -top-1 -right-1 text-[10px] bg-sky-500 text-white px-1 rounded">D</span>}

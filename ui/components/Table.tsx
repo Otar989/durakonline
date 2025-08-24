@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useFlip } from './FlipLayer';
+import { consumePendingFlight } from '../lib/flightBus';
 import { Pair, Card } from '../../game-core/types';
 import { PlayingCard } from './TrumpPile';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -14,6 +15,33 @@ export const TableBoard: React.FC<Props> = ({ table, trumpSuit, onDefend, select
 
   // отслеживаем момент когда стол очищён (END_TURN) и показываем анимацию исчезновения карт
   useEffect(()=>{
+    // появление новой атаки/защиты: hand->table перелёт
+    if(table.length > prevTableRef.current.length){
+      const diffPairs = table.filter(p=> !prevTableRef.current.find(o=> o.attack.r===p.attack.r && o.attack.s===p.attack.s));
+      const host = containerRef.current;
+      const pending = consumePendingFlight();
+      if(pending && diffPairs.length){
+        // атакующая карта
+        const targetPair = diffPairs[0];
+        const el = host?.querySelector(`[data-card-id='${targetPair.attack.r+targetPair.attack.s}']`) as HTMLElement|null;
+        if(el && flyCard){
+          const tr = el.getBoundingClientRect();
+          flyCard(pending.from, { x:tr.x, y:tr.y, w:tr.width, h:tr.height }, { r:targetPair.attack.r, s:targetPair.attack.s }, pending.trumpSuit);
+        }
+      }
+    } else if(table.length === prevTableRef.current.length){
+      // возможно добавилась защита (уже была атака без защиты)
+      const newlyDefended = table.filter(p=> p.defend && !prevTableRef.current.find(o=> o.attack.r===p.attack.r && o.attack.s===p.attack.s && o.defend));
+      if(newlyDefended.length){
+        const pending = consumePendingFlight();
+        const host = containerRef.current;
+        if(pending && flyCard){
+          const pair = newlyDefended[0];
+            const el = host?.querySelector(`[data-card-id='${pair.defend!.r+pair.defend!.s}']`) as HTMLElement|null;
+            if(el){ const tr = el.getBoundingClientRect(); flyCard(pending.from, { x:tr.x, y:tr.y, w:tr.width, h:tr.height }, { r:pair.defend!.r, s:pair.defend!.s }, pending.trumpSuit); }
+        }
+      }
+    }
     if(table.length===0 && prevTableRef.current.length>0){
       const host = containerRef.current;
       prevTableRef.current.forEach(pair=>{
