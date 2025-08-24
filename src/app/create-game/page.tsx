@@ -88,7 +88,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
-function Toggle({ label, checked, onChange }: { label: string; checked: boolean; onChange: (v:boolean)=>void }){
+function Toggle({ label, checked, onChange }: { label: string; checked: boolean; onChange: (_v:boolean)=>void }){
   return (
     <button type="button" onClick={()=>onChange(!checked)} className={`toggle ${checked? 'data-[on=true]':''}`} data-on={checked}>
       <span className="knob" />
@@ -101,7 +101,7 @@ function Chip({ active, onClick, children }: { active: boolean; onClick:()=>void
   return <button onClick={onClick} className={`px-3 py-1 rounded-full text-xs font-medium transition-colors chip ${active? 'chip-active':''}`}>{children}</button>;
 }
 
-function Range({ value, min, max, onChange }: { value: number; min: number; max: number; onChange:(v:number)=>void }){
+function Range({ value, min, max, onChange }: { value: number; min: number; max: number; onChange:(_v:number)=>void }){
   return (
     <div className="flex items-center gap-3">
       <input type="range" min={min} max={max} value={value} onChange={e=>onChange(Number(e.target.value))} className="range" />

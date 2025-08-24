@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Pair, Card } from '../../game-core/types';
 import { PlayingCard } from './TrumpPile';
 
-interface Props { table: Pair[]; trumpSuit: string; onDefend: (target: Card, card: Card)=>void; selectableDefend: { target: Card; defendWith: Card }[]; onAttackDrop?: (card: Card)=>void; }
+interface Props { table: Pair[]; trumpSuit: string; onDefend: (_target: Card, _card: Card)=>void; selectableDefend: { target: Card; defendWith: Card }[]; onAttackDrop?: (_card: Card)=>void; }
 export const TableBoard: React.FC<Props> = ({ table, trumpSuit, onDefend, selectableDefend, onAttackDrop }) => {
   const [flashInvalid,setFlashInvalid] = useState(false);
   return (

@@ -23,15 +23,14 @@ export function App(){
     const next = state; applyMove(next, m, me); setState({...next});
   };
 
-  // simple bot tick
+  // simple bot tick (single dependency)
   useEffect(()=>{
-    if(!state) return;
-    if(state.phase!=='playing') return;
-    if(state.defender==='bot' || state.attacker==='bot'){
-      const mv = botChoose(state, 'bot');
-      if(mv){ setTimeout(()=>{ applyMove(state, mv, 'bot'); setState({...state}); }, 600); }
+    const st = state; if(!st || st.phase!=='playing') return;
+    if(st.defender==='bot' || st.attacker==='bot'){
+      const mv = botChoose(st, 'bot');
+  if(mv){ setTimeout(()=>{ applyMove(st, mv, 'bot'); setState(()=>({...st})); }, 600); }
     }
-  },[state?.table.length, state?.attacker, state?.defender]);
+  },[state]);
 
   return <div className="p-4 text-sm">
     {mode==='idle' && <button onClick={startOffline}>Играть</button>}

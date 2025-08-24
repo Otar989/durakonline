@@ -28,14 +28,8 @@ export const NewGamePage: React.FC = () => {
   const hasAttack = moves.some(mv=>mv.type==='ATTACK');
   const hasDefend = !hasAttack && moves.some(mv=>mv.type==='DEFEND');
   const hint = hasAttack? 'Перетащите или кликните карту для атаки': hasDefend? 'Отбейте карту или ВЗЯТЬ':'Ждите';
-  return <div className="max-w-5xl mx-auto p-6 flex flex-col gap-6">
-    <h1 className="text-2xl font-semibold">Durak</h1>
-    <StatusBar mode={socketState} turnOwner={activeState? activeState.attacker: undefined} hint={hint} />
-    <div>
-      <button className="px-5 py-3 rounded-lg bg-sky-600 text-white" onClick={startUnified}>Играть</button>
-      {roomId && <span className="ml-3 text-xs opacity-70 select-all">Ссылка: {typeof window!=='undefined'? window.location.origin + '?room='+roomId: roomId}</span>}
-    </div>
-    {activeState && <div className="flex flex-col gap-4">
+  const content = !activeState ? null : (
+    <div className="flex flex-col gap-4">
       <div className="flex items-start gap-6 flex-wrap">
         <TrumpPile trump={activeState.trump} deckCount={activeState.deck.length} />
         <div className="flex-1 min-w-[300px]">
@@ -52,13 +46,25 @@ export const NewGamePage: React.FC = () => {
           />
         </div>
       </div>
-  <Hand hand={activeState.players.find(p=>p.id===myId)?.hand||[]} legal={moves} onPlay={(m)=> inOnline? playMove(m): playLocal(m)} />
+      <Hand hand={activeState.players.find(p=>p.id===myId)?.hand||[]} legal={moves} onPlay={(m)=> inOnline? playMove(m): playLocal(m)} />
       <ActionButtons legal={moves} onPlay={(m)=> inOnline? playMove(m): playLocal(m)} />
       <div className="glass rounded-xl p-3">
         <h3 className="text-xs font-semibold mb-2 opacity-70">Ходы</h3>
         <MoveLog entries={activeState.log} me={myId||undefined} />
       </div>
-    </div>}
-  </div>;
+    </div>
+  );
+
+  return (
+    <div className="max-w-5xl mx-auto p-6 flex flex-col gap-6">
+      <h1 className="text-2xl font-semibold">Durak</h1>
+      <StatusBar mode={socketState} turnOwner={activeState? activeState.attacker: undefined} hint={hint} />
+      <div>
+        <button className="px-5 py-3 rounded-lg bg-sky-600 text-white" onClick={startUnified}>Играть</button>
+        {roomId && <span className="ml-3 text-xs opacity-70 select-all">Ссылка: {typeof window!=='undefined'? window.location.origin + '?room='+roomId: roomId}</span>}
+      </div>
+      {content}
+    </div>
+  );
 };
 export default NewGamePage;
