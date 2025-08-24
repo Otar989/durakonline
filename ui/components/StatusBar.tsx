@@ -1,6 +1,6 @@
 import React from 'react';
 interface Props { mode: 'ONLINE'|'OFFLINE'|'RECONNECTING'; turnOwner?: string; hint?: string; allowTranslation?: boolean; attackerNick?:string; defenderNick?:string }
-export const StatusBar: React.FC<Props> = ({ mode, turnOwner, hint, allowTranslation, attackerNick, defenderNick }) => {
+export const StatusBar: React.FC<Props> = React.memo(({ mode, turnOwner, hint, allowTranslation, attackerNick, defenderNick }) => {
   const color = mode==='ONLINE'? 'bg-emerald-500':'RECONNECTING'===mode? 'bg-amber-400':'bg-slate-500';
   return (
     <div className="flex items-center gap-4 px-4 py-2 rounded-xl bg-white/5 border border-white/10 backdrop-blur" role="status" aria-live="polite">
@@ -11,4 +11,5 @@ export const StatusBar: React.FC<Props> = ({ mode, turnOwner, hint, allowTransla
       {hint && <span className="text-xs opacity-70" aria-label="Подсказка хода">{hint}</span>}
     </div>
   );
-};
+});
+StatusBar.displayName = 'StatusBar';

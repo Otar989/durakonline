@@ -12,6 +12,8 @@ import { useAudio } from '../../src/hooks/useAudio';
 import { Move } from '../../game-core/types';
 import { MoveLog } from '../components/MoveLog';
 import { Avatar, ConfettiBurst } from '../components/Avatar';
+import { OpponentPanel } from '../components/OpponentPanel';
+import { DiscardPanel } from '../components/DiscardPanel';
 import { FlipProvider, useFlip } from '../components/FlipLayer';
 import { ToastHost, useToasts } from '../components/Toast';
 
@@ -209,21 +211,8 @@ export const NewGamePage: React.FC = () => {
               <div className="font-semibold text-sm flex items-center gap-2">Козырь <span className="text-base">{activeState.trump.s}</span></div>
               <div data-deck-origin><TrumpPile trump={activeState.trump} deckCount={activeState.deck.length} /></div>
             </div>
-            {activeState.discard.length>0 && <div className="glass p-3 rounded-2xl text-xs flex flex-col gap-2">
-              <div className="font-semibold text-sm">Бито</div>
-              <div className="relative w-24 h-32">
-                {activeState.discard.slice(-8).map((c,i)=>(
-                  <div key={c.r+c.s} className="absolute" style={{ left: (i*3)%40, top: (i*4)%50, transform:`rotate(${(i*9)%25 -12}deg)` }}>
-                    <PlayingCard card={c} small ghost />
-                  </div>
-                ))}
-              </div>
-              <div className="text-[10px] opacity-60">{activeState.discard.length} карт</div>
-            </div>}
-            {opp && <div className="glass p-3 rounded-2xl text-xs flex flex-col gap-2">
-              <Avatar nick={opp.nick} />
-              <div>Карты: <b>{opp.hand.length}</b></div>
-            </div>}
+            <DiscardPanel discard={activeState.discard} />
+            {opp && <OpponentPanel nick={opp.nick} handCount={opp.hand.length} />}
             <div className="glass p-3 rounded-2xl text-xs flex flex-col gap-1">
               <label className="flex items-center gap-2 cursor-pointer text-[11px]"><input type="checkbox" checked={autosort} onChange={e=> setAutosort(e.target.checked)} /> Авто-сорт</label>
               <label className="flex items-center gap-2 cursor-pointer text-[11px]"><input type="checkbox" checked={showLog} onChange={e=> setShowLog(e.target.checked)} /> Лог</label>
@@ -295,7 +284,7 @@ export const NewGamePage: React.FC = () => {
           </div>
         </div>
   <div className="flex gap-3 items-center">
-          <button className="btn" disabled={!!activeState} onClick={startUnified}>Играть</button>
+          <button className="btn" disabled={!!activeState} onClick={startUnified}>{activeState? 'В игре':'Играть'}</button>
           {mode==='ONLINE' && roomId && <button className="text-xs underline" onClick={()=>{ try { navigator.clipboard.writeText(window.location.origin+'?room='+roomId); push('Ссылка скопирована','success'); } catch {} }}>Копировать ссылку</button>}
           {mode==='ONLINE' && roomId && <span className="text-[11px] opacity-60 select-all">{window.location.origin+'?room='+roomId}</span>}
           {mode==='ONLINE' && roomId && <button className="text-[10px] px-2 py-1 rounded bg-white/10 hover:bg-white/20" onClick={()=> requestSync()}>SYNC</button>}
