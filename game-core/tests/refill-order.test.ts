@@ -12,7 +12,8 @@ describe('Refill order', ()=>{
     const end = legalMoves(st, st.attacker).find(m=>m.type==='END_TURN'); if(end) applyMove(st, end, st.attacker);
     const afterAtt = st.players.find(p=>p.id===st.attacker)!.hand.length;
     const afterDef = st.players.find(p=>p.id===st.defender)!.hand.length;
-    expect(afterAtt >= afterDef || afterAtt===6).toBe(true);
-    expect(afterAtt>=startAtt || afterAtt===6).toBe(true);
+  // Допускаем равенство или больше: атакующий добирает первым, но итог может совпасть если дефицит карт.
+  expect(afterAtt >= afterDef).toBe(true);
+  expect(afterAtt>=startAtt || afterAtt===6).toBe(true);
   });
 });

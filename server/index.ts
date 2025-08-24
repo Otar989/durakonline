@@ -3,7 +3,7 @@ import { Server } from 'socket.io';
 import { initGame, applyMove, legalMoves } from '../game-core/engine';
 import { Move, GameState } from '../game-core/types';
 
-interface PlayerMeta { id:string; nick:string; socketId:string; clientId?:string }
+interface PlayerMeta { id:string; nick:string; socketId:string; clientId?:string; offline?:boolean }
 interface Room {
   id: string;
   state: GameState | null;
@@ -106,6 +106,36 @@ io.on('connection', socket=>{
       if(removed){ touch(room); io.to(id).emit('room_state', snapshot(room)); scheduleAutoBot(room); }
     }
   });
+    socket.on('disconnect', ()=>{
+      for(const [id, room] of rooms){
+        for(const meta of room.players.values()){
+          if(meta.socketId===socket.id){
+            // если игра ещё не началась — прежнее поведение (удаляем)
+            if(!room.state){
+              room.players.delete(meta.id);
+              touch(room); io.to(id).emit('room_state', snapshot(room)); scheduleAutoBot(room);
+            } else {
+              // активная партия: помечаем offline и планируем takeover через 5с, если не вернулся
+              meta.offline = true; meta.socketId='';
+              touch(room); io.to(id).emit('room_state', snapshot(room));
+              if(!room.bot){
+                setTimeout(()=>{
+                  // если к этому моменту игрок всё ещё offline и нет бота — бот берёт его id
+                  const still = room.players.get(meta.id);
+                  if(still && still.offline && !room.bot){
+                    room.bot = { id: meta.id, nick: 'Bot' };
+                    io.to(id).emit('room_state', snapshot(room));
+                    // если ход за ботом — попытаться сделать ход сразу
+                    tryBotTurn(room);
+                  }
+                },5000);
+              }
+            }
+            break;
+          }
+        }
+      }
+    });
 });
 
 function snapshot(room: Room){
@@ -128,6 +158,18 @@ function scheduleAutoBot(room: Room){
   room.waitBotTimer = setTimeout(()=>{
     if(room.players.size===1 && !room.bot){ room.bot = { id:'bot', nick:'Bot' }; io.to(room.id).emit('room_state', snapshot(room)); }
   }, 5000);
+}
+
+function tryBotTurn(room: Room){
+  if(!room.bot || !room.state || room.state.phase!=='playing') return;
+  const needBot = room.state.attacker===room.bot.id || room.state.defender===room.bot.id;
+  if(!needBot) return;
+  setTimeout(()=>{
+    if(!room.state) return; try {
+      const lm = legalMoves(room.state!, room.bot!.id);
+      const pick = lm[0]; if(pick){ applyMove(room.state!, pick, room.bot!.id); io.to(room.id).emit('move_applied', { state: room.state, lastMove: pick }); if(room.state.phase==='finished'){ io.to(room.id).emit('game_over', { state: room.state, winner: room.state.winner, loser: room.state.loser }); } tryBotTurn(room); }
+    } catch{}
+  }, 550);
 }
 
 const port = Number(process.env.PORT||4001);
