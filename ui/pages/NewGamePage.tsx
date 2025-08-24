@@ -20,7 +20,8 @@ const MoveLog = dynamic(()=> import('../components/MoveLog').then(m=> m.MoveLog)
 import { Avatar, ConfettiBurst } from '../components/Avatar';
 import { OpponentPanel } from '../components/OpponentPanel';
 import { DiscardPanel } from '../components/DiscardPanel';
-import { FlipProvider, useFlip } from '../components/FlipLayer';
+const FlipProviderDynamic = dynamic(()=> import('../components/FlipLayer').then(m=> m.FlipProvider), { ssr:false });
+const useFlipDynamic = () => { try { return (require('../components/FlipLayer') as any).useFlip(); } catch { return null; } };
 import { ToastHost, useToasts } from '../components/Toast';
 import { useHotkeys } from '../hooks/useHotkeys';
 import Modal from '../components/Modal';
@@ -123,7 +124,7 @@ export const NewGamePage: React.FC<{ onRestart?: ()=>void; initialNick?: string;
   const myId = inOnline? snapshot.players[0]?.id : 'p1';
   const moves = useMemo(()=> activeState && myId? legalMoves(activeState, myId): [], [activeState, myId]);
   const lastDeckCountRef = useRef<number>(activeState?.deck.length||0);
-  const { flyCard, reduced, toggleReduced } = (useFlip as any)?.() || {};
+  const { flyCard, reduced, toggleReduced } = (useFlipDynamic as any)?.() || {};
 
   // полёт добора: отслеживаем уменьшение deck и появление новых карт в руке
   useEffect(()=>{
@@ -332,7 +333,7 @@ export const NewGamePage: React.FC<{ onRestart?: ()=>void; initialNick?: string;
   );
 
   const MotionControls: React.FC = () => {
-    const flip = useFlip();
+  const flip = useFlipDynamic && useFlipDynamic();
     if(!flip) return null;
     return (
       <div className="flex items-center gap-2">
@@ -347,7 +348,7 @@ export const NewGamePage: React.FC<{ onRestart?: ()=>void; initialNick?: string;
   };
 
   return (
-  <FlipProvider>
+  <FlipProviderDynamic>
   <div ref={gestureRef} className="max-w-6xl mx-auto p-6 flex flex-col gap-6">
   <LiveRegion message={ariaAnnounce} />
   <DragLive />
@@ -431,7 +432,7 @@ export const NewGamePage: React.FC<{ onRestart?: ()=>void; initialNick?: string;
     </div>
   </Modal>
   </div>
-  </FlipProvider>
+  </FlipProviderDynamic>
   );
 };
 export default NewGamePage;
