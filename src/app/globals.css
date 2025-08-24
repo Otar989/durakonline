@@ -2,9 +2,9 @@
 @import '../styles/tokens.css';
 
 :root {
-  --background: linear-gradient(135deg,#0b0f14 0%,#141b23 50%,#0a0e12 100%);
-  --foreground: #f5f7fa;
-  --accent: #5ac8fa; /* Apple style blue */
+  --background: radial-gradient(circle at 20% 20%, hsl(220 40% 18% / .55), hsl(220 35% 8% / 0)) , linear-gradient(135deg,#0b0f14 0%,#141b23 50%,#0a0e12 100%);
+  --foreground: var(--durak-color-text);
+  --accent: var(--durak-color-accent);
   --accent-glow: 190 100% 60%;
   --radius: 18px;
   /* card sizes: desktop ≥1280 ~160px high, mid 130-140px, mobile 100-110px */
@@ -22,18 +22,18 @@
 
 /* Light theme override (optional) */
 @media (prefers-color-scheme: light) {
-  :root { --background: linear-gradient(135deg,#f6f9ff,#e9eef6); --foreground:#0f141a; color-scheme: light; }
+  :root { --background: linear-gradient(135deg,#f6f9ff,#e9eef6); --foreground: var(--durak-color-text); color-scheme: light; }
 }
 
 html, body, #__next { height: 100%; }
 body {
   min-height: 100vh;
   background: var(--background) fixed;
-  background-size: 200% 200%;
+  background-size: 240% 240%;
   color: var(--foreground);
   font-family: var(--font-geist-sans, system-ui, -apple-system, "SF Pro Display", "SF Pro Text", Segoe UI, Roboto, sans-serif);
   -webkit-font-smoothing: antialiased;
-  animation: bgMove 18s ease-in-out infinite;
+  animation: bgMove 28s ease-in-out infinite;
 }
 
 /* Table texture & UI custom controls */
@@ -123,11 +123,11 @@ body {
   letter-spacing: .25px;
   border-radius: 14px;
   color: #fff;
-  background: linear-gradient(160deg,#4aa3ff,#0a7bff 55%,#0a61de);
+  background: var(--durak-gradient-btn);
   box-shadow: 0 6px 22px -2px rgba(0,123,255,0.5), 0 0 0 1px rgba(255,255,255,0.18) inset;
   transition: background .4s, transform .25s, box-shadow .4s;
 }
-.btn:hover { transform: translateY(-2px); box-shadow: 0 10px 30px -2px rgba(0,123,255,0.6), 0 0 0 1px rgba(255,255,255,0.24) inset; }
+.btn:hover { transform: translateY(-2px); box-shadow: 0 10px 30px -2px rgba(0,123,255,0.6), 0 0 0 1px rgba(255,255,255,0.24) inset; background: var(--durak-gradient-btn-hover); }
 .btn:active { transform: translateY(0); }
 
 .card-stack { perspective: 1200px; }
@@ -170,10 +170,10 @@ button[disabled] .playing-card { cursor:not-allowed !important; filter:grayscale
 @keyframes card-pop { from { transform: translateY(8px) scale(.96); opacity:0;} to { transform: translateY(0) scale(1); opacity:1; } }
 .card-enter { animation: card-pop .25s ease; }
 .glass {
-  background: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.15), rgba(255,255,255,0.04));
-  backdrop-filter: blur(20px) saturate(160%);
-  -webkit-backdrop-filter: blur(20px) saturate(160%);
-  border: 1px solid rgba(255,255,255,0.15);
+  background: var(--durak-color-surface);
+  backdrop-filter: var(--durak-glass-backdrop);
+  -webkit-backdrop-filter: var(--durak-glass-backdrop);
+  border: 1px solid var(--durak-color-border);
   box-shadow: 0 4px 24px -4px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.08) inset;
 }
 .playable-card .playing-card { box-shadow:0 0 0 2px rgba(56,189,248,.8),0 0 10px -2px rgba(56,189,248,.8),0 6px 18px -4px rgba(0,0,0,.5); animation: playablePulse 1.4s ease-in-out infinite; }

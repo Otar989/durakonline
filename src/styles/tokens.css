@@ -16,6 +16,15 @@
   --durak-color-win: hsl(140 70% 45% / 1);
   --durak-color-warn: hsl(40 90% 55% / 1);
   --durak-color-danger: hsl(350 80% 55% / 1);
+  --durak-color-text: hsl(210 25% 92% / 1);
+  --durak-color-text-muted: hsl(210 15% 70% / 1);
+  --durak-color-overlay: hsl(220 30% 4% / 0.7);
+  --durak-shadow-elev: 0 10px 40px -5px rgba(0,0,0,0.55);
+  --durak-gradient-btn: linear-gradient(160deg,#4aa3ff,#0a7bff 55%,#0a61de);
+  --durak-gradient-btn-hover: linear-gradient(160deg,#56adff,#0f82ff 55%,#0d6dff);
+  --durak-gradient-card: linear-gradient(155deg,#ffffff,#e9f1f9);
+  --durak-glass-backdrop: blur(20px) saturate(160%);
+  --durak-outline-accent: 0 0 0 2px var(--durak-color-accent),0 10px 28px -4px rgba(var(--durak-color-accent-rgb) / .55);
   --durak-duration-fast: 120ms;
   --durak-duration-base: 220ms;
   --durak-duration-slow: 420ms;
@@ -30,6 +39,12 @@
   --durak-color-accent: hsl(200 90% 45% / 1);
   --durak-color-accent-rgb: 10 140 210;
   --durak-color-win: hsl(130 55% 45% / 1);
+  --durak-color-text: hsl(216 25% 14% / 1);
+  --durak-color-text-muted: hsl(216 15% 38% / 1);
+  --durak-color-overlay: hsl(210 40% 95% / 0.72);
+  --durak-gradient-btn: linear-gradient(160deg,#218dff,#0a70df 55%,#0855b5);
+  --durak-gradient-btn-hover: linear-gradient(160deg,#3398ff,#0f7ef4 55%,#0c63cb);
+  --durak-gradient-card: linear-gradient(155deg,#ffffff,#f3f7fb);
 }
 
 /* utility classes (can be purged or replaced by Tailwind plugin later) */
