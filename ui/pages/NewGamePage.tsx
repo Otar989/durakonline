@@ -17,6 +17,11 @@ import { DiscardPanel } from '../components/DiscardPanel';
 import { FlipProvider, useFlip } from '../components/FlipLayer';
 import { ToastHost, useToasts } from '../components/Toast';
 import { useHotkeys } from '../hooks/useHotkeys';
+import Modal from '../components/Modal';
+
+const LiveRegion: React.FC<{ message: string }> = ({ message }) => (
+  <div aria-live="polite" aria-atomic="true" className="sr-only" role="status">{message}</div>
+);
 
 export const NewGamePage: React.FC = () => {
   const [roomId,setRoomId] = useState<string | null>(null);
@@ -287,7 +292,7 @@ export const NewGamePage: React.FC = () => {
   return (
   <FlipProvider>
   <div ref={gestureRef} className="max-w-6xl mx-auto p-6 flex flex-col gap-6">
-  <div aria-live="polite" className="sr-only">{ariaAnnounce}</div>
+  <LiveRegion message={ariaAnnounce} />
       <header className="flex flex-col gap-4">
         <div className="flex items-center gap-4 flex-wrap">
           <h1 className="text-2xl font-semibold">Дурак Онлайн</h1>
@@ -325,28 +330,23 @@ export const NewGamePage: React.FC = () => {
       </header>
       {renderContent()}
       <ToastHost queue={toasts} />
-      {showRules && <div className="fixed inset-0 bg-black/60 backdrop-blur flex items-center justify-center z-50">
-        <div className="glass p-6 rounded-2xl max-w-md text-sm space-y-3">
-          <h2 className="text-lg font-semibold">Правила (кратко)</h2>
-          <ul className="list-disc pl-5 space-y-1 text-xs">
-            <li>36 карт (6–A), козырь — масть открытой карты талона.</li>
-            <li>Первым ходит самый младший козырь.</li>
-            <li>Подкидывать только ранги на столе, всего ≤6 и не больше карт у защитника.</li>
-            <li>Перевод до первой защиты (если включено) — карта того же ранга, роли меняются.</li>
-            <li>«Бито» когда все атаки покрыты; иначе защитник может «ВЗЯТЬ».</li>
-          </ul>
-          <div className="flex justify-end gap-2 text-xs"><button className="px-3 py-1 rounded bg-white/10" onClick={()=> setShowRules(false)}>Закрыть</button></div>
-        </div>
-      </div>}
+      <Modal open={showRules} onClose={()=> setShowRules(false)} title="Правила (кратко)" id="rules-modal">
+        <ul className="list-disc pl-5 space-y-1 text-xs">
+          <li>36 карт (6–A), козырь — масть открытой карты талона.</li>
+          <li>Первым ходит самый младший козырь.</li>
+          <li>Подкидывать только ранги на столе, всего ≤6 и не больше карт у защитника.</li>
+          <li>Перевод до первой защиты (если включено) — карта того же ранга, роли меняются.</li>
+          <li>«Бито» когда все атаки покрыты; иначе защитник может «ВЗЯТЬ».</li>
+        </ul>
+      </Modal>
   <ConfettiBurst show={!!gameEnded?.winner} />
-  {gameEnded && <div className="fixed inset-0 bg-black/70 backdrop-blur flex items-center justify-center z-50">
-        <div className="glass p-8 rounded-2xl max-w-sm text-center space-y-4">
-          <h2 className="text-xl font-semibold">{gameEnded.winner? 'Победа!':'Ничья'}</h2>
-          {gameEnded.winner && <p className="text-sm">Победил: <b>{gameEnded.winner}</b>{gameEnded.loser? ` — Дурак: ${gameEnded.loser}`:''}</p>}
-          {!gameEnded.winner && <p className="text-sm">Обе руки пусты.</p>}
-          <button className="btn" onClick={()=>{ setGameEnded(null); startUnified(); }}>Новая игра</button>
-        </div>
-      </div>}
+  <Modal open={!!gameEnded} onClose={()=> setGameEnded(null)} title={gameEnded?.winner? 'Результат партии':'Ничья'} id="result-modal">
+    <div className="text-center space-y-3">
+      {gameEnded?.winner && <p className="text-sm">Победил: <b>{gameEnded.winner}</b>{gameEnded.loser? ` — Дурак: ${gameEnded.loser}`:''}</p>}
+      {!gameEnded?.winner && <p className="text-sm">Обе руки пусты.</p>}
+      <div className="flex justify-center"><button className="btn" onClick={()=>{ setGameEnded(null); startUnified(); }}>Новая игра</button></div>
+    </div>
+  </Modal>
   </div>
   </FlipProvider>
   );
