@@ -33,6 +33,9 @@ export default function RootLayout({
       <head>
         <link rel="manifest" href="/manifest.json" />
   <meta name="theme-color" content="#0b0f14" />
+  {/* Google Fonts preconnects (удаляют ESLint warning) */}
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         {/* Preload fonts */}
         <link
           rel="preload"
