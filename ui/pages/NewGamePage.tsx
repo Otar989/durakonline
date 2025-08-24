@@ -8,6 +8,7 @@ import { ActionButtons } from '../components/ActionButtons';
 import { TrumpPile } from '../components/TrumpPile';
 import { legalMoves } from '../../game-core/engine';
 import { Move } from '../../game-core/types';
+import { MoveLog } from '../components/MoveLog';
 
 export const NewGamePage: React.FC = () => {
   const [roomId,setRoomId] = useState<string | null>(null);
@@ -48,8 +49,12 @@ export const NewGamePage: React.FC = () => {
           />
         </div>
       </div>
-  <Hand hand={activeState.players.find(p=>p.id===myId)?.hand||[]} legal={moves} onPlay={(m)=> inOnline? playMove(m): playLocal(m)} phase={'attack'} />
+      <Hand hand={activeState.players.find(p=>p.id===myId)?.hand||[]} legal={moves} onPlay={(m)=> inOnline? playMove(m): playLocal(m)} phase={'attack'} />
       <ActionButtons legal={moves} onPlay={(m)=> inOnline? playMove(m): playLocal(m)} />
+      <div className="glass rounded-xl p-3">
+        <h3 className="text-xs font-semibold mb-2 opacity-70">Ходы</h3>
+        <MoveLog entries={activeState.log} me={myId||undefined} />
+      </div>
     </div>}
   </div>;
 };

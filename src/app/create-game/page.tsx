@@ -53,7 +53,7 @@ export default function CreateGamePage(){
             </Field>
             <Field label="Размер колоды">
               <div className="flex gap-2 flex-wrap">
-                {[24,36,52].map(n=> <Chip key={n} active={settings.deckSize===n} onClick={()=>update('deckSize', n)}>{n}</Chip>)}
+                {[24,36,52].map(n=> <Chip key={n} active={settings.deckSize===n} onClick={()=>update('deckSize', n as 24|36|52)}>{n}</Chip>)}
               </div>
             </Field>
           </div>

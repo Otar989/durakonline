@@ -40,14 +40,14 @@ io.on('connection', socket=>{
     scheduleAutoBot(room);
   });
 
-  socket.on('start_game', ({ roomId, withBot }: { roomId:string; withBot?:boolean })=>{
+  socket.on('start_game', ({ roomId, withBot, allowTranslation }: { roomId:string; withBot?:boolean; allowTranslation?: boolean })=>{
     const room = rooms.get(roomId); if(!room) return;
     if(room.state) return;
     if(withBot && !room.bot){ room.bot = { id:'bot', nick:'Bot' }; }
     const list = [...room.players.values()].map(p=>({ id:p.id, nick:p.nick }));
     if(room.bot) list.push(room.bot);
     if(list.length!==2) return; // need exactly 2 to start
-    room.state = initGame(list, true);
+  room.state = initGame(list, true, { allowTranslation: !!allowTranslation });
     touch(room);
     io.to(roomId).emit('game_started', snapshot(room));
   });

@@ -9,7 +9,7 @@ export function useLocalGame(){
   const [mode,setMode] = useState<'idle'|'playing'|'finished'>('idle');
 
   const start = useCallback(()=>{
-    const st = initGame([{id:'p1',nick:'Вы'},{id:'bot',nick:'Бот'}]);
+    const st = initGame([{id:'p1',nick:'Вы'},{id:'bot',nick:'Бот'}], true, { allowTranslation: false });
     setState(st); setMode('playing');
   },[]);
 

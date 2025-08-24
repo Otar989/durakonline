@@ -1,4 +1,4 @@
-import { Card, Suit, Rank, GameState, Move, Pair, PlayerState } from './types';
+import { Card, Suit, Rank, GameState, Move, PlayerState } from './types';
 
 export const RANKS: Rank[] = ['6','7','8','9','10','J','Q','K','A'];
 export const SUITS: Suit[] = ['♠','♥','♦','♣'];
@@ -81,8 +81,6 @@ export function legalMoves(st: GameState, playerId: string): Move[] {
     } else {
       // all defended but defender cannot END_TURN, only attacker
     }
-  } else {
-    // Non-active player may contribute? For 2-player game no third attacker.
   }
   return moves;
 }
@@ -92,7 +90,7 @@ export function applyMove(st: GameState, move: Move, playerId: string): GameStat
   const legal = legalMoves(st, playerId).some(m=> JSON.stringify(m)===JSON.stringify(move));
   if(!legal) throw new Error('Illegal move');
   const meHand = handOf(st.players, playerId);
-  const pushLog = () => { st.log && st.log.push({ by: playerId, move, t: Date.now() }); };
+  const pushLog = () => { st.log?.push({ by: playerId, move, t: Date.now() }); };
   switch(move.type){
     case 'ATTACK':{
       removeCard(meHand, move.card);
@@ -175,4 +173,4 @@ function checkEnd(st: GameState){
 }
 
 export function serialize(st: GameState){ return { state: st }; }
-export function deserialize(data: any): GameState { return data.state as GameState; }
+export function deserialize(data: { state: GameState }): GameState { return data.state; }
