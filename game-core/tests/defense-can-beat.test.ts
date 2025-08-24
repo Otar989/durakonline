@@ -7,9 +7,8 @@ describe('Defense logic', ()=>{
     const atk = legalMoves(st, st.attacker).find(m=>m.type==='ATTACK');
     if(!atk) return;
     applyMove(st, atk, st.attacker);
-    const defs = legalMoves(st, st.defender).filter(m=>m.type==='DEFEND');
+    const defs = legalMoves(st, st.defender).filter(m=>m.type==='DEFEND') as Extract<ReturnType<typeof legalMoves>[number], {type:'DEFEND'}>[];
     for(const m of defs){
-      // @ts-expect-error narrowing
       expect(canBeat(atk.card, m.card, st.trump.s)).toBe(true);
     }
   });

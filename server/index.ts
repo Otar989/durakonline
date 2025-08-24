@@ -2,6 +2,8 @@ import { createServer } from 'http';
 import { Server } from 'socket.io';
 import { initGame, applyMove, legalMoves } from '../game-core/engine';
 import { Move, GameState } from '../game-core/types';
+import { insertMatch } from './db';
+import { randomBytes } from 'crypto';
 
 interface PlayerMeta { id:string; nick:string; socketId:string; clientId?:string; offline?:boolean }
 interface Room {
@@ -22,6 +24,8 @@ const io = new Server(httpServer, { cors:{ origin: process.env.CORS_ORIGIN?.spli
 
 function touch(room: Room){ room.lastActivity = Date.now(); if(room.timeout) clearTimeout(room.timeout); room.timeout = setTimeout(()=>{ rooms.delete(room.id); }, 1000*60*30); }
 
+function otherId(state: GameState, me: string){ const p = state.players.find(x=>x.id!==me); return p? p.id: null; }
+
 io.on('connection', socket=>{
   socket.on('join_room', ({ roomId, nick, clientId }: { roomId:string; nick:string; clientId?:string })=>{
     let room = rooms.get(roomId);
@@ -31,13 +35,14 @@ io.on('connection', socket=>{
     // если уже есть с таким id – переустановим socketId
     if(room.players.has(pid)){
       const pm = room.players.get(pid)!; pm.socketId = socket.id; room.players.set(pid, pm);
-      socket.join(roomId); touch(room); socket.emit('room_state', snapshot(room)); return;
+      socket.join(roomId); touch(room); socket.emit('room_state', snapshot(room)); socket.emit('invite_link', { url: `${process.env.PUBLIC_ORIGIN||'http://localhost:3000'}?room=${roomId}` }); return;
     }
     if(room.players.size>=2){ socket.emit('room_full'); return; }
     room.players.set(pid, { id: pid, nick, socketId: socket.id, clientId });
     socket.join(roomId);
     touch(room);
     socket.emit('room_state', snapshot(room));
+    socket.emit('invite_link', { url: `${process.env.PUBLIC_ORIGIN||'http://localhost:3000'}?room=${roomId}` });
     scheduleAutoBot(room);
   });
 
@@ -48,9 +53,10 @@ io.on('connection', socket=>{
     const list = [...room.players.values()].map(p=>({ id:p.id, nick:p.nick }));
     if(room.bot) list.push(room.bot);
     if(list.length!==2) return; // need exactly 2 to start
-  room.state = initGame(list, true, { allowTranslation: !!allowTranslation });
+    room.state = initGame(list, true, { allowTranslation: !!allowTranslation });
     touch(room);
     io.to(roomId).emit('game_started', snapshot(room));
+    io.to(roomId).emit('invite_link', { url: `${process.env.PUBLIC_ORIGIN||'http://localhost:3000'}?room=${roomId}` });
   });
 
   socket.on('play_move', ({ roomId, move }: { roomId:string; move:Move })=>{
@@ -73,20 +79,80 @@ io.on('connection', socket=>{
       io.to(roomId).emit('move_applied', { state: room.state, lastMove: move });
       if(room.state.phase==='finished'){
         io.to(roomId).emit('game_over', { state: room.state, winner: room.state.winner, loser: room.state.loser });
+        // async persist match (MVP)
+        try { void insertMatch({
+          started_at: new Date(room.state.log?.[0]?.t || Date.now()),
+          finished_at: new Date(),
+          mode: room.state.allowTranslation? 'passing':'basic',
+          deck_size: 36, // current engine
+          room_id: roomId,
+          players: room.state.players.map(p=>({ id:p.id, nick:p.nick })),
+          result: { winner: room.state.winner, loser: room.state.loser, order: room.state.finished },
+          state_hash: stateHash(room.state),
+          logs: (room.state.log||[]).slice(-50),
+        }); } catch{}
       }
       // если бот участвует и его очередь — сделать ход спустя задержку
       if(room.bot && room.state.phase==='playing'){
         const needBot = room.state.attacker===room.bot.id || room.state.defender===room.bot.id;
         if(needBot){
           setTimeout(()=>{
-            if(!room.state) return; try {
+            if(!room.state) return;
+            try {
               const lm = legalMoves(room.state!, room.bot!.id);
               const pick = pickBotMove(room.state!, lm, room.bot!.id);
-              if(pick){ applyMove(room.state!, pick, room.bot!.id); io.to(room.id).emit('move_applied', { state: room.state, lastMove: pick }); if(room.state.phase==='finished'){ io.to(room.id).emit('game_over', { state: room.state, winner: room.state.winner, loser: room.state.loser }); } }
-            } catch{} }, 550);
+              if(pick){
+                applyMove(room.state!, pick, room.bot!.id);
+                io.to(room.id).emit('move_applied', { state: room.state, lastMove: pick });
+                if(room.state.phase==='finished'){
+                  io.to(room.id).emit('game_over', { state: room.state, winner: room.state.winner, loser: room.state.loser });
+                  try {
+                    void insertMatch({
+                      started_at: new Date(room.state.log?.[0]?.t || Date.now()),
+                      finished_at: new Date(),
+                      mode: room.state.allowTranslation? 'passing':'basic',
+                      deck_size: 36,
+                      room_id: room.id,
+                      players: room.state.players.map(p=>({ id:p.id, nick:p.nick })),
+                      result: { winner: room.state.winner, loser: room.state.loser, order: room.state.finished },
+                      state_hash: stateHash(room.state),
+                      logs: (room.state.log||[]).slice(-50)
+                    });
+                  } catch{}
+                }
+              }
+            } catch{}
+          }, 550);
         }
       }
     } finally { room.busy = false; }
+  });
+
+  socket.on('surrender', ({ roomId }: { roomId:string })=>{
+    const room = rooms.get(roomId); if(!room || !room.state) return;
+    const pid = [...room.players.values()].find(p=>p.socketId===socket.id)?.id || socket.id;
+    room.state.phase='finished';
+    room.state.loser = pid;
+    room.state.winner = otherId(room.state, pid);
+    room.state.log = room.state.log || []; room.state.log.push({ by: pid, move: { type: 'TAKE' } as any, t: Date.now() });
+    io.to(roomId).emit('game_over', { state: room.state, winner: room.state.winner, loser: room.state.loser });
+    try {
+      void insertMatch({
+        started_at: new Date(room.state.log?.[0]?.t || Date.now()),
+        finished_at: new Date(),
+        mode: room.state.allowTranslation? 'passing':'basic',
+        deck_size: 36,
+        room_id: roomId,
+        players: room.state.players.map(p=>({ id:p.id, nick:p.nick })),
+        result: { winner: room.state.winner, loser: room.state.loser, surrender: true, order: room.state.finished },
+        state_hash: stateHash(room.state),
+        logs: (room.state.log||[]).slice(-50)
+      });
+    } catch{}
+  });
+
+  socket.on('ping', ({ roomId, nonce }: { roomId:string; nonce?:string })=>{
+    const now = Date.now(); socket.emit('pong', { t: now, nonce });
   });
 
   // клиент может запросить актуальное состояние (re-sync)
@@ -168,7 +234,7 @@ function tryBotTurn(room: Room){
   setTimeout(()=>{
     if(!room.state) return; try {
       const lm = legalMoves(room.state!, room.bot!.id);
-      const pick = pickBotMove(room.state!, lm, room.bot!.id); if(pick){ applyMove(room.state!, pick, room.bot!.id); io.to(room.id).emit('move_applied', { state: room.state, lastMove: pick }); if(room.state.phase==='finished'){ io.to(room.id).emit('game_over', { state: room.state, winner: room.state.winner, loser: room.state.loser }); } tryBotTurn(room); }
+      const pick = pickBotMove(room.state!, lm, room.bot!.id); if(pick){ applyMove(room.state!, pick, room.bot!.id); io.to(room.id).emit('move_applied', { state: room.state, lastMove: pick }); if(room.state.phase==='finished'){ io.to(room.id).emit('game_over', { state: room.state, winner: room.state.winner, loser: room.state.loser }); try { void insertMatch({ started_at: new Date(room.state.log?.[0]?.t || Date.now()), finished_at: new Date(), mode: room.state.allowTranslation? 'passing':'basic', deck_size: 36, room_id: room.id, players: room.state.players.map(p=>({ id:p.id, nick:p.nick })), result: { winner: room.state.winner, loser: room.state.loser, order: room.state.finished }, state_hash: stateHash(room.state), logs: (room.state.log||[]).slice(-50) }); } catch{} } tryBotTurn(room); }
     } catch{}
   }, 550);
 }

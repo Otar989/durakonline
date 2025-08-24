@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "@sentry/nextjs": "8.21.0",
+    "@supabase/supabase-js": "^2.56.0",
     "clsx": "2.1.1",
     "framer-motion": "11.2.10",
     "next": "15.5.0",

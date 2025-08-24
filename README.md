@@ -160,3 +160,31 @@ PR и issue приветствуются. Запускайте в режиме �
 ## 📜 Лицензия
 MIT
 
+# Durak Online – Prod Roadmap (MVP Premium)
+
+## Быстрый старт
+
+- Node 20.x
+- ENV:
+  - NEXT_PUBLIC_SOCKET_URL=http://localhost:4001
+  - NEXT_PUBLIC_SUPABASE_URL=... 
+  - NEXT_PUBLIC_SUPABASE_ANON_KEY=...
+- Установка: `npm ci`
+- Тесты: `npm test`
+- Запуск фронта: `npm run dev` (Next.js)
+- Запуск сервера сокетов: `npm run start` (порт 4001)
+
+## Стек
+- Next 15, TypeScript, Tailwind, Framer Motion, Howler, PWA
+- Node + Socket.IO (валидация ходов на сервере)
+- Supabase (Auth/Postgres)
+
+## Миграции Supabase
+SQL в `supabase/migrations/`:
+- `0002_schema_core.sql` – users, profiles, wallets, matches, ratings, inventories, seasons, leaderboards
+
+## Заметки
+- Ядро правил в `game-core/` c тестами (Vitest)
+- UI подсвечивает только легальные ходы, сервер валидирует тем же ядром
+- OFFLINE режим – против бота
+
