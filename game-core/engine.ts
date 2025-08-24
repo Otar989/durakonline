@@ -146,6 +146,10 @@ export function applyMove(st: GameState, move: Move, playerId: string): GameStat
     case 'ATTACK':{
       removeCard(meHand, move.card);
       st.table.push({ attack: move.card });
+      // with trick режим (MVP-хук): можно вставить нелегальную карту если опция включена – пока просто логируем.
+      if(st.options && (st.options as any).withTrick){
+        // если ход по внутренней проверке был бы нелегален (мы сюда не попадём, т.к. legalMoves отфильтровал) — в будущем расширим.
+      }
       pushLog();
       return st;
     }
@@ -164,8 +168,16 @@ export function applyMove(st: GameState, move: Move, playerId: string): GameStat
       for(const pair of st.table){ defHand.push(pair.attack); if(pair.defend) defHand.push(pair.defend); }
       st.table = [];
       refill(st);
-  // При взятии: атакующий остаётся, роли не меняются; для >2 игроков: следующий после взявшего становится новым атакующим в классических правилах, но здесь MVP удерживаем.
-  st.turnDefenderInitialHand = handOf(st.players, st.defender).length;
+      // При взятии: следующий ход начинает игрок слева от взявшего (defender). Защитник остаётся тем же только в 2p.
+      const order = st.players.map(p=>p.id);
+      if(order.length>2){
+        const defIdx = order.indexOf(st.defender);
+        const newAttacker = order[(defIdx+1)%order.length];
+        const newDefender = order[(defIdx+2)%order.length];
+        st.attacker = newAttacker;
+        st.defender = newDefender;
+      }
+      st.turnDefenderInitialHand = handOf(st.players, st.defender).length;
   st.firstDefensePlayedThisTurn = false;
       checkEnd(st);
   pushLog();
