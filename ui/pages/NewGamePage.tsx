@@ -3,7 +3,9 @@ import { useLocalGame } from '../hooks/useLocalGame';
 import { useSocketGame } from '../hooks/useSocketGame';
 import { StatusBar } from '../components/StatusBar';
 import { Hand } from '../components/Hand';
-import { TableBoard } from '../components/Table';
+import dynamic from 'next/dynamic';
+// Динамический импорт TableBoard (framer-motion heavy) для уменьшения initial bundle
+const TableBoard = dynamic(()=> import('../components/Table').then(m=> m.TableBoard), { ssr:false, loading: ()=> <div className="glass p-6 rounded-xl text-xs opacity-70">Загрузка стола...</div> });
 import { ActionButtons } from '../components/ActionButtons';
 import MobileControls from '../components/MobileControls';
 import { TrumpPile, PlayingCard } from '../components/TrumpPile';
@@ -12,9 +14,9 @@ import { useGamePersistence, loadPersisted } from '../../src/hooks/useGamePersis
 // (legacy useAudio removed) -> migrated to SettingsContext
 import { useSettings } from '../context/SettingsContext';
 import { Move } from '../../game-core/types';
-import dynamic from 'next/dynamic';
+// (dynamic уже импортирован выше)
 // Ленивая загрузка MoveLog для снижения initial bundle
-const MoveLog = dynamic(()=> import('../components/MoveLog').then(m=> m.MoveLog), { ssr:false, loading: ()=> <div className="text-xs opacity-60">Загрузка лога...</div> });
+const MoveLog = dynamic(()=> import('../components/MoveLog').then(m=> m.MoveLog), { ssr:false, loading: ()=> <div className="text-xs opacity-60">Загрузка лога...</div> }); // Ленивая загрузка MoveLog для снижения initial bundle (dynamic импорт выше)
 import { Avatar, ConfettiBurst } from '../components/Avatar';
 import { OpponentPanel } from '../components/OpponentPanel';
 import { DiscardPanel } from '../components/DiscardPanel';
