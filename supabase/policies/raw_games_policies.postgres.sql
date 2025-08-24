@@ -1,0 +1,1 @@
+-- Removed legacy Supabase policy file (postgres variant). Intentionally left blank.

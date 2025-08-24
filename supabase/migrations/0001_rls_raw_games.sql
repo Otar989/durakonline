@@ -1,0 +1,1 @@
+-- Removed legacy Supabase migration. Intentionally left blank.

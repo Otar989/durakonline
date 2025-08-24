@@ -5,12 +5,21 @@ import { botChoose } from '../bot';
 function randomPlay(){
   const st = initGame([{id:'A',nick:'A'},{id:'B',nick:'B'}]);
   let guard=0;
-  while(st.phase==='playing' && guard<500){
-    const current = Math.random()<0.5? st.attacker : st.defender; // simple alternating preference
-    const moves = legalMoves(st, current);
-    if(!moves.length) break;
-    const mv = moves[Math.floor(Math.random()*moves.length)];
-    try { applyMove(st, mv, current); } catch(_){}
+  while(st.phase==='playing' && guard<800){
+    const current = st.attacker; // deterministic: always side to move (attacker or defender reaction via legalMoves)
+    // attacker acts
+    const attMoves = legalMoves(st, current);
+    if(attMoves.length===0) break;
+    const mvA = attMoves[Math.floor(Math.random()*attMoves.length)];
+    try { applyMove(st, mvA, current); } catch(_){/* ignore */}
+    // defender reacts if still playing and there is something to defend
+    if(st.phase==='playing' && st.table.some(p=>!p.defend)){
+      const defMoves = legalMoves(st, st.defender);
+      if(defMoves.length){
+        const mvD = defMoves[Math.floor(Math.random()*defMoves.length)];
+        try { applyMove(st, mvD, st.defender); } catch(_){/* ignore */}
+      }
+    }
     guard++;
   }
   return st.phase==='finished';
@@ -19,6 +28,7 @@ function randomPlay(){
 describe('Simulation 50 games', ()=>{
   it('runs 50 games without crash', ()=>{
     let finished=0; for(let i=0;i<50;i++){ if(randomPlay()) finished++; }
+    // At least some proportion should finish; we only assert >0 to detect total stagnation
     expect(finished).toBeGreaterThan(0);
   });
 });
