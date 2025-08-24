@@ -25,23 +25,7 @@ export const NewGamePage: React.FC = () => {
   useEffect(()=>{ if(typeof document!=='undefined'){ document.documentElement.dataset.theme = theme; try { localStorage.setItem('durak_theme', theme);} catch{} } },[theme]);
   useEffect(()=>{ if(typeof window!=='undefined'){ try { const t = localStorage.getItem('durak_theme'); if(t==='light'||t==='dark') setTheme(t as any); } catch{} } },[]);
 
-  // swipe gestures (mobile) on main area: left = END_TURN, right = TAKE
   const gestureRef = useRef<HTMLDivElement|null>(null);
-  useEffect(()=>{
-    const el = gestureRef.current; if(!el) return;
-    let startX=0, startY=0;
-    function onStart(e: TouchEvent){ const t = e.touches[0]; startX=t.clientX; startY=t.clientY; }
-    function onEnd(e: TouchEvent){ const t = e.changedTouches[0]; const dx = t.clientX-startX; const dy = t.clientY-startY; if(Math.abs(dx)>60 && Math.abs(dy)<50){
-      if(dx>0){ // swipe right -> TAKE if legal
-        const take = (moves as Move[]).find(m=>m.type==='TAKE'); if(take){ inOnline? playMove(take): playLocal(take); }
-      } else { // left -> END_TURN
-        const end = (moves as Move[]).find(m=>m.type==='END_TURN'); if(end){ inOnline? playMove(end): playLocal(end); }
-      }
-    }}
-    el.addEventListener('touchstart', onStart, { passive:true });
-    el.addEventListener('touchend', onEnd);
-    return ()=>{ el.removeEventListener('touchstart', onStart); el.removeEventListener('touchend', onEnd); };
-  },[moves, inOnline, playMove, playLocal]);
 
   // load persisted offline state (basic) – if no active state present yet
   useEffect(()=>{
@@ -68,6 +52,20 @@ export const NewGamePage: React.FC = () => {
   const activeState = inOnline? snapshot.state : localState;
   const myId = inOnline? snapshot.players[0]?.id : 'p1';
   const moves = useMemo(()=> activeState && myId? legalMoves(activeState, myId): [], [activeState, myId]);
+
+  // swipe gestures (mobile) on main area: left = END_TURN, right = TAKE
+  useEffect(()=>{
+    const el = gestureRef.current; if(!el) return;
+    let startX=0, startY=0;
+    function onStart(e: TouchEvent){ const t = e.touches[0]; startX=t.clientX; startY=t.clientY; }
+    function onEnd(e: TouchEvent){ const t = e.changedTouches[0]; const dx = t.clientX-startX; const dy = t.clientY-startY; if(Math.abs(dx)>60 && Math.abs(dy)<50){
+      if(dx>0){ const take = (moves as Move[]).find(m=>m.type==='TAKE'); if(take){ inOnline? playMove(take): playLocal(take); } }
+      else { const end = (moves as Move[]).find(m=>m.type==='END_TURN'); if(end){ inOnline? playMove(end): playLocal(end); } }
+    }}
+    el.addEventListener('touchstart', onStart, { passive:true });
+    el.addEventListener('touchend', onEnd);
+    return ()=>{ el.removeEventListener('touchstart', onStart); el.removeEventListener('touchend', onEnd); };
+  },[moves, inOnline, playMove, playLocal]);
 
   // parse ?cfg= if present (created by create-game page) to extract options including allowTranslation
   useEffect(()=>{

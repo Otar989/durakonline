@@ -13,6 +13,7 @@ interface Room {
   timeout?: NodeJS.Timeout;
   waitBotTimer?: NodeJS.Timeout;
   busy?: boolean; // простая защита от гонок
+  lastMoveAt?: Record<string, number>; // для rate-limit
 }
 
 const rooms = new Map<string, Room>();
@@ -58,6 +59,13 @@ io.on('connection', socket=>{
     room.busy = true;
     try {
       const pid = [...room.players.values()].find(p=>p.socketId===socket.id)?.id || (room.bot?.id===socket.id? room.bot.id: socket.id);
+      // rate limit: не чаще 5 действий в 3 секунды (пакетно)
+      const now = Date.now();
+      room.lastMoveAt = room.lastMoveAt || {};
+      const key = pid;
+      const prev = room.lastMoveAt[key] || 0;
+      if(now - prev < 300){ socket.emit('error', { code:'RATE', message:'Too fast' }); return; }
+      room.lastMoveAt[key] = now;
       const legal = legalMoves(room.state, pid).some(m=> JSON.stringify(m)===JSON.stringify(move));
       if(!legal){ socket.emit('error', { code:'ILLEGAL', message:'Illegal move' }); return; }
       applyMove(room.state, move, pid);
