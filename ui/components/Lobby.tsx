@@ -19,7 +19,7 @@ export const Lobby: React.FC<Props> = () => {
   const [hasPersist,setHasPersist] = useState(false);
 
   useEffect(()=>{ try { if(localStorage.getItem('durak_persist')) setHasPersist(true);} catch{} },[]);
-  useEffect(()=>{ try { localStorage.setItem('durak_anim', animations? 'on':'off'); } catch{} },[animations]);
+  useEffect(()=>{ try { localStorage.setItem('durak_anim', animations? 'on':'off'); } catch{}; if(typeof document!=='undefined'){ document.body.classList.toggle('reduced-motion', !animations); } },[animations]);
   useEffect(()=>{ try { localStorage.setItem('durak_sound_muted', sound? 'false':'true'); } catch{} },[sound]);
   useEffect(()=>{ try { localStorage.setItem('durak_theme_mode', theme); } catch{} },[theme]);
 

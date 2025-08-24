@@ -25,11 +25,11 @@ const LiveRegion: React.FC<{ message: string }> = ({ message }) => (
   <div aria-live="polite" aria-atomic="true" className="sr-only" role="status">{message}</div>
 );
 
-export const NewGamePage: React.FC<{ onRestart?: ()=>void }> = ({ onRestart }) => {
-  const [roomId,setRoomId] = useState<string | null>(null);
+export const NewGamePage: React.FC<{ onRestart?: ()=>void; initialNick?: string; initialRoom?: string; initialMode?: string }> = ({ onRestart, initialNick, initialRoom, initialMode }) => {
+  const [roomId,setRoomId] = useState<string | null>(initialRoom || null);
   const [allowTranslationOpt,setAllowTranslationOpt] = useState<boolean|undefined>(undefined);
-  const [nick,setNick] = useState('Player');
-  const [mode,setMode] = useState<'ONLINE'|'OFFLINE'>('OFFLINE');
+  const [nick,setNick] = useState(initialNick || 'Player');
+  const [mode,setMode] = useState<'ONLINE'|'OFFLINE'>(initialMode==='online'? 'ONLINE':'OFFLINE');
   const [showRules,setShowRules] = useState(false);
   const [showLog,setShowLog] = useState(true);
   const [autosort,setAutosort] = useState(true);
@@ -128,7 +128,7 @@ export const NewGamePage: React.FC<{ onRestart?: ()=>void }> = ({ onRestart }) =
   useEffect(()=>{
     if(activeState && activeState.meta && activeState.log && activeState.log.length===0){
       const low = activeState.meta.lowestTrump; const first = activeState.meta.firstAttacker;
-      push(`Первым ходит ${first} (младший козырь: ${low.r}${low.s})`,'info');
+      push(`Первым ходит ${first} (младший козырь: ${low.r}${low.s})`,'info',{ dedupeKey:'first_turn_toast', ttl: 60000 });
     }
   },[activeState, push]);
 
@@ -332,6 +332,13 @@ export const NewGamePage: React.FC<{ onRestart?: ()=>void }> = ({ onRestart }) =
         />
       </header>
       {renderContent()}
+      {/* Mobile mini HUD */}
+      {activeState && <div className="md:hidden glass rounded-xl p-2 text-[11px] flex flex-wrap gap-2 justify-center">
+        <span>Козырь: {activeState.trump.r}{activeState.trump.s}</span>
+        <span>Колода: {activeState.deck.length}</span>
+        <span>Бито: {activeState.discard.length}</span>
+        <span>Соперник: {activeState.players.find(p=>p.id!==myId)?.hand.length??0}</span>
+      </div>}
       <ToastHost queue={toasts} />
       <Modal open={showRules} onClose={()=> setShowRules(false)} title="Правила (кратко)" id="rules-modal">
         <ul className="list-disc pl-5 space-y-1 text-xs">

@@ -7,15 +7,15 @@
   --accent: #5ac8fa; /* Apple style blue */
   --accent-glow: 190 100% 60%;
   --radius: 18px;
-  /* card base size (md) */
-  --card-w: 70px;
-  --card-h: 100px;
-  --card-w-lg: 78px;
-  --card-h-lg: 112px;
-  --card-w-sm: 62px;
-  --card-h-sm: 88px;
-  --card-w-xs: 54px;
-  --card-h-xs: 78px;
+  /* card sizes: desktop ≥1280 ~160px high, mid 130-140px, mobile 100-110px */
+  --card-w: 110px;
+  --card-h: 160px;
+  --card-w-lg: 115px;
+  --card-h-lg: 168px;
+  --card-w-sm: 95px;
+  --card-h-sm: 140px;
+  --card-w-xs: 78px;
+  --card-h-xs: 110px;
   color-scheme: dark;
 }
 
@@ -192,10 +192,9 @@ button[disabled] .playing-card { cursor:not-allowed !important; filter:grayscale
 
 /* Mobile tuning */
 /* upscale on very large viewports */
-@media (min-width: 1500px){ :root { --card-w: var(--card-w-lg); --card-h: var(--card-h-lg); } }
-@media (max-width: 1000px){ :root { --card-w: var(--card-w-sm); --card-h: var(--card-h-sm); } }
-@media (max-width: 780px){ :root { --card-w: 58px; --card-h: 82px; } }
-@media (max-width: 640px){ :root { --card-w: var(--card-w-xs); --card-h: var(--card-h-xs); }
+@media (min-width: 1280px){ :root { --card-w: var(--card-w); --card-h: var(--card-h); } }
+@media (max-width: 1279px){ :root { --card-w: var(--card-w-sm); --card-h: var(--card-h-sm); } }
+@media (max-width: 767px){ :root { --card-w: var(--card-w-xs); --card-h: var(--card-h-xs); }
   .playing-card { padding:4px 4px 3px; }
   .playing-card .rank { font-size:13px; }
   .playing-card .suit { font-size:16px; }
