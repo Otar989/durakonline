@@ -41,7 +41,7 @@ export function initGame(players: { id: string; nick: string }[], seedShuffle = 
   const gs: GameState = {
     deck, discard: [], trump, players: ps, attacker, defender, table: [], phase:'playing', loser:null, winner:null, finished:[], turnDefenderInitialHand: handOf(ps, defender).length,
     allowTranslation: !!opts?.allowTranslation,
-    options: { deckSize, allowTranslation: opts?.allowTranslation, limitFiveBeforeBeat: opts?.limitFiveBeforeBeat },
+  options: { deckSize, allowTranslation: opts?.allowTranslation, limitFiveBeforeBeat: opts?.limitFiveBeforeBeat, withTrick: opts?.withTrick },
     firstDefensePlayedThisTurn: false,
     log: [],
     meta: { firstAttacker: attacker, lowestTrump: lowestInfo?.card || trump }
@@ -94,10 +94,14 @@ export function legalMoves(st: GameState, playerId: string): Move[] {
     // End turn if all defended and >0
     if(tableCount>0 && st.table.every(p=>p.defend)) moves.push({ type:'END_TURN' });
     // Attack / add cards
-    if(tableCount < limit){
+  if(tableCount < limit){
       const ranksOnTable = new Set(st.table.flatMap(p=>[p.attack.r, p.defend?.r].filter(Boolean) as Rank[]));
       for(const c of meHand){
-        if(tableCount===0 || ranksOnTable.has(c.r)) moves.push({ type:'ATTACK', card: c });
+        const normal = (tableCount===0 || ranksOnTable.has(c.r));
+        if(normal) moves.push({ type:'ATTACK', card: c });
+        if(st.options?.withTrick && !normal){
+          moves.push({ type:'CHEAT_ATTACK', card: c } as Move);
+        }
       }
     }
   } else if(isDefender){
@@ -119,6 +123,21 @@ export function legalMoves(st: GameState, playerId: string): Move[] {
     } else {
       // all defended but defender cannot END_TURN, only attacker
     }
+  }
+  // accuse доступен всем, кроме уже помеченных (simple rule) если есть подозреваемые
+  if(st.options?.withTrick){
+    // можно обвинить любую уже отмеченную подозрительную атаку (suspects) или вообще любую атаку на столе (MVP) кроме своей
+    const offered: Record<string,boolean> = {};
+    if(st.cheat?.suspects){
+      for(const sus of st.cheat.suspects){
+        const pair = st.table[sus.attackIndex]; if(!pair) continue;
+        if(playerId!==sus.by){
+          const key = sus.by+':'+sus.attackIndex;
+          if(!offered[key]){ moves.push({ type:'ACCUSE', card: pair.attack, targetPlayer: sus.by } as Move); offered[key]=true; }
+        }
+      }
+    }
+    // расширение: если нет suspects, пока запрещаем произвольные обвинения (нужно основание)
   }
   return moves;
 }
@@ -145,11 +164,24 @@ export function applyMove(st: GameState, move: Move, playerId: string): GameStat
   switch(move.type){
     case 'ATTACK':{
       removeCard(meHand, move.card);
-      st.table.push({ attack: move.card });
+      st.table.push({ attack: move.card, owner: playerId });
       // with trick режим (MVP-хук): можно вставить нелегальную карту если опция включена – пока просто логируем.
       if(st.options && (st.options as any).withTrick){
         // если ход по внутренней проверке был бы нелегален (мы сюда не попадём, т.к. legalMoves отфильтровал) — в будущем расширим.
       }
+      pushLog();
+      return st;
+    }
+    case 'CHEAT_ATTACK':{
+      if(!st.options?.withTrick) throw new Error('Cheat mode off');
+      // намеренно разрешаем карту, которая НЕ входит в legalMoves обычной атакой
+      // проверим что карта у игрока есть
+      const idx = meHand.findIndex(c=> c.r===move.card.r && c.s===move.card.s);
+      if(idx<0) throw new Error('card missing');
+      const card = meHand.splice(idx,1)[0];
+      st.table.push({ attack: card, owner: playerId });
+      st.cheat = st.cheat || { flagged:{}, accusations:[], suspects:[] };
+      st.cheat.suspects?.push({ attackIndex: st.table.length-1, by: playerId, cheat: true });
       pushLog();
       return st;
     }
@@ -213,6 +245,24 @@ export function applyMove(st: GameState, move: Move, playerId: string): GameStat
   st.attacker = oldDef;
   st.defender = order[(oldDefIdx+1)%order.length];
   pushLog();
+      return st;
+    }
+    case 'ACCUSE':{
+      if(!st.options?.withTrick) throw new Error('Cheat mode off');
+      st.cheat = st.cheat || { flagged:{}, accusations:[], suspects:[] };
+      // ищем suspect с такой картой и владельцем
+      const suspect = (st.cheat.suspects||[]).find(s=> st.table[s.attackIndex] && st.table[s.attackIndex].attack.r===move.card.r && st.table[s.attackIndex].attack.s===move.card.s && s.by===move.targetPlayer);
+      let success = false;
+      if(suspect && suspect.cheat){
+        success = true;
+        const rollbackPairs = st.table.splice(suspect.attackIndex);
+        const ownerHand = handOf(st.players, move.targetPlayer);
+        for(const pr of rollbackPairs){ ownerHand.push(pr.attack); if(pr.defend) ownerHand.push(pr.defend); }
+        st.cheat.flagged[move.targetPlayer] = true;
+      }
+      if(!success){ st.cheat.flagged[playerId] = true; }
+      st.cheat.accusations.push({ by: playerId, against: move.targetPlayer, card: move.card, success, t: Date.now() });
+      pushLog();
       return st;
     }
   }
