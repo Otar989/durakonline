@@ -12,6 +12,7 @@ import { useAudio } from '../../src/hooks/useAudio';
 import { Move } from '../../game-core/types';
 import { MoveLog } from '../components/MoveLog';
 import { Avatar, ConfettiBurst } from '../components/Avatar';
+import { FlipProvider, useFlip } from '../components/FlipLayer';
 import { ToastHost, useToasts } from '../components/Toast';
 
 export const NewGamePage: React.FC = () => {
@@ -197,7 +198,8 @@ export const NewGamePage: React.FC = () => {
   }
 
   return (
-    <div ref={gestureRef} className="max-w-6xl mx-auto p-6 flex flex-col gap-6">
+  <FlipProvider>
+  <div ref={gestureRef} className="max-w-6xl mx-auto p-6 flex flex-col gap-6">
       <header className="flex flex-col gap-4">
         <div className="flex items-center gap-4 flex-wrap">
           <h1 className="text-2xl font-semibold">Дурак Онлайн</h1>
@@ -247,7 +249,8 @@ export const NewGamePage: React.FC = () => {
           <button className="btn" onClick={()=>{ setGameEnded(null); startUnified(); }}>Новая игра</button>
         </div>
       </div>}
-    </div>
+  </div>
+  </FlipProvider>
   );
 };
 export default NewGamePage;
