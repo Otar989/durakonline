@@ -13,7 +13,7 @@ import { MoveLog } from '../components/MoveLog';
 export const NewGamePage: React.FC = () => {
   const [roomId,setRoomId] = useState<string | null>(null);
   const [nick] = useState('Player');
-  const { state: localState, start: startLocal, play: playLocal, myMoves: localMoves, mode: localMode } = useLocalGame();
+  const { state: localState, start: startLocal, play: playLocal } = useLocalGame();
   const { snapshot, socketState, startGame, playMove } = useSocketGame(roomId, nick);
 
   const inOnline = socketState==='ONLINE' && snapshot.state;

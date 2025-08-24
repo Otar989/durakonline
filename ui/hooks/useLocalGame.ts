@@ -19,12 +19,13 @@ export function useLocalGame(){
 
   // bot reaction
   useEffect(()=>{
-    if(!state || state.phase!=='playing') return;
-    if(state.attacker==='bot' || state.defender==='bot'){
-      const mv = botChoose(state, 'bot');
-      if(mv) setTimeout(()=>{ applyMove(state, mv, 'bot'); setState({...state}); }, 500);
+    const st = state; // snapshot
+    if(!st || st.phase!=='playing') return;
+    if(st.attacker==='bot' || st.defender==='bot'){
+      const mv = botChoose(st, 'bot');
+      if(mv) setTimeout(()=>{ applyMove(st, mv, 'bot'); setState({...st}); }, 500);
     }
-  },[state?.table.length, state?.attacker, state?.defender]);
+  },[state]);
 
   return { state, start, play, myMoves, mode };
 }
