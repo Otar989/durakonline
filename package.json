@@ -11,8 +11,9 @@
   "typecheck": "tsc --noEmit",
     "dev:ws": "node server/index.ts",
     "dev:all": "concurrently -k -n WEB,WS -c magenta,cyan \"npm:dev\" \"npm:start\"",
-    "test": "vitest run",
-    "test:watch": "vitest"
+  "test": "vitest run",
+  "test:watch": "vitest",
+  "format": "prettier . --write"
   },
   "dependencies": {
     "clsx": "2.1.1",
@@ -21,7 +22,9 @@
     "react-dom": "19.1.0",
     "socket.io": "4.7.5",
   "socket.io-client": "4.7.5",
-  "zod": "3.23.8"
+  "zod": "3.23.8",
+  "framer-motion": "11.2.10",
+  "workbox-window": "7.1.0"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
@@ -36,7 +39,8 @@
   "typescript": "^5",
     "vitest": "^1.6.0",
     "husky": "^9.0.0",
-    "lint-staged": "^15.2.0"
+  "lint-staged": "^15.2.0",
+  "prettier": "3.3.3"
   },
   "lint-staged": {
     "*.{ts,tsx,js,jsx}": ["eslint --fix"],

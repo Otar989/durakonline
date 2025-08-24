@@ -1,0 +1,12 @@
+{
+  "name": "Durak Online",
+  "short_name": "Durak",
+  "display": "standalone",
+  "start_url": "/",
+  "background_color": "#0b1220",
+  "theme_color": "#14b8a6",
+  "description": "Подкидной Дурак онлайн и офлайн с красивыми анимациями",
+  "icons": [
+    { "src": "/favicon.ico", "sizes": "64x64 32x32 16x16", "type": "image/x-icon" }
+  ]
+}
