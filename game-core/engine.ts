@@ -102,9 +102,7 @@ export function applyMove(st: GameState, move: Move, playerId: string): GameStat
       for(const pair of st.table){ defHand.push(pair.attack); if(pair.defend) defHand.push(pair.defend); }
       st.table = [];
       refill(st);
-      // attacker stays same, defender rotates to attacker? In 2-player attacker unchanged.
-      // defender becomes same, but in 2p attacker unchanged (classic) => defender now next after attacker
-      st.defender = st.attacker===st.defender? st.defender : st.defender; // no-op for 2p
+  // В подкидном 2p: атакующий сохраняется тем же; защитник остаётся тем же (после взятия снова атакует атакующий прежний, защитник не меняется).
       st.turnDefenderInitialHand = handOf(st.players, st.defender).length;
       checkEnd(st);
       return st;
@@ -143,7 +141,7 @@ function checkEnd(st: GameState){
     if(active.length===1){
       st.phase='finished';
       st.loser = active[0].id;
-      st.winner = st.players.find(p=>p.id!==active[0].id && !st.finished.includes(active[0].id))?.id || null;
+  st.winner = st.players.find(p=>p.id!==active[0].id) ?.id || null;
     } else if(active.length===0){
       st.phase='finished';
       st.loser = null; st.winner = null;

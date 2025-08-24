@@ -34,7 +34,12 @@ export const NewGamePage: React.FC = () => {
       <div className="flex items-start gap-6 flex-wrap">
         <TrumpPile trump={activeState.trump} deckCount={activeState.deck.length} />
         <div className="flex-1 min-w-[300px]">
-          <TableBoard table={activeState.table} trumpSuit={activeState.trump.s} onDefend={()=>{}} selectableDefend={[]} />
+          <TableBoard table={activeState.table} trumpSuit={activeState.trump.s} onDefend={()=>{}} selectableDefend={[]}
+            onAttackDrop={(card)=>{
+              const atk = moves.find(m=> m.type==='ATTACK' && (m as any).card.r===card.r && (m as any).card.s===card.s);
+              if(atk){ inOnline? playMove(atk as any): playLocal(atk as any); }
+            }}
+          />
         </div>
       </div>
       <Hand hand={activeState.players.find(p=>p.id===myId)?.hand||[]} legal={moves} onPlay={(m)=> inOnline? playMove(m as any): playLocal(m as any)} phase={'attack'} />

@@ -11,9 +11,13 @@ export const Hand: React.FC<Props> = ({ hand, legal, onPlay, phase }) => {
       const id = c.r+c.s;
       const attackable = legalAttack.has(id);
       const defendable = legalDef.find(m=> m.card.r===c.r && m.card.s===c.s);
-      return <button key={id} disabled={!attackable && !defendable} onClick={()=>{
-        if(attackable) onPlay({ type:'ATTACK', card: c }); else if(defendable) onPlay(defendable);
-      }} className="transition-transform hover:-translate-y-1 disabled:opacity-30">
+      const data = JSON.stringify({ card:c });
+      return <button key={id}
+        disabled={!attackable && !defendable}
+        draggable={attackable || !!defendable}
+        onDragStart={e=>{ e.dataTransfer.setData('application/x-card', data); }}
+        onClick={()=>{ if(attackable) onPlay({ type:'ATTACK', card: c }); else if(defendable) onPlay(defendable); }}
+        className="transition-transform hover:-translate-y-1 disabled:opacity-30">
         <PlayingCard card={c} trumpSuit={undefined} dim={false} />
       </button>;
     })}

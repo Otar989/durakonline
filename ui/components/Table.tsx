@@ -2,10 +2,13 @@ import React from 'react';
 import { Pair, Card } from '../../game-core/types';
 import { PlayingCard } from './TrumpPile';
 
-interface Props { table: Pair[]; trumpSuit: string; onDefend: (target: Card, card: Card)=>void; selectableDefend: { target: Card; defendWith: Card }[]; illegalFlashId?: string; }
-export const TableBoard: React.FC<Props> = ({ table, trumpSuit, onDefend, selectableDefend }) => {
+interface Props { table: Pair[]; trumpSuit: string; onDefend: (target: Card, card: Card)=>void; selectableDefend: { target: Card; defendWith: Card }[]; onAttackDrop?: (card: Card)=>void; }
+export const TableBoard: React.FC<Props> = ({ table, trumpSuit, onDefend, selectableDefend, onAttackDrop }) => {
   return (
-    <div className="flex flex-wrap gap-4 p-4 rounded-xl bg-white/5 border border-white/10 min-h-[140px] relative">
+    <div className="flex flex-wrap gap-4 p-4 rounded-xl bg-white/5 border border-white/10 min-h-[140px] relative"
+      onDragOver={e=>{ if(onAttackDrop) e.preventDefault(); }}
+      onDrop={e=>{ if(!onAttackDrop) return; try { const raw = e.dataTransfer.getData('application/x-card'); if(raw){ const { card } = JSON.parse(raw); onAttackDrop(card); } } catch(_){} }}
+    >
       {table.map((pair,i)=> (
         <div key={i} className="relative w-28 h-24 flex items-center justify-center">
           <div className="absolute left-0 top-2"><PlayingCard card={pair.attack} trumpSuit={trumpSuit} /></div>
