@@ -62,6 +62,31 @@ export const NewGamePage: React.FC = () => {
   const activeState = inOnline? snapshot.state : localState;
   const myId = inOnline? snapshot.players[0]?.id : 'p1';
   const moves = useMemo(()=> activeState && myId? legalMoves(activeState, myId): [], [activeState, myId]);
+  const lastDeckCountRef = useRef<number>(activeState?.deck.length||0);
+  const { flyCard, reduced, toggleReduced } = (useFlip as any)?.() || {};
+
+  // полёт добора: отслеживаем уменьшение deck и появление новых карт в руке
+  useEffect(()=>{
+    if(!activeState) return;
+    const deckLen = activeState.deck.length;
+    const prev = lastDeckCountRef.current;
+    lastDeckCountRef.current = deckLen;
+    if(deckLen < prev){
+      // карты добраны: найдём новые по id (по hand длине + отсутствию в предыдущем state невозможно без хранения, упрощенно анимируем последние N)
+      const me = activeState.players.find(p=>p.id===myId);
+      if(!me) return;
+      const gained = prev - deckLen; if(gained<=0) return;
+      const slice = me.hand.slice(-gained);
+      // координата колоды (TrumpPile trump card)
+      const deckEl = document.querySelector('[data-deck-origin]') as HTMLElement|null;
+      if(!deckEl || !flyCard) return;
+      const fr = deckEl.getBoundingClientRect();
+      slice.forEach(c=>{
+        const targetEl = document.querySelector(`[data-card-id='${c.r+c.s}']`) as HTMLElement|null;
+        if(targetEl){ const tr = targetEl.getBoundingClientRect(); flyCard({ x:fr.x, y:fr.y, w:fr.width, h:fr.height }, { x:tr.x, y:tr.y, w:tr.width, h:tr.height }, { r:c.r, s:c.s }, activeState.trump.s, 'draw'); }
+      });
+    }
+  },[activeState, myId, flyCard]);
 
   // стартовый тост о первом ходе
   useEffect(()=>{
@@ -148,7 +173,7 @@ export const NewGamePage: React.FC = () => {
           <div className="flex flex-col gap-2 min-w-[160px]">
             <div className="glass p-3 rounded-2xl flex flex-col gap-2 text-xs">
               <div className="font-semibold text-sm flex items-center gap-2">Козырь <span className="text-base">{activeState.trump.s}</span></div>
-              <TrumpPile trump={activeState.trump} deckCount={activeState.deck.length} />
+              <div data-deck-origin><TrumpPile trump={activeState.trump} deckCount={activeState.deck.length} /></div>
             </div>
             {activeState.discard.length>0 && <div className="glass p-3 rounded-2xl text-xs flex flex-col gap-2">
               <div className="font-semibold text-sm">Бито</div>
@@ -212,6 +237,7 @@ export const NewGamePage: React.FC = () => {
               </select>
             </label>
             <button onClick={toggleMute} className="px-2 py-1 rounded bg-white/10 hover:bg-white/20">{muted? '🔇':'🔊'}</button>
+            <button onClick={()=> (useFlip as any)?.().toggleReduced()} className="px-2 py-1 rounded bg-white/10 hover:bg-white/20" title="Reduced motion">RM</button>
             <input type="range" min={0} max={1} step={0.05} value={volume} onChange={e=> setVolume(Number(e.target.value))} className="accent-sky-400 w-20" />
             <button onClick={()=> setTheme(t=> t==='dark'?'light':'dark')} className="px-2 py-1 rounded bg-white/10 hover:bg-white/20">{theme==='dark'? '🌙':'☀️'}</button>
             <button onClick={()=> setShowRules(true)} className="px-2 py-1 rounded bg-white/10 hover:bg-white/20">Правила</button>

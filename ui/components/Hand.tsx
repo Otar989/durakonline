@@ -32,7 +32,7 @@ export const Hand: React.FC<Props> = ({ hand, legal, onPlay, trumpSuit, autosort
       const defendable = legalDef.find(m=> m.card.r===c.r && m.card.s===c.s);
       const data = JSON.stringify({ card:c });
       const canTranslate = translateCards.has(id);
-      return <motion.button key={id}
+  return <motion.button key={id} data-card-id={id}
         layout
         initial={{ opacity:0, y:12, scale:0.9 }}
         animate={{ opacity:1, y:0, scale:1 }}

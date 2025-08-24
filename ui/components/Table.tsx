@@ -26,7 +26,7 @@ export const TableBoard: React.FC<Props> = ({ table, trumpSuit, onDefend, select
         const el = host?.querySelector(`[data-card-id='${targetPair.attack.r+targetPair.attack.s}']`) as HTMLElement|null;
         if(el && flyCard){
           const tr = el.getBoundingClientRect();
-          flyCard(pending.from, { x:tr.x, y:tr.y, w:tr.width, h:tr.height }, { r:targetPair.attack.r, s:targetPair.attack.s }, pending.trumpSuit);
+          flyCard(pending.from, { x:tr.x, y:tr.y, w:tr.width, h:tr.height }, { r:targetPair.attack.r, s:targetPair.attack.s }, pending.trumpSuit, pending.kind);
         }
       }
     } else if(table.length === prevTableRef.current.length){
@@ -38,7 +38,7 @@ export const TableBoard: React.FC<Props> = ({ table, trumpSuit, onDefend, select
         if(pending && flyCard){
           const pair = newlyDefended[0];
             const el = host?.querySelector(`[data-card-id='${pair.defend!.r+pair.defend!.s}']`) as HTMLElement|null;
-            if(el){ const tr = el.getBoundingClientRect(); flyCard(pending.from, { x:tr.x, y:tr.y, w:tr.width, h:tr.height }, { r:pair.defend!.r, s:pair.defend!.s }, pending.trumpSuit); }
+            if(el){ const tr = el.getBoundingClientRect(); flyCard(pending.from, { x:tr.x, y:tr.y, w:tr.width, h:tr.height }, { r:pair.defend!.r, s:pair.defend!.s }, pending.trumpSuit, pending.kind); }
         }
       }
     }
