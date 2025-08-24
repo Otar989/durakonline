@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { ErrorBoundary } from '../../ui/components/ErrorBoundary';
+import { SettingsProvider } from '../../ui/context/SettingsContext';
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -53,8 +54,11 @@ export default function RootLayout({
         />
       </head>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+        <script dangerouslySetInnerHTML={{ __html: `(()=>{try{var t=localStorage.getItem('durak_theme_mode')||'system';var m=t==='system'? (matchMedia('(prefers-color-scheme: light)').matches?'light':'dark'):t;document.documentElement.dataset.theme=m;}catch{}})();` }} />
         <ErrorBoundary>
-          {children}
+          <SettingsProvider>
+            {children}
+          </SettingsProvider>
         </ErrorBoundary>
         <script dangerouslySetInnerHTML={{ __html: `if('serviceWorker' in navigator){window.addEventListener('load',()=>{navigator.serviceWorker.register('/sw.js').catch(()=>{});});}` }} />
       </body>
