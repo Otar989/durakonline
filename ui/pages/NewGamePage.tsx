@@ -21,6 +21,7 @@ import { ToastHost, useToasts } from '../components/Toast';
 import { useHotkeys } from '../hooks/useHotkeys';
 import Modal from '../components/Modal';
 import Sidebar from '../components/Sidebar';
+import GameLayout from '../components/GameLayout';
 import { useNetStatus } from '../hooks/useNetStatus';
 
 // Live drag announcer
@@ -277,48 +278,54 @@ export const NewGamePage: React.FC<{ onRestart?: ()=>void; initialNick?: string;
   { combo:'enter', handler:()=>{ const me = activeState?.players.find(p=>p.id===myId); if(!me) return; const card = me.hand[selectedIndex]; if(!card) return; const atk = (moves as Move[]).find(m=> m.type==='ATTACK' && m.card.r===card.r && m.card.s===card.s); const tr = (moves as Move[]).find(m=> m.type==='TRANSLATE' && m.card.r===card.r && m.card.s===card.s); const def = (moves as Move[]).find(m=> m.type==='DEFEND' && m.card.r===card.r && m.card.s===card.s); const m = atk||tr||def; if(m){ inOnline? playMove(m): playLocal(m); } } },
   { combo:'escape', handler:()=>{ if(confirm('Выйти в меню?')) window.location.href='/'; } }
   ], !!activeState);
-  function renderContent(){
-    if(!activeState) return null;
-    const me = activeState.players.find(p=>p.id===myId);
+  const sidebarNode = activeState ? (()=>{
     const opp = activeState.players.find(p=>p.id!==myId);
-  return (
-      <div className="flex flex-col gap-4 lg:flex-row">
-        <div className="flex items-start gap-4 flex-wrap flex-1">
-          <Sidebar trump={activeState.trump} deckCount={activeState.deck.length} discard={activeState.discard} opponent={opp? { nick: opp.nick, handCount: opp.hand.length, isBot: (opp as any).bot || (opp.nick||'').toLowerCase().includes('bot'), isOffline: (opp as any).offline }: null} />
-          <div className="flex flex-col gap-2 min-w-[160px] flex-1">
-            <div className="glass p-3 rounded-2xl text-xs flex flex-col gap-1">
-              <label className="flex items-center gap-2 cursor-pointer text-[11px]"><input type="checkbox" checked={autosort} onChange={e=> setAutosort(e.target.checked)} /> Авто-сорт</label>
-              <label className="flex items-center gap-2 cursor-pointer text-[11px]"><input type="checkbox" checked={showLog} onChange={e=> setShowLog(e.target.checked)} /> Лог</label>
-            </div>
-          </div>
-          <div className="flex-1 min-w-[300px]">
-            <TableBoard table={activeState.table} trumpSuit={activeState.trump.s} translationHint={!!canTranslate}
-              onDefend={(target, card)=>{
-                const def = (moves as Move[]).find((m): m is Extract<Move,{type:'DEFEND'}>=> m.type==='DEFEND' && m.card.r===card.r && m.card.s===card.s && m.target.r===target.r && m.target.s===target.s);
-                if(def) { inOnline? playMove(def): playLocal(def); }
-              }}
-              selectableDefend={(moves.filter(m=> m.type==='DEFEND') as Extract<Move,{type:'DEFEND'}>[]).map(m=> ({ target:m.target, defendWith:m.card }))}
-              onAttackDrop={(card)=>{
-                const atk = (moves as Move[]).find((m): m is Extract<Move,{type:'ATTACK'}>=> m.type==='ATTACK' && m.card.r===card.r && m.card.s===card.s);
-                if(atk){ inOnline? playMove(atk): playLocal(atk); }
-              }}
-            />
-            {showLog && <div className="glass rounded-xl p-3 mt-4">
-              <div className="flex items-center justify-between mb-2"><h3 className="text-xs font-semibold opacity-70">Ходы</h3><button className="text-[10px] opacity-60 hover:opacity-100" onClick={()=> setShowLog(false)}>Скрыть</button></div>
-              <MoveLog entries={activeState.log} me={myId||undefined} />
-            </div>}
-            {!showLog && <button className="text-[10px] opacity-60 hover:opacity-100 mt-2" onClick={()=> setShowLog(true)}>Показать лог</button>}
-          </div>
-        </div>
-  <div id="hand-hint" className="sr-only">Горячие клавиши: A атака (если одна), D защита (если одна), R перевод (если одна), T взять, E бито.</div>
-  <MobileControls moves={moves as any} onPlay={(m:any)=> { inOnline? playMove(m): playLocal(m); }} className="mt-3" />
-  <Hand hand={me?.hand||[]} legal={moves} trumpSuit={activeState.trump.s} autosort={autosort} describedBy="hand-hint" selectedIndex={selectedIndex} onChangeSelected={setSelectedIndex} onPlay={(m)=> { const isLegal = moves.some(x=> JSON.stringify(x)===JSON.stringify(m)); if(!isLegal){ push('Нельзя: ход недоступен','warn'); return; }
+    return <Sidebar trump={activeState.trump} deckCount={activeState.deck.length} discard={activeState.discard} opponent={opp? { nick: opp.nick, handCount: opp.hand.length, isBot: (opp as any).bot || (opp.nick||'').toLowerCase().includes('bot'), isOffline: (opp as any).offline }: null} />;
+  })() : null;
+
+  const tableNode = activeState ? (
+    <div>
+      <TableBoard table={activeState.table} trumpSuit={activeState.trump.s} translationHint={!!canTranslate}
+        onDefend={(target, card)=>{
+          const def = (moves as Move[]).find((m): m is Extract<Move,{type:'DEFEND'}>=> m.type==='DEFEND' && m.card.r===card.r && m.card.s===card.s && m.target.r===target.r && m.target.s===target.s);
+          if(def) { inOnline? playMove(def): playLocal(def); }
+        }}
+        selectableDefend={(moves.filter(m=> m.type==='DEFEND') as Extract<Move,{type:'DEFEND'}>[]).map(m=> ({ target:m.target, defendWith:m.card }))}
+        onAttackDrop={(card)=>{
+          const atk = (moves as Move[]).find((m): m is Extract<Move,{type:'ATTACK'}>=> m.type==='ATTACK' && m.card.r===card.r && m.card.s===card.s);
+          if(atk){ inOnline? playMove(atk): playLocal(atk); }
+        }}
+      />
+    </div>
+  ) : null;
+
+  const logNode = activeState ? (
+    <div className="glass rounded-xl p-3">
+      <div className="flex items-center justify-between mb-2"><h3 className="text-xs font-semibold opacity-70">Ходы</h3><button className="text-[10px] opacity-60 hover:opacity-100" onClick={()=> setShowLog(s=> !s)}>{showLog? 'Скрыть':'Показать'}</button></div>
+      {showLog && <MoveLog entries={activeState.log} me={myId||undefined} />}
+    </div>
+  ) : null;
+
+  const me = activeState?.players.find(p=>p.id===myId);
+  const handNode = activeState ? (
+    <div>
+      <div id="hand-hint" className="sr-only">Горячие клавиши: A атака (если одна), D защита (если одна), R перевод (если одна), T взять, E бито.</div>
+      <MobileControls moves={moves as any} onPlay={(m:any)=> { inOnline? playMove(m): playLocal(m); }} className="mt-3" />
+      <Hand hand={me?.hand||[]} legal={moves} trumpSuit={activeState.trump.s} autosort={autosort} describedBy="hand-hint" selectedIndex={selectedIndex} onChangeSelected={setSelectedIndex} onPlay={(m)=> { const isLegal = moves.some(x=> JSON.stringify(x)===JSON.stringify(m)); if(!isLegal){ push('Нельзя: ход недоступен','warn'); return; }
           if(m.type==='TRANSLATE'){ push('Перевод! 🔁','success'); playSound('translate'); if(navigator.vibrate) navigator.vibrate(20);} else if(m.type==='ATTACK'){ playSound('card'); } else if(m.type==='DEFEND'){ playSound('defend'); } else if(m.type==='TAKE'){ playSound('take'); if(navigator.vibrate) navigator.vibrate([10,40,20]); } else if(m.type==='END_TURN'){ playSound('bito'); }
-    inOnline? playMove(m): playLocal(m); }} />
-        <ActionButtons legal={moves} onPlay={(m)=> inOnline? playMove(m): playLocal(m)} />
-      </div>
-    );
-  }
+        inOnline? playMove(m): playLocal(m); }} />
+      <ActionButtons legal={moves} onPlay={(m)=> inOnline? playMove(m): playLocal(m)} />
+    </div>
+  ) : null;
+
+  const topBarNode = (
+    <div className="glass p-3 rounded-2xl text-xs flex flex-wrap gap-3 items-center justify-start">
+      <label className="flex items-center gap-2 cursor-pointer text-[11px]"><input type="checkbox" checked={autosort} onChange={e=> setAutosort(e.target.checked)} /> Авто-сорт</label>
+      <label className="flex items-center gap-2 cursor-pointer text-[11px]"><input type="checkbox" checked={showLog} onChange={e=> setShowLog(e.target.checked)} /> Лог</label>
+      {activeState && <span className="opacity-60 text-[11px]">Козырь: {activeState.trump.r}{activeState.trump.s}</span>}
+      {activeState && <span className="opacity-60 text-[11px]">Колода: {activeState.deck.length}</span>}
+    </div>
+  );
 
   const MotionControls: React.FC = () => {
     const flip = useFlip();
@@ -375,7 +382,7 @@ export const NewGamePage: React.FC<{ onRestart?: ()=>void; initialNick?: string;
           defenderNick={activeState? activeState.players.find(p=>p.id===activeState.defender)?.nick: undefined}
         />
       </header>
-      {renderContent()}
+  <GameLayout sidebar={sidebarNode} table={tableNode} log={logNode} hand={handNode} topBar={topBarNode} />
       {/* Mobile mini HUD */}
       {activeState && <div className="md:hidden glass rounded-xl p-2 text-[11px] flex flex-wrap gap-2 justify-center">
         <span>Козырь: {activeState.trump.r}{activeState.trump.s}</span>
