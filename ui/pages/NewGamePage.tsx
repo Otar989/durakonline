@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useLocalGame } from '../hooks/useLocalGame';
 import { useSocketGame } from '../hooks/useSocketGame';
 import { StatusBar } from '../components/StatusBar';
@@ -20,7 +20,28 @@ export const NewGamePage: React.FC = () => {
   const { state: localState, start: startLocal, play: playLocal } = useLocalGame();
   const { snapshot, socketState, startGame, playMove } = useSocketGame(roomId, nick);
   const { toasts, push } = useToasts();
-  const { play: playSound } = useAudio(true);
+  const { play: playSound, muted, toggleMute, volume, setVolume } = useAudio(true);
+  const [theme,setTheme] = useState<'dark'|'light'>(()=> (typeof window!=='undefined' && window.matchMedia('(prefers-color-scheme: light)').matches)? 'light':'dark');
+  useEffect(()=>{ if(typeof document!=='undefined'){ document.documentElement.dataset.theme = theme; try { localStorage.setItem('durak_theme', theme);} catch{} } },[theme]);
+  useEffect(()=>{ if(typeof window!=='undefined'){ try { const t = localStorage.getItem('durak_theme'); if(t==='light'||t==='dark') setTheme(t as any); } catch{} } },[]);
+
+  // swipe gestures (mobile) on main area: left = END_TURN, right = TAKE
+  const gestureRef = useRef<HTMLDivElement|null>(null);
+  useEffect(()=>{
+    const el = gestureRef.current; if(!el) return;
+    let startX=0, startY=0;
+    function onStart(e: TouchEvent){ const t = e.touches[0]; startX=t.clientX; startY=t.clientY; }
+    function onEnd(e: TouchEvent){ const t = e.changedTouches[0]; const dx = t.clientX-startX; const dy = t.clientY-startY; if(Math.abs(dx)>60 && Math.abs(dy)<50){
+      if(dx>0){ // swipe right -> TAKE if legal
+        const take = (moves as Move[]).find(m=>m.type==='TAKE'); if(take){ inOnline? playMove(take): playLocal(take); }
+      } else { // left -> END_TURN
+        const end = (moves as Move[]).find(m=>m.type==='END_TURN'); if(end){ inOnline? playMove(end): playLocal(end); }
+      }
+    }}
+    el.addEventListener('touchstart', onStart, { passive:true });
+    el.addEventListener('touchend', onEnd);
+    return ()=>{ el.removeEventListener('touchstart', onStart); el.removeEventListener('touchend', onEnd); };
+  },[moves, inOnline, playMove, playLocal]);
 
   // load persisted offline state (basic) – if no active state present yet
   useEffect(()=>{
@@ -111,12 +132,17 @@ export const NewGamePage: React.FC = () => {
   }
 
   return (
-    <div className="max-w-5xl mx-auto p-6 flex flex-col gap-6">
+  <div ref={gestureRef} className="max-w-5xl mx-auto p-6 flex flex-col gap-6">
       <h1 className="text-2xl font-semibold">Durak</h1>
   <StatusBar mode={socketState} turnOwner={activeState? activeState.attacker: undefined} hint={hint} allowTranslation={!!activeState?.allowTranslation} />
-      <div>
+      <div className="flex flex-wrap gap-4 items-center">
         <button className="px-5 py-3 rounded-lg bg-sky-600 text-white" onClick={startUnified}>Играть</button>
         {roomId && <span className="ml-3 text-xs opacity-70 select-all">Ссылка: {typeof window!=='undefined'? window.location.origin + '?room='+roomId: roomId}</span>}
+        <div className="flex items-center gap-2 text-xs ml-auto bg-white/5 rounded-lg px-3 py-2">
+          <button onClick={toggleMute} className="px-2 py-1 rounded bg-white/10 hover:bg-white/20">{muted? '🔇':'🔊'}</button>
+          <input type="range" min={0} max={1} step={0.05} value={volume} onChange={e=> setVolume(Number(e.target.value))} className="accent-sky-400" />
+          <button onClick={()=> setTheme(t=> t==='dark'?'light':'dark')} className="px-2 py-1 rounded bg-white/10 hover:bg-white/20">{theme==='dark'? '🌙':'☀️'}</button>
+        </div>
   </div>
   {renderContent()}
   <ToastHost queue={toasts} />
