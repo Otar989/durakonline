@@ -11,7 +11,8 @@ export const Hand: React.FC<Props> = React.memo(({ hand, legal, onPlay, trumpSui
       .map(m=> m.card.r+m.card.s)
   );
   const legalDef = legal.filter(m=>m.type==='DEFEND') as Extract<Move,{type:'DEFEND'}>[];
-  const translateCards = new Set((legal.filter(m=>m.type==='TRANSLATE') as Extract<Move,{type:'TRANSLATE'}>[]).map(m=> m.card.r+m.card.s));
+  const translateMoves = legal.filter(m=> m.type==='TRANSLATE') as Extract<Move,{type:'TRANSLATE'}>[];
+  const translateCards = new Set(translateMoves.map(m=> m.card.r+m.card.s));
   const displayHand = React.useMemo(()=>{
     if(!autosort) return hand;
     const orderRank = ['6','7','8','9','10','J','Q','K','A'];
@@ -39,6 +40,8 @@ export const Hand: React.FC<Props> = React.memo(({ hand, legal, onPlay, trumpSui
       const attackable = legalAttack.has(id);
   const defendable = legalDef.find(m=> m.card.r===c.r && m.card.s===c.s);
   const defendCoversHover = hoverAttack && defendable && defendable.target.r===hoverAttack.r && defendable.target.s===hoverAttack.s;
+  // перевод: подсвечиваем если перевод разрешён и есть hover атака того же ранга (до первой защиты) — логика упрощена: если есть любой translate move и карта именно translate
+  const translateHover = hoverAttack && translateCards.has(id) && translateMoves.some(tm=> tm.card.r===c.r && tm.card.s===c.s && tm.card.r===hoverAttack.r);
       const data = JSON.stringify({ card:c });
       const canTranslate = translateCards.has(id);
       const idx = displayHand.indexOf(c);
@@ -59,7 +62,7 @@ export const Hand: React.FC<Props> = React.memo(({ hand, legal, onPlay, trumpSui
             if(attackable) onPlay({ type:'ATTACK', card: c }); else if(defendable) onPlay(defendable); else if(canTranslate) onPlay({ type:'TRANSLATE', card: c } as Move);
           } else { onSelectCard?.(c); } }}
   aria-label={`Карта ${c.r}${c.s}${attackable? ' (можно атаковать)':''}${defendable? ' (можно защитить)':''}${canTranslate? ' (можно перевести)':''}`}
-  className={`transition-all disabled:opacity-30 rounded relative focus:outline-none focus:ring-2 focus:ring-sky-300 ${attackable? 'ring-2 ring-emerald-400': defendable? (defendCoversHover? 'ring-2 ring-emerald-400 animate-pulse':'ring-2 ring-sky-400'): canTranslate? 'ring-2 ring-fuchsia-400 animate-pulse':''} ${selectedIndex===idx? 'outline outline-2 outline-amber-400':''}`}>        
+  className={`transition-all disabled:opacity-30 rounded relative focus:outline-none focus:ring-2 focus:ring-sky-300 ${attackable? 'ring-2 ring-emerald-400': defendable? (defendCoversHover? 'ring-2 ring-emerald-400 animate-pulse':'ring-2 ring-sky-400'): canTranslate? (translateHover? 'ring-2 ring-emerald-400 animate-pulse':'ring-2 ring-fuchsia-400 animate-pulse') : ''} ${selectedIndex===idx? 'outline outline-2 outline-amber-400':''}`}>        
         <PlayingCard card={c} trumpSuit={undefined} dim={false} />
         {defendable && <span className="absolute -top-1 -right-1 text-[10px] bg-sky-500 text-white px-1 rounded">D</span>}
         {canTranslate && <span className="absolute -bottom-1 -right-1 text-[10px] bg-fuchsia-600 text-white px-1 rounded">TR</span>}

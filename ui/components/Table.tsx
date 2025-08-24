@@ -10,6 +10,7 @@ export const TableBoard: React.FC<Props> = ({ table, trumpSuit, onDefend, select
   const [flashInvalid,setFlashInvalid] = useState(false);
   const prevTableRef = useRef<Pair[]>(table);
   const [clearing,setClearing] = useState<Card[]>([]);
+  const [flashDefendIds,setFlashDefendIds] = useState<string[]>([]);
   const containerRef = useRef<HTMLDivElement|null>(null);
   const { flyCard } = useFlip()||{};
 
@@ -40,6 +41,10 @@ export const TableBoard: React.FC<Props> = ({ table, trumpSuit, onDefend, select
             const el = host?.querySelector(`[data-card-id='${pair.defend!.r+pair.defend!.s}']`) as HTMLElement|null;
             if(el){ const tr = el.getBoundingClientRect(); flyCard(pending.from, { x:tr.x, y:tr.y, w:tr.width, h:tr.height }, { r:pair.defend!.r, s:pair.defend!.s }, pending.trumpSuit, pending.kind); }
         }
+        // flash всех новых защит (может быть несколько одновременно)
+        const ids = newlyDefended.map(p=> (p.defend!.r+p.defend!.s));
+        setFlashDefendIds(cur=> [...cur, ...ids]);
+        setTimeout(()=> setFlashDefendIds(cur=> cur.filter(id=> !ids.includes(id))), 700);
       }
     }
     if(table.length===0 && prevTableRef.current.length>0){
@@ -118,7 +123,7 @@ export const TableBoard: React.FC<Props> = ({ table, trumpSuit, onDefend, select
             }}
           >
             <div className="absolute left-0 top-2" data-card-id={pair.attack.r+pair.attack.s}><PlayingCard card={pair.attack} trumpSuit={trumpSuit} /></div>
-            {pair.defend && <div className="absolute left-6 top-4 rotate-6" data-card-id={pair.defend.r+pair.defend.s}><PlayingCard card={pair.defend} trumpSuit={trumpSuit} /></div>}
+            {pair.defend && <div className={`absolute left-6 top-4 rotate-6 ${flashDefendIds.includes(pair.defend.r+pair.defend.s)? 'animate-[pulse_0.7s_ease-out] ring-2 ring-emerald-400 rounded':''}`} data-card-id={pair.defend.r+pair.defend.s}><PlayingCard card={pair.defend} trumpSuit={trumpSuit} /></div>}
             {!pair.defend && droppable && <div className="absolute inset-0 bg-sky-400/10 rounded pointer-events-none" />}
           </motion.div>
         );
