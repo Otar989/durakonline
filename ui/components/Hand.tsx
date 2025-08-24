@@ -43,7 +43,8 @@ export const Hand: React.FC<Props> = ({ hand, legal, onPlay, trumpSuit, autosort
   onDragStart={(e: React.DragEvent)=>{ e.dataTransfer.setData('application/x-card', data); }}
   onClick={(e)=>{ if(attackable || defendable || canTranslate){
             const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-            setPendingFlight({ id, from:{ x:rect.x, y:rect.y, w:rect.width, h:rect.height }, trumpSuit });
+            let kind: 'attack'|'defend'|'translate' = attackable? 'attack': defendable? 'defend':'translate';
+            setPendingFlight({ id, card:{ r:c.r, s:c.s }, kind, from:{ x:rect.x, y:rect.y, w:rect.width, h:rect.height }, trumpSuit });
             if(attackable) onPlay({ type:'ATTACK', card: c }); else if(defendable) onPlay(defendable); else if(canTranslate) onPlay({ type:'TRANSLATE', card: c } as Move);
           } else { onSelectCard?.(c); } }}
         className={`transition-all disabled:opacity-30 rounded relative focus:outline-none focus:ring-2 focus:ring-sky-300 ${attackable? 'ring-2 ring-emerald-400': defendable? 'ring-2 ring-sky-400': canTranslate? 'ring-2 ring-fuchsia-400 animate-pulse':''}`}>
