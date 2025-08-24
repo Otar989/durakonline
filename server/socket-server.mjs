@@ -172,13 +172,34 @@ io.on('connection', (socket) => {
   // joinRoom override
   const originalJoin = socket.listeners('joinRoom');
   socket.removeAllListeners('joinRoom');
-  socket.on('joinRoom', (roomId, nick) => {
+  socket.on('joinRoom', (roomId, nick, clientId) => {
     let room = rooms.get(roomId);
     if(!room){
-      room = { players: new Map(), spectators: new Map(), bots: new Map(), settings: { ...DEFAULT_SETTINGS }, state: initialState(), turnLog: [] };
+      room = { players: new Map(), spectators: new Map(), bots: new Map(), settings: { ...DEFAULT_SETTINGS }, state: initialState(), turnLog: [], creatorId: null };
       rooms.set(roomId, room);
     }
-    const realId = socketUserMap.get(socket.id)?.userId || socket.id;
+    // Определяем стабильный идентификатор: при наличии supabase токена он приоритетен; иначе клиентский guestId
+    let realId = socketUserMap.get(socket.id)?.userId || null;
+    if(!realId){
+      if(clientId && typeof clientId==='string') realId = clientId;
+      else realId = 'guest_' + socket.id; // fallback
+      socketUserMap.set(socket.id, { userId: realId });
+    }
+    if(!room.creatorId) room.creatorId = realId;
+
+    // Если игрок с таким id уже есть (reconnect) — просто обновить socketId и вернуть состояние
+    if(room.players.has(realId)){
+      const existing = room.players.get(realId);
+      existing.socketId = socket.id;
+      socket.join(roomId);
+      emitRoom(roomId);
+      io.to(socket.id).emit('toast', { type:'info', message:'Переподключение' });
+      return;
+    }
+    // Если был среди зрителей — обновим socketId
+    for(const [sid, spec] of room.spectators){
+      if(spec.id===realId){ spec.socketId = socket.id; }
+    }
     if(room.state.phase!=='lobby' || room.players.size + room.bots.size >= room.settings.maxPlayers){
       room.spectators.set(socket.id, { id: realId, nick, spectator: true, socketId: socket.id });
       socket.join(roomId);

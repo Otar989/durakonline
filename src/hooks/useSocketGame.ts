@@ -34,7 +34,15 @@ export function useSocketGame(opts: UseSocketGameOptions){
   const [toasts,setToasts] = useState<{ id: string; type: string; message: string }[]>([]);
   interface PrivateHandPayload { playerId: string; hand: { r: string; s: string }[] }
   const [hand,setHand] = useState<PrivateHandPayload | null>(null);
-  const [selfId,setSelfId] = useState<string | null>(null);
+    const [selfId,setSelfId] = useState<string | null>(null);
+    const clientIdRef = useRef<string | null>(null);
+    if(typeof window!=='undefined' && !clientIdRef.current){
+      const stored = localStorage.getItem('durak_guest_id');
+      if(stored) clientIdRef.current = stored; else {
+        clientIdRef.current = 'guest_'+Math.random().toString(36).slice(2,10);
+        localStorage.setItem('durak_guest_id', clientIdRef.current);
+      }
+    }
 
   const connect = useCallback(async ()=>{
     if(socketRef.current) return;
@@ -53,7 +61,7 @@ export function useSocketGame(opts: UseSocketGameOptions){
     if(debug) console.log('[socket] connecting to', socketUrl);
     const s = io(socketUrl, { transports:['websocket'], autoConnect:true, auth: { token } });
     socketRef.current = s;
-  s.on('connect', ()=> { if(debug) console.log('[socket] connected'); setConnected(true); setError(null); if(roomId && nickname){ s.emit('joinRoom', roomId, nickname); } });
+  s.on('connect', ()=> { if(debug) console.log('[socket] connected'); setConnected(true); setError(null); if(roomId && nickname){ s.emit('joinRoom', roomId, nickname, clientIdRef.current); } });
     s.on('disconnect', ()=> { if(debug) console.log('[socket] disconnected'); setConnected(false); });
     s.on('connect_error', (e)=> {
       if(debug) console.error('[socket] connect_error', e.message);
@@ -90,7 +98,7 @@ export function useSocketGame(opts: UseSocketGameOptions){
 
   useEffect(()=>{
     if(socketRef.current && roomId && nickname){
-      socketRef.current.emit('joinRoom', roomId, nickname);
+      socketRef.current.emit('joinRoom', roomId, nickname, clientIdRef.current);
     }
   },[roomId, nickname]);
 
@@ -107,5 +115,6 @@ export function useSocketGame(opts: UseSocketGameOptions){
   const restart = useCallback(()=>{ if(socketRef.current && roomId) socketRef.current.emit('restartGame', roomId); },[roomId]);
   const takeSeat = useCallback(()=>{ if(socketRef.current && roomId) socketRef.current.emit('takeSeat', roomId); },[roomId]);
   const removeToast = (id:string)=> setToasts(t=>t.filter(x=>x.id!==id));
-  return { socket: socketRef.current, connected, room, selfHand: hand?.hand || [], error, startGame, sendAction, addBot, updateSettings, restart, toasts, removeToast, selfId, socketUrl, reconnect, takeSeat };
+  const isSpectator = !!(room && selfId && !room.players.find(p=>p.id===selfId));
+  return { socket: socketRef.current, connected, room, selfHand: hand?.hand || [], error, startGame, sendAction, addBot, updateSettings, restart, toasts, removeToast, selfId, socketUrl, reconnect, takeSeat, isSpectator, clientId: clientIdRef.current };
 }
