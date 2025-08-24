@@ -200,6 +200,19 @@ export const NewGamePage: React.FC = () => {
   const hasDefend = !hasAttack && moves.some(mv=>mv.type==='DEFEND');
   const canTranslate = activeState && myId? isTranslationAvailable(activeState, myId): false;
   const hint = hasAttack? 'Перетащите или кликните карту для атаки': hasDefend? (canTranslate? 'Можно перевести, или отбивайтесь / ВЗЯТЬ':'Отбейте карту или ВЗЯТЬ'):'Ждите';
+  const [ariaAnnounce, setAriaAnnounce] = useState('');
+  useEffect(()=>{
+    const last = activeState?.log?.[activeState.log.length-1];
+    if(!last) return;
+    const m = last.move;
+    let msg='';
+    if(m.type==='ATTACK') msg = `${last.by} атакует ${m.card.r}${m.card.s}`;
+    else if(m.type==='DEFEND') msg = `${last.by} покрывает ${m.target.r}${m.target.s} ${m.card.r}${m.card.s}`;
+    else if(m.type==='TAKE') msg = `${last.by} взял карты`;
+    else if(m.type==='END_TURN') msg = `Бито`; 
+    else if(m.type==='TRANSLATE') msg = `${last.by} перевод ${m.card.r}${m.card.s}`;
+    setAriaAnnounce(msg);
+  },[activeState?.log?.length]);
 
   // hotkeys: A=single attack, D=single defend, T=take, E=end turn, R=translate (если одна опция)
   useHotkeys([
@@ -274,6 +287,7 @@ export const NewGamePage: React.FC = () => {
   return (
   <FlipProvider>
   <div ref={gestureRef} className="max-w-6xl mx-auto p-6 flex flex-col gap-6">
+  <div aria-live="polite" className="sr-only">{ariaAnnounce}</div>
       <header className="flex flex-col gap-4">
         <div className="flex items-center gap-4 flex-wrap">
           <h1 className="text-2xl font-semibold">Дурак Онлайн</h1>

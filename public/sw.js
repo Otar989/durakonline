@@ -2,22 +2,29 @@
 self.addEventListener('install', _e=>{ self.skipWaiting(); });
 self.addEventListener('activate', _e=>{ clients.claim(); });
 
-const CACHE = 'durak-static-v1';
-const _ASSETS = [ '/', '/manifest.json' ];
+const CACHE = 'durak-static-v2';
+const STATIC_ASSETS = [ '/', '/manifest.json' ];
+const OFFLINE_FALLBACK = '/';
 
 self.addEventListener('fetch', event=>{
   const { request } = event;
   if(request.method !== 'GET') return;
   event.respondWith((async ()=>{
     const cache = await caches.open(CACHE);
-    const cached = await cache.match(request);
-    if(cached) return cached;
+    if(STATIC_ASSETS.includes(new URL(request.url).pathname)){
+      const cached = await cache.match(request);
+      if(cached) return cached;
+    }
     try {
-      const res = await fetch(request);
-      if(res.status===200 && res.headers.get('content-type')?.includes('text') ){ cache.put(request, res.clone()); }
-      return res;
+      const network = await fetch(request);
+      // Stale-while-revalidate for text resources
+      if(network.status===200 && network.headers.get('content-type')?.includes('text')){
+        cache.put(request, network.clone());
+      }
+      return network;
     } catch {
-      return cached || Response.error();
+      const fallback = await cache.match(request) || await cache.match(OFFLINE_FALLBACK);
+      return fallback || Response.error();
     }
   })());
 });
