@@ -3,17 +3,16 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-  "dev": "next dev --turbopack",
-  "build": "next build --turbopack",
-  "start": "node server/index.ts",
-    "lint": "eslint",
-    "dev:ws": "node server/socket-server.mjs",
-  "dev:all": "concurrently -k -n APP,WS -c magenta,cyan \"npm:dev\" \"npm:dev:ws\"",
-  "test": "vitest run",
-  "test:watch": "vitest"
+    "dev": "next dev --turbopack",
+    "build": "next build --turbopack",
+    "start": "node server/index.ts",
+    "lint": "eslint .",
+    "dev:ws": "node server/index.ts",
+    "dev:all": "concurrently -k -n WEB,WS -c magenta,cyan \"npm:dev\" \"npm:start\"",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.45.2",
     "clsx": "2.1.1",
     "jsonwebtoken": "9.0.2",
     "next": "15.5.0",
@@ -27,13 +26,13 @@
   "devDependencies": {
     "@eslint/eslintrc": "^3",
     "@tailwindcss/postcss": "^4",
-    "@types/node": "^20",
+  "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "concurrently": "8.2.2",
     "eslint": "^9",
     "eslint-config-next": "15.5.0",
-    "tailwindcss": "^4",
+  "tailwindcss": "^4",
   "typescript": "^5",
   "vitest": "^1.6.0"
   },
