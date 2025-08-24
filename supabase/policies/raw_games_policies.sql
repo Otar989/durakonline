@@ -1,1 +1,0 @@
--- Removed legacy Supabase policy file. Intentionally left blank.

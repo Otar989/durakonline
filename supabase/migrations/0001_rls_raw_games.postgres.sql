@@ -1,1 +1,0 @@
--- Removed legacy Supabase migration (postgres variant). Intentionally left blank.
