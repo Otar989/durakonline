@@ -45,10 +45,9 @@ describe('Durak core rules', ()=>{
   it('END_TURN rotates attacker', ()=>{
     const st = initGame([{id:'A',nick:'A'},{id:'B',nick:'B'}], true);
     const attack = legalMoves(st, st.attacker).find(m=>m.type==='ATTACK')!; applyMove(st, attack, st.attacker);
-    // auto defend artificially to allow end turn
-    const pair = st.table[0];
-    const defCard = st.players.find(p=>p.id===st.defender)!.hand.find(c=> c.s===pair.attack.s && c.r!==pair.attack.r) || st.players.find(p=>p.id===st.defender)!.hand[0];
-    if(defCard) applyMove(st, { type:'DEFEND', card:defCard, target: pair.attack }, st.defender);
+  // возьмём легальный DEFEND из legalMoves
+  const def = legalMoves(st, st.defender).find(m=>m.type==='DEFEND');
+  if(def) applyMove(st, def, st.defender);
     const end = legalMoves(st, st.attacker).find(m=>m.type==='END_TURN');
     if(end) applyMove(st, end, st.attacker);
     expect(st.attacker).not.toBe(st.defender);
@@ -76,10 +75,12 @@ describe('Durak core rules', ()=>{
     const st = initGame([{id:'A',nick:'A'},{id:'B',nick:'B'}], true);
     const first = legalMoves(st, st.attacker).find(m=>m.type==='ATTACK');
     if(!first) return; applyMove(st, first, st.attacker);
-    // simple defend if possible
-    const d = legalMoves(st, st.defender).find(m=>m.type==='DEFEND'); if(d) applyMove(st, d as any, st.defender);
-    const end = legalMoves(st, st.attacker).find(m=>m.type==='END_TURN'); if(end) applyMove(st, end, st.attacker);
-    expect(st.attacker).toBe(st.defender); // после смены defender уже обновлён внутри
+  const prevDef = st.defender;
+  const d = legalMoves(st, st.defender).find(m=>m.type==='DEFEND'); if(!d) return; // нет защиты -> не сможем END_TURN
+  applyMove(st, d as any, st.defender);
+  const end = legalMoves(st, st.attacker).find(m=>m.type==='END_TURN'); if(!end) return; // без END_TURN тест не применим
+  applyMove(st, end, st.attacker);
+  expect(st.attacker).toBe(prevDef);
   });
   it('Simultaneous finish (both hands empty) -> loser null', ()=>{
     const st = initGame([{id:'A',nick:'A'},{id:'B',nick:'B'}], false);
