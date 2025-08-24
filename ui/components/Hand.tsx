@@ -1,7 +1,7 @@
 import React, { useCallback, useRef } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
 import { Card, Move } from '../../game-core/types';
 import { PlayingCard } from './TrumpPile';
-import { AnimatePresence, motion } from 'framer-motion';
 
 interface Props { hand: Card[]; legal: Move[]; onPlay: (_m:Move)=>void; }
 export const Hand: React.FC<Props> = ({ hand, legal, onPlay }) => {
