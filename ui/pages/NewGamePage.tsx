@@ -5,7 +5,7 @@ import { StatusBar } from '../components/StatusBar';
 import { Hand } from '../components/Hand';
 import { TableBoard } from '../components/Table';
 import { ActionButtons } from '../components/ActionButtons';
-import { TrumpPile } from '../components/TrumpPile';
+import { TrumpPile, PlayingCard } from '../components/TrumpPile';
 import { legalMoves, isTranslationAvailable } from '../../game-core/engine';
 import { useGamePersistence, loadPersisted } from '../../src/hooks/useGamePersistence';
 import { useAudio } from '../../src/hooks/useAudio';
@@ -35,12 +35,11 @@ export const NewGamePage: React.FC = () => {
   // load persisted offline state (basic) – if no active state present yet
   useEffect(()=>{
     const p = loadPersisted();
-    if(p && !snapshot.state && !localState && p.offlineState){
-      // naive restore into local game start
-      // (could implement hydrate in engine; placeholder for now)
-      startLocal({ allowTranslation: p.allowTranslation });
+    if(p && p.mode==='OFFLINE' && !snapshot.state && !localState && p.offlineState){
+      startLocal({ hydrate: p.offlineState });
+      push('Продолжена сохранённая партия','info');
     }
-  },[snapshot.state, localState, startLocal]);
+  },[snapshot.state, localState, startLocal, push]);
 
   const persistPayload = useMemo(()=>{
     if(localState){
@@ -58,19 +57,49 @@ export const NewGamePage: React.FC = () => {
   const myId = inOnline? snapshot.players[0]?.id : 'p1';
   const moves = useMemo(()=> activeState && myId? legalMoves(activeState, myId): [], [activeState, myId]);
 
-  // swipe gestures (mobile) on main area: left = END_TURN, right = TAKE
+  // стартовый тост о первом ходе
+  useEffect(()=>{
+    if(activeState && activeState.meta && activeState.log && activeState.log.length===0){
+      const low = activeState.meta.lowestTrump; const first = activeState.meta.firstAttacker;
+      push(`Первым ходит ${first} (младший козырь: ${low.r}${low.s})`,'info');
+    }
+  },[activeState, push]);
+
+  // окончание партии
+  useEffect(()=>{
+    if(activeState && activeState.phase==='finished' && !gameEnded){
+      setGameEnded({ winner: activeState.winner, loser: activeState.loser });
+      playSound('win'); if(navigator.vibrate) navigator.vibrate([40,60,40]);
+    }
+  },[activeState, gameEnded, playSound]);
+
+  // swipe gestures (mobile): right=TAKE, left=END_TURN, up=single DEFEND (если одна опция), down=TAKE
   useEffect(()=>{
     const el = gestureRef.current; if(!el) return;
     let startX=0, startY=0;
     function onStart(e: TouchEvent){ const t = e.touches[0]; startX=t.clientX; startY=t.clientY; }
-    function onEnd(e: TouchEvent){ const t = e.changedTouches[0]; const dx = t.clientX-startX; const dy = t.clientY-startY; if(Math.abs(dx)>60 && Math.abs(dy)<50){
-      if(dx>0){ const take = (moves as Move[]).find(m=>m.type==='TAKE'); if(take){ inOnline? playMove(take): playLocal(take); } }
-      else { const end = (moves as Move[]).find(m=>m.type==='END_TURN'); if(end){ inOnline? playMove(end): playLocal(end); } }
-    }}
+    function onEnd(e: TouchEvent){
+      const t = e.changedTouches[0]; const dx = t.clientX-startX; const dy = t.clientY-startY;
+      const absX = Math.abs(dx); const absY = Math.abs(dy);
+      if(absX>60 && absY<50){
+        if(dx>0){ const take = (moves as Move[]).find(m=>m.type==='TAKE'); if(take){ inOnline? playMove(take): playLocal(take); } }
+        else { const end = (moves as Move[]).find(m=>m.type==='END_TURN'); if(end){ inOnline? playMove(end): playLocal(end); } }
+      } else if(absY>60 && absX<60){
+        if(dy<0){ const defs = (moves as Move[]).filter(m=>m.type==='DEFEND') as Extract<Move,{type:'DEFEND'}>[]; if(defs.length===1){ inOnline? playMove(defs[0]): playLocal(defs[0]); } }
+        else { const take = (moves as Move[]).find(m=>m.type==='TAKE'); if(take){ inOnline? playMove(take): playLocal(take); } }
+      }
+    }
     el.addEventListener('touchstart', onStart, { passive:true });
     el.addEventListener('touchend', onEnd);
     return ()=>{ el.removeEventListener('touchstart', onStart); el.removeEventListener('touchend', onEnd); };
   },[moves, inOnline, playMove, playLocal]);
+
+  // глобальные кастомные события (нелегальный dnd)
+  useEffect(()=>{
+    function onIllegal(e: Event){ const ce = e as CustomEvent; push(ce.detail||'Нельзя','warn'); }
+    document.addEventListener('durak-illegal', onIllegal as any);
+    return ()=> document.removeEventListener('durak-illegal', onIllegal as any);
+  },[push]);
 
   // parse ?cfg= if present (created by create-game page) to extract options including allowTranslation
   useEffect(()=>{
@@ -115,6 +144,17 @@ export const NewGamePage: React.FC = () => {
               <div className="font-semibold text-sm flex items-center gap-2">Козырь <span className="text-base">{activeState.trump.s}</span></div>
               <TrumpPile trump={activeState.trump} deckCount={activeState.deck.length} />
             </div>
+            {activeState.discard.length>0 && <div className="glass p-3 rounded-2xl text-xs flex flex-col gap-2">
+              <div className="font-semibold text-sm">Бито</div>
+              <div className="relative w-24 h-32">
+                {activeState.discard.slice(-8).map((c,i)=>(
+                  <div key={c.r+c.s} className="absolute" style={{ left: (i*3)%40, top: (i*4)%50, transform:`rotate(${(i*9)%25 -12}deg)` }}>
+                    <PlayingCard card={c} small ghost />
+                  </div>
+                ))}
+              </div>
+              <div className="text-[10px] opacity-60">{activeState.discard.length} карт</div>
+            </div>}
             {opp && <div className="glass p-3 rounded-2xl text-xs flex flex-col gap-1">
               <div className="font-semibold">{opp.nick}</div>
               <div>Карты: <b>{opp.hand.length}</b></div>
@@ -143,7 +183,8 @@ export const NewGamePage: React.FC = () => {
             {!showLog && <button className="text-[10px] opacity-60 hover:opacity-100 mt-2" onClick={()=> setShowLog(true)}>Показать лог</button>}
           </div>
         </div>
-        <Hand hand={me?.hand||[]} legal={moves} trumpSuit={activeState.trump.s} autosort={autosort} onPlay={(m)=> { if(m.type==='TRANSLATE'){ push('Перевод! 🔁','success'); playSound('card'); if(navigator.vibrate) navigator.vibrate(20);} else if(m.type==='ATTACK'){ playSound('card'); } else if(m.type==='DEFEND'){ playSound('defend'); } else if(m.type==='TAKE'){ playSound('take'); if(navigator.vibrate) navigator.vibrate([10,40,20]); } else if(m.type==='END_TURN'){ playSound('bito'); }
+        <Hand hand={me?.hand||[]} legal={moves} trumpSuit={activeState.trump.s} autosort={autosort} onPlay={(m)=> { const isLegal = moves.some(x=> JSON.stringify(x)===JSON.stringify(m)); if(!isLegal){ push('Нельзя: ход недоступен','warn'); return; }
+          if(m.type==='TRANSLATE'){ push('Перевод! 🔁','success'); playSound('card'); if(navigator.vibrate) navigator.vibrate(20);} else if(m.type==='ATTACK'){ playSound('card'); } else if(m.type==='DEFEND'){ playSound('defend'); } else if(m.type==='TAKE'){ playSound('take'); if(navigator.vibrate) navigator.vibrate([10,40,20]); } else if(m.type==='END_TURN'){ playSound('bito'); }
     inOnline? playMove(m): playLocal(m); }} />
         <ActionButtons legal={moves} onPlay={(m)=> inOnline? playMove(m): playLocal(m)} />
       </div>

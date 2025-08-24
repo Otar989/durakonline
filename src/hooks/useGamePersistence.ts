@@ -8,9 +8,10 @@ export interface PersistPayload {
   offlineState?: GameState;
   roomId?: string | null;
   allowTranslation?: boolean;
+  version?: number;
 }
 
-const KEY = 'durak_persist_v1';
+const KEY = 'durak_persist_v2';
 
 export function loadPersisted(): PersistPayload | null {
   if (typeof window === 'undefined') return null;

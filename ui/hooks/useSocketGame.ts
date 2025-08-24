@@ -10,7 +10,17 @@ export function useSocketGame(roomId: string | null, nick: string){
   const [snapshot,setSnapshot] = useState<Snapshot>({ state:null, players:[] });
   const [connected,setConnected] = useState(false);
   const sref = useRef<Socket|null>(null);
-  const clientIdRef = useRef<string>('c_'+Math.random().toString(36).slice(2,10));
+  const clientIdRef = useRef<string>('');
+  // load / persist clientId
+  if(clientIdRef.current===''){
+    if(typeof window!=='undefined'){
+      const stored = localStorage.getItem('durak_client_id');
+      clientIdRef.current = stored || 'c_'+Math.random().toString(36).slice(2,10);
+      if(!stored) localStorage.setItem('durak_client_id', clientIdRef.current);
+    } else {
+      clientIdRef.current = 'c_'+Math.random().toString(36).slice(2,10);
+    }
+  }
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const connect = useCallback(()=>{

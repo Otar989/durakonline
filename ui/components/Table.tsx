@@ -42,7 +42,7 @@ export const TableBoard: React.FC<Props> = ({ table, trumpSuit, onDefend, select
                 const { card } = JSON.parse(raw) as { card: Card };
                 const match = defendOptions.find(opt=> opt.defendWith.r===card.r && opt.defendWith.s===card.s);
                 if(match){ onDefend(match.target, match.defendWith); }
-                else { setFlashInvalid(true); setTimeout(()=>setFlashInvalid(false), 450); }
+                else { setFlashInvalid(true); setTimeout(()=>setFlashInvalid(false), 450); document.dispatchEvent(new CustomEvent('durak-illegal',{ detail:'Нельзя защитить этой картой'})); }
               } catch{}
             }}
           >
