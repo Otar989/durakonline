@@ -4,10 +4,10 @@ import { motion } from 'framer-motion';
 
 export const TrumpPile: React.FC<{ trump: Card; deckCount: number }> = ({ trump, deckCount }) => {
   return (
-    <div className="flex items-center gap-3">
+    <div className="flex items-center gap-3" role="group" aria-label={`Козырь ${trump.r}${trump.s}, колода ${deckCount}`}>
       <div className="relative">
         <PlayingCard card={trump} trumpSuit={trump.s} small />
-        <div className="absolute -right-6 top-1 text-xs opacity-70">Колода: {deckCount}</div>
+        <div className="absolute -right-6 top-1 text-xs opacity-70" aria-label={`Колода: ${deckCount}`}>Колода: {deckCount}</div>
       </div>
     </div>
   );

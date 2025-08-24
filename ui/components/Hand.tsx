@@ -24,7 +24,7 @@ export const Hand: React.FC<Props> = ({ hand, legal, onPlay, trumpSuit, autosort
       return orderRank.indexOf(a.r)-orderRank.indexOf(b.r);
     });
   },[hand, autosort, trumpSuit]);
-  return <div className="flex gap-2 flex-nowrap overflow-x-auto py-3 justify-start glass rounded-xl px-4 select-none scrollbar-thin">
+  return <div className="flex gap-2 flex-nowrap overflow-x-auto py-3 justify-start glass rounded-xl px-4 select-none scrollbar-thin" aria-label="Рука игрока" role="list">
   <AnimatePresence initial={false}>
   {displayHand.map(c=>{
       const id = c.r+c.s;
@@ -47,7 +47,8 @@ export const Hand: React.FC<Props> = ({ hand, legal, onPlay, trumpSuit, autosort
             setPendingFlight({ id, card:{ r:c.r, s:c.s }, kind, from:{ x:rect.x, y:rect.y, w:rect.width, h:rect.height }, trumpSuit });
             if(attackable) onPlay({ type:'ATTACK', card: c }); else if(defendable) onPlay(defendable); else if(canTranslate) onPlay({ type:'TRANSLATE', card: c } as Move);
           } else { onSelectCard?.(c); } }}
-        className={`transition-all disabled:opacity-30 rounded relative focus:outline-none focus:ring-2 focus:ring-sky-300 ${attackable? 'ring-2 ring-emerald-400': defendable? 'ring-2 ring-sky-400': canTranslate? 'ring-2 ring-fuchsia-400 animate-pulse':''}`}>
+  aria-label={`Карта ${c.r}${c.s}${attackable? ' (можно атаковать)':''}${defendable? ' (можно защитить)':''}${canTranslate? ' (можно перевести)':''}`}
+  className={`transition-all disabled:opacity-30 rounded relative focus:outline-none focus:ring-2 focus:ring-sky-300 ${attackable? 'ring-2 ring-emerald-400': defendable? 'ring-2 ring-sky-400': canTranslate? 'ring-2 ring-fuchsia-400 animate-pulse':''}`}>
         <PlayingCard card={c} trumpSuit={undefined} dim={false} />
         {defendable && <span className="absolute -top-1 -right-1 text-[10px] bg-sky-500 text-white px-1 rounded">D</span>}
         {canTranslate && <span className="absolute -bottom-1 -right-1 text-[10px] bg-fuchsia-600 text-white px-1 rounded">TR</span>}
