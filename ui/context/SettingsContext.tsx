@@ -106,6 +106,22 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const play = useCallback((name:string)=>{ if(!sound) return; soundManager.play(name); },[sound]);
   useEffect(()=>{ if(sound){ soundManager.setVolume(volume); } else { soundManager.mute(true); } },[sound,volume]);
 
+  // iOS / Safari watchdog: при возвращении вкладки или новом pointer возобновляем контекст если подвис
+  useEffect(()=>{
+    if(typeof window==='undefined') return;
+    function tryResume(){
+      const anySM: any = soundManager as any;
+      const ctx = (anySM as any).ctx as AudioContext | undefined;
+      if(ctx && ctx.state==='suspended'){ ctx.resume().catch(()=>{}); }
+    }
+    document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='visible') tryResume(); });
+    window.addEventListener('pointerdown', tryResume);
+    return ()=> {
+      document.removeEventListener('visibilitychange', tryResume as any);
+      window.removeEventListener('pointerdown', tryResume);
+    };
+  },[]);
+
   const value: SettingsState = { theme, sound, volume, animations, setTheme, toggleSound, setVolume, toggleAnimations, ready, ensureAudioUnlocked, play };
   return <SettingsCtx.Provider value={value}>{children}</SettingsCtx.Provider>;
 };
