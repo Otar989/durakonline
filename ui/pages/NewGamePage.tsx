@@ -209,6 +209,7 @@ export const NewGamePage: React.FC<{ onRestart?: ()=>void; initialNick?: string;
   const canTranslate = activeState && myId? isTranslationAvailable(activeState, myId): false;
   const hint = hasAttack? 'Перетащите или кликните карту для атаки': hasDefend? (canTranslate? 'Можно перевести, или отбивайтесь / ВЗЯТЬ':'Отбейте карту или ВЗЯТЬ'):'Ждите';
   const [ariaAnnounce, setAriaAnnounce] = useState('');
+  const [selectedIndex,setSelectedIndex] = useState(0);
   useEffect(()=>{
     const last = activeState?.log?.[activeState.log.length-1];
     if(!last) return;
@@ -232,7 +233,9 @@ export const NewGamePage: React.FC<{ onRestart?: ()=>void; initialNick?: string;
   { combo:'b', handler:()=>{ const end = (moves as Move[]).find(m=>m.type==='END_TURN'); if(end){ inOnline? playMove(end): playLocal(end); } } }, // БИТО
   { combo:'v', handler:()=>{ const take = (moves as Move[]).find(m=>m.type==='TAKE'); if(take){ inOnline? playMove(take): playLocal(take); } } }, // ВЗЯТЬ
   // стрелки и Enter: для простоты сейчас фокус на первой легальной атаке/защите; TODO: internal selection state
-  { combo:'enter', handler:()=>{ const first = (moves as Move[])[0]; if(first){ inOnline? playMove(first): playLocal(first); } } },
+  { combo:'arrowright', handler:()=> setSelectedIndex(i=> Math.min(i+1, (activeState?.players.find(p=>p.id===myId)?.hand.length||1)-1)) },
+  { combo:'arrowleft', handler:()=> setSelectedIndex(i=> Math.max(i-1, 0)) },
+  { combo:'enter', handler:()=>{ const me = activeState?.players.find(p=>p.id===myId); if(!me) return; const card = me.hand[selectedIndex]; if(!card) return; const atk = (moves as Move[]).find(m=> m.type==='ATTACK' && m.card.r===card.r && m.card.s===card.s); const tr = (moves as Move[]).find(m=> m.type==='TRANSLATE' && m.card.r===card.r && m.card.s===card.s); const def = (moves as Move[]).find(m=> m.type==='DEFEND' && m.card.r===card.r && m.card.s===card.s); const m = atk||tr||def; if(m){ inOnline? playMove(m): playLocal(m); } } },
   { combo:'escape', handler:()=>{ if(confirm('Выйти в меню?')) window.location.href='/'; } }
   ], !!activeState);
   function renderContent(){
@@ -269,7 +272,7 @@ export const NewGamePage: React.FC<{ onRestart?: ()=>void; initialNick?: string;
           </div>
         </div>
   <div id="hand-hint" className="sr-only">Горячие клавиши: A атака (если одна), D защита (если одна), R перевод (если одна), T взять, E бито.</div>
-  <Hand hand={me?.hand||[]} legal={moves} trumpSuit={activeState.trump.s} autosort={autosort} describedBy="hand-hint" onPlay={(m)=> { const isLegal = moves.some(x=> JSON.stringify(x)===JSON.stringify(m)); if(!isLegal){ push('Нельзя: ход недоступен','warn'); return; }
+  <Hand hand={me?.hand||[]} legal={moves} trumpSuit={activeState.trump.s} autosort={autosort} describedBy="hand-hint" selectedIndex={selectedIndex} onChangeSelected={setSelectedIndex} onPlay={(m)=> { const isLegal = moves.some(x=> JSON.stringify(x)===JSON.stringify(m)); if(!isLegal){ push('Нельзя: ход недоступен','warn'); return; }
           if(m.type==='TRANSLATE'){ push('Перевод! 🔁','success'); playSound('card'); if(navigator.vibrate) navigator.vibrate(20);} else if(m.type==='ATTACK'){ playSound('card'); } else if(m.type==='DEFEND'){ playSound('defend'); } else if(m.type==='TAKE'){ playSound('take'); if(navigator.vibrate) navigator.vibrate([10,40,20]); } else if(m.type==='END_TURN'){ playSound('bito'); }
     inOnline? playMove(m): playLocal(m); }} />
         <ActionButtons legal={moves} onPlay={(m)=> inOnline? playMove(m): playLocal(m)} />

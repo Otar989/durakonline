@@ -4,8 +4,8 @@ import { Card, Move } from '../../game-core/types';
 import { PlayingCard } from './TrumpPile';
 import { setPendingFlight } from '../lib/flightBus';
 
-interface Props { hand: Card[]; legal: Move[]; onPlay: (_m:Move)=>void; trumpSuit?: string; autosort?: boolean; onSelectCard?: (c:Card|null)=>void; describedBy?: string }
-export const Hand: React.FC<Props> = React.memo(({ hand, legal, onPlay, trumpSuit, autosort, onSelectCard, describedBy }) => {
+interface Props { hand: Card[]; legal: Move[]; onPlay: (_m:Move)=>void; trumpSuit?: string; autosort?: boolean; onSelectCard?: (c:Card|null)=>void; describedBy?: string; selectedIndex?: number; onChangeSelected?: (i:number)=>void }
+export const Hand: React.FC<Props> = React.memo(({ hand, legal, onPlay, trumpSuit, autosort, onSelectCard, describedBy, selectedIndex, onChangeSelected }) => {
   const legalAttack = new Set(
     (legal.filter(m=>m.type==='ATTACK') as Extract<Move,{type:'ATTACK'}>[])
       .map(m=> m.card.r+m.card.s)
@@ -32,6 +32,7 @@ export const Hand: React.FC<Props> = React.memo(({ hand, legal, onPlay, trumpSui
       const defendable = legalDef.find(m=> m.card.r===c.r && m.card.s===c.s);
       const data = JSON.stringify({ card:c });
       const canTranslate = translateCards.has(id);
+      const idx = displayHand.indexOf(c);
   return <motion.button key={id} data-card-id={id}
         layout
         initial={{ opacity:0, y:12, scale:0.9 }}
@@ -41,14 +42,14 @@ export const Hand: React.FC<Props> = React.memo(({ hand, legal, onPlay, trumpSui
         disabled={!attackable && !defendable && !canTranslate}
         draggable={attackable || !!defendable || canTranslate}
   onDragStart={(e: React.DragEvent)=>{ e.dataTransfer.setData('application/x-card', data); }}
-  onClick={(e)=>{ if(attackable || defendable || canTranslate){
+  onClick={(e)=>{ onChangeSelected?.(idx); if(attackable || defendable || canTranslate){
             const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
             let kind: 'attack'|'defend'|'translate' = attackable? 'attack': defendable? 'defend':'translate';
             setPendingFlight({ id, card:{ r:c.r, s:c.s }, kind, from:{ x:rect.x, y:rect.y, w:rect.width, h:rect.height }, trumpSuit });
             if(attackable) onPlay({ type:'ATTACK', card: c }); else if(defendable) onPlay(defendable); else if(canTranslate) onPlay({ type:'TRANSLATE', card: c } as Move);
           } else { onSelectCard?.(c); } }}
   aria-label={`Карта ${c.r}${c.s}${attackable? ' (можно атаковать)':''}${defendable? ' (можно защитить)':''}${canTranslate? ' (можно перевести)':''}`}
-  className={`transition-all disabled:opacity-30 rounded relative focus:outline-none focus:ring-2 focus:ring-sky-300 ${attackable? 'ring-2 ring-emerald-400': defendable? 'ring-2 ring-sky-400': canTranslate? 'ring-2 ring-fuchsia-400 animate-pulse':''}`}>
+  className={`transition-all disabled:opacity-30 rounded relative focus:outline-none focus:ring-2 focus:ring-sky-300 ${attackable? 'ring-2 ring-emerald-400': defendable? 'ring-2 ring-sky-400': canTranslate? 'ring-2 ring-fuchsia-400 animate-pulse':''} ${selectedIndex===idx? 'outline outline-2 outline-amber-400':''}`}>        
         <PlayingCard card={c} trumpSuit={undefined} dim={false} />
         {defendable && <span className="absolute -top-1 -right-1 text-[10px] bg-sky-500 text-white px-1 rounded">D</span>}
         {canTranslate && <span className="absolute -bottom-1 -right-1 text-[10px] bg-fuchsia-600 text-white px-1 rounded">TR</span>}

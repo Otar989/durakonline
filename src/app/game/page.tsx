@@ -10,6 +10,7 @@ export default function GamePage(){
     const sp = new URLSearchParams(window.location.search);
     setParams({ nick: sp.get('nick')||undefined, room: sp.get('room')||undefined, m: sp.get('m')||undefined });
   },[]);
-  const restart = () => { if(typeof window!=='undefined') window.location.reload(); };
-  return <main className="max-w-7xl mx-auto p-4 md:p-6"><AppShell onRestart={restart} confirmExit><NewGamePage onRestart={restart} initialNick={params.nick} initialRoom={params.room} initialMode={params.m} /></AppShell></main>;
+  const [instance,setInstance] = useState(0);
+  const restart = () => { setInstance(i=> i+1); };
+  return <main className="max-w-7xl mx-auto p-4 md:p-6"><AppShell onRestart={restart} confirmExit><NewGamePage key={instance} onRestart={restart} initialNick={params.nick} initialRoom={params.room} initialMode={params.m} /></AppShell></main>;
 }
