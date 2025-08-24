@@ -1,0 +1,36 @@
+/* Design Tokens (initial minimal set) */
+:root {
+  --durak-radius-sm: 4px;
+  --durak-radius-md: 12px;
+  --durak-radius-lg: 20px;
+  --durak-gap-xs: 4px;
+  --durak-gap-sm: 8px;
+  --durak-gap-md: 16px;
+  --durak-gap-lg: 24px;
+  --durak-color-bg: hsl(220 15% 10% / 1);
+  --durak-color-bg-alt: hsl(220 15% 14% / 1);
+  --durak-color-surface: hsl(220 20% 18% / 0.6);
+  --durak-color-border: hsl(220 25% 40% / 0.3);
+  --durak-color-accent: hsl(190 90% 55% / 1);
+  --durak-color-accent-rgb: 20 180 230;
+  --durak-color-win: hsl(140 70% 45% / 1);
+  --durak-color-warn: hsl(40 90% 55% / 1);
+  --durak-color-danger: hsl(350 80% 55% / 1);
+  --durak-duration-fast: 120ms;
+  --durak-duration-base: 220ms;
+  --durak-duration-slow: 420ms;
+}
+
+/* light theme override */
+[data-theme='light'] {
+  --durak-color-bg: hsl(210 40% 98% / 1);
+  --durak-color-bg-alt: hsl(210 40% 94% / 1);
+  --durak-color-surface: hsl(210 40% 92% / 0.7);
+  --durak-color-border: hsl(210 25% 65% / 0.4);
+  --durak-color-accent: hsl(200 90% 45% / 1);
+  --durak-color-accent-rgb: 10 140 210;
+  --durak-color-win: hsl(130 55% 45% / 1);
+}
+
+/* utility classes (can be purged or replaced by Tailwind plugin later) */
+.glass { background: var(--durak-color-surface); border: 1px solid var(--durak-color-border); backdrop-filter: blur(12px); }
