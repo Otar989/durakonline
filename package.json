@@ -3,12 +3,14 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev --turbopack",
-    "build": "next build --turbopack",
-    "start": "next start",
+  "dev": "next dev --turbopack",
+  "build": "next build --turbopack",
+  "start": "node server/index.ts",
     "lint": "eslint",
     "dev:ws": "node server/socket-server.mjs",
-    "dev:all": "concurrently -k -n APP,WS -c magenta,cyan \"npm:dev\" \"npm:dev:ws\""
+  "dev:all": "concurrently -k -n APP,WS -c magenta,cyan \"npm:dev\" \"npm:dev:ws\"",
+  "test": "vitest run",
+  "test:watch": "vitest"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.2",
@@ -32,7 +34,8 @@
     "eslint": "^9",
     "eslint-config-next": "15.5.0",
     "tailwindcss": "^4",
-    "typescript": "^5"
+  "typescript": "^5",
+  "vitest": "^1.6.0"
   },
   "engines": {
     "node": "20.x"
