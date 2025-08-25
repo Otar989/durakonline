@@ -29,6 +29,7 @@ import Sidebar from '../components/Sidebar';
 import GameLayout from '../components/GameLayout';
 import { useNetStatus } from '../hooks/useNetStatus';
 import { useWallet, usePurchasePremium } from '../hooks/useWallet';
+import { useProfile } from '../hooks/useProfile';
 import MultiOpponents from '../components/MultiOpponents';
 
 // Live drag announcer
@@ -75,6 +76,7 @@ export const NewGamePage: React.FC<{ onRestart?: ()=>void; initialNick?: string;
   const wallet = useWallet(deviceId);
   const purchasePremium = usePurchasePremium(deviceId);
   const isPremium = wallet.premiumUntil && new Date(wallet.premiumUntil) > new Date();
+  const profile = useProfile(deviceId);
   const { toasts, push } = useToasts();
   const { play: playSound, sound, toggleSound, volume, setVolume, theme, setTheme, ensureAudioUnlocked } = useSettings();
   // Разблокируем аудио по первому жесту пользователя и запускаем ambient один раз
@@ -381,7 +383,7 @@ export const NewGamePage: React.FC<{ onRestart?: ()=>void; initialNick?: string;
               <span className="text-[10px] opacity-70">💰</span>
               {wallet.rewardFlash && <span className="absolute -top-3 right-0 text-[10px] text-emerald-300 animate-bounce">+{wallet.rewardFlash}</span>}
             </div>}
-            <button disabled={wallet.loading} onClick={async()=>{ if(isPremium){ push('Премиум активен','info'); return; } const res = await purchasePremium(7); if(res.ok){ push('Премиум на 7 дней активирован','success'); wallet.reload(); } else if(res.error==='insufficient_funds'){ push('Недостаточно монет','warn'); } else { push('Не удалось купить','warn'); } }} className={`px-2 py-1 rounded bg-white/10 hover:bg-white/20 text-[11px] ${isPremium? 'ring-1 ring-amber-400/60': ''}`}>{isPremium? '⭐ Premium':'Купить ⭐'}</button>
+            <button disabled={wallet.loading} onClick={async()=>{ if(isPremium){ push('Премиум активен','info'); return; } const res = await purchasePremium(7); if(res.ok){ push('Премиум на 7 дней активирован','success'); wallet.reload(); profile.reload(); } else if(res.error==='insufficient_funds'){ push('Недостаточно монет','warn'); } else { push('Не удалось купить','warn'); } }} className={`px-2 py-1 rounded bg-white/10 hover:bg-white/20 text-[11px] ${isPremium? 'ring-1 ring-amber-400/60': ''}`}>{isPremium? '⭐ Premium':'Купить ⭐'}</button>
             <button disabled={wallet.loading || !wallet.claimAvailable} onClick={async()=>{
               const res = await wallet.claimDaily();
               if(res.ok){ push(`Daily бонус: +${res.reward}`,'success'); } else { if(res.error==='already_claimed'){ push('Уже получено сегодня','info'); } else { push('Не удалось daily','warn'); } }
@@ -457,7 +459,11 @@ export const NewGamePage: React.FC<{ onRestart?: ()=>void; initialNick?: string;
       {!gameEnded?.winner && <p className="text-sm">Обе руки пусты.</p>}
       {wallet && !wallet.loading && <div className="text-xs opacity-80 space-y-1">
   <div>Баланс: {wallet.coins}💰 (daily стрик: {wallet.dailyStreak}) {isPremium && <span className="ml-2 px-2 py-0.5 rounded bg-amber-400/20 text-amber-300 text-[10px]">⭐ Premium до {new Date(wallet.premiumUntil!).toLocaleDateString()}</span>}</div>
-  {/* placeholder: уровень и опыт нужны из профиля, пока нет прямого fetch — будущий API /api/profile */}
+        {profile && !profile.loading && <div className="flex items-center gap-2">
+          <span>Lvl {profile.level}</span>
+          <div className="flex-1 h-2 w-32 bg-white/10 rounded overflow-hidden"><div className="h-full bg-gradient-to-r from-fuchsia-500 to-sky-500" style={{ width: (profile.progress?.percent||0)+'%' }} /></div>
+          <span className="text-[10px] opacity-60 tabular-nums">{Math.round(profile.progress?.percent||0)}%</span>
+        </div>}
         {isPremium && <div className="text-[10px] opacity-60">Бонус к рейтингу/монетам активен</div>}
       </div>}
       <div className="flex justify-center gap-2">
