@@ -1,60 +1,72 @@
 import { GameState, Move, Card } from './types';
 import { legalMoves, RANKS, cloneState, applyMove } from './engine';
 
+// Новый расширенный выбор хода бота (используется локально; на сервере отдельная, но аналогичная реализация)
 export function botChoose(st: GameState, botId: string): Move | null {
   const moves = legalMoves(st, botId);
   if(!moves.length) return null;
-  // Consider translation first if available: heuristic - if translating keeps hand size manageable (<= opponent) or creates pressure with low card
-  const translateMoves = moves.filter(m=>m.type==='TRANSLATE') as Extract<Move,{type:'TRANSLATE'}>[];
-  if(translateMoves.length){
-    const me = st.players.find(p=>p.id===botId)!;
-    const opp = st.players.find(p=>p.id!==botId)!;
-    // Score each translate: simulate and see resulting hand differential (we attack after translating)
-    const scored = translateMoves.map(m=>{
-      const sim = cloneState(st);
-      try { applyMove(sim, m, botId); } catch{}
-      const myHand = sim.players.find(p=>p.id===botId)!.hand.length;
-      const oppHand = sim.players.find(p=>p.id!==botId)!.hand.length;
-      // Lower myHand minus oppHand better; prefer not increasing diff; also penalize if we lose last trump early
-      const loseTrumpPenalty = m.card.s===st.trump.s? 3:0;
-      const diff = myHand - oppHand + loseTrumpPenalty;
-      return { m, diff };
-    }).sort((a,b)=> a.diff - b.diff || RANKS.indexOf(a.m.card.r)-RANKS.indexOf(b.m.card.r));
-    const best = scored[0];
-    if(best && best.diff <= 1 && me.hand.length>=2 && opp.hand.length>=me.hand.length){
-      return best.m;
-    }
+  const me = st.players.find(p=> p.id===botId);
+  const defender = st.players.find(p=> p.id===st.defender);
+  const attacker = st.players.find(p=> p.id===st.attacker);
+  if(!me) return moves[0];
+
+  // 1. Обвинить подозреваемого (чит-режим)
+  const accuse = moves.filter(m=> m.type==='ACCUSE');
+  if(accuse.length && st.cheat?.suspects?.length){
+    const sure = st.cheat.suspects.filter(s=> s.cheat);
+    if(sure.length && Math.random()<0.5) return accuse[0];
+    if(Math.random()<0.03) return accuse[0];
   }
-  // DEFEND logic
-  const defendMoves = moves.filter(m=>m.type==='DEFEND') as Extract<Move,{type:'DEFEND'}>[];
+
+  // 2. Защита: минимальная победная карта (нетрамповая приоритетно)
+  const defendMoves = moves.filter(m=> m.type==='DEFEND');
   if(defendMoves.length){
-    // split by trump / non-trump and sort
-    defendMoves.sort((a,b)=> defenseScore(st, a.card) - defenseScore(st, b.card));
+    defendMoves.sort((a,b)=> compareCard(a.card,b.card, st.trump.s));
     return defendMoves[0];
   }
-  // TAKE if no defense or strategic choice (never strategic yet)
-  const take = moves.find(m=>m.type==='TAKE');
-  if(take && !defendMoves.length) return take;
-  // ATTACK: pick minimal non-trump rank else minimal trump
-  const attackMoves = moves.filter(m=>m.type==='ATTACK') as Extract<Move,{type:'ATTACK'}>[];
-  if(attackMoves.length){
-    attackMoves.sort((a,b)=> attackScore(st, a.card)-attackScore(st, b.card));
-    return attackMoves[0];
+
+  // 3. Перевод, если защищаюсь и это уменьшает дисбаланс рук
+  const translateMoves = moves.filter(m=> m.type==='TRANSLATE');
+  if(translateMoves.length && me.id===st.defender){
+    // условие: у атакующего карт >= чем у меня, и у меня минимум 2 карты (сохраняем гибкость)
+    if(defender && attacker && attacker.hand.length>=defender.hand.length && defender.hand.length>1){
+      translateMoves.sort((a,b)=> rankOrder(a.card.r)-rankOrder(b.card.r));
+      return translateMoves[0];
+    }
   }
-  const end = moves.find(m=>m.type==='END_TURN');
-  if(end) return end;
+
+  // 4. Чит-атака (редко): если мало карт у защитника или у нас много
+  const cheatAttack = moves.filter(m=> m.type==='CHEAT_ATTACK');
+  if(cheatAttack.length){
+    const defHand = defender?.hand.length||0;
+    if(defHand<=3 && Math.random()<0.2) return cheatAttack[Math.floor(Math.random()*cheatAttack.length)];
+    if(me.hand.length>=6 && Math.random()<0.08) return cheatAttack[0];
+  }
+
+  // 5. Обычная атака: использовать частые ранги, экономить козыри
+  const attackMoves = moves.filter(m=> m.type==='ATTACK');
+  if(attackMoves.length){
+    const freq: Record<string, number> = {};
+    me.hand.forEach(c=>{ freq[c.r]=(freq[c.r]||0)+1; });
+    const scored = attackMoves.map(m=> ({ m, score: (freq[m.card.r]||1)*10 - (m.card.s===st.trump.s?5:0) - rankOrder(m.card.r) }));
+    scored.sort((a,b)=> b.score-a.score);
+    return scored[0].m;
+  }
+
+  // 6. Завершить ход, если можно
+  const end = moves.find(m=> m.type==='END_TURN'); if(end) return end;
+
+  // 7. Взять карты в безвыходной ситуации
+  const take = moves.find(m=> m.type==='TAKE'); if(take) return take;
+
   return moves[0];
 }
 
-function defenseScore(st: GameState, c: Card){
-  const trumpSuit = st.trump.s;
-  const base = RANKS.indexOf(c.r);
-  return (c.s===trumpSuit? base + 100 : base); // не тратить козыри рано
-}
-function attackScore(st: GameState, c: Card){
-  const trumpSuit = st.trump.s;
-  const base = RANKS.indexOf(c.r);
-  return c.s===trumpSuit? base + 150 : base; // трампы дороже -> позже
-}
+// Старая бот-логика была удалена/заменена
 
-// rankOrder removed (unused)
+function rankOrder(r: string){ return RANKS.indexOf(r as any); }
+function compareCard(a: Card, b: Card, trump: string){
+  const at = a.s===trump, bt = b.s===trump;
+  if(at!==bt) return at? 1:-1; // non-trump first
+  return rankOrder(a.r)-rankOrder(b.r);
+}
