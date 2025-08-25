@@ -62,7 +62,7 @@ export const Hand: React.FC<Props> = React.memo(({ hand, legal, onPlay, trumpSui
           const legalAny = attackable || !!defendable || canTranslate || cheatAttackable;
           const slightRotate = (idx - (count-1)/2) * 2;
           return <motion.button key={id} data-card-id={id}
-            layout="position"
+            layout
             initial={{ opacity:0, y:12, scale:0.9 }}
             animate={{ opacity:1, y:0, scale:1 }}
             exit={{ opacity:0, y:-8, scale:0.85 }}
