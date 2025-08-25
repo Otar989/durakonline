@@ -2,7 +2,7 @@ import { GameState } from '../game-core/types';
 import { supabaseAdmin } from './db';
 import { deltaR, League } from './rating';
 import { adjustLeague } from './leagueRules';
-import { detectSignals } from './antiabuse';
+import { detectSignals, HistoryMetrics } from './antiabuse';
 
 interface ProfitResult { [pid: string]: number }
 
@@ -101,12 +101,40 @@ export async function applyRatings(matchId: string, st: GameState){
       if(reward>0){ await supabaseAdmin.from('wallets').update({ coins: wallet.coins + reward, updated_at: new Date().toISOString() }).eq('user_id', id); }
     }
     if(rows.length) await supabaseAdmin.from('ratings').insert(rows);
-    // anti-abuse signals logging
+    // anti-abuse signals logging (with historical context for 2p matches and per-player)
     try {
       const startTs = st.log?.[0]?.t || Date.now();
       const endTs = Date.now();
       const durationSec = Math.round((endTs - startTs)/1000);
-      const signals = detectSignals({ durationSec, surrenders: st.log?.filter(l=> l.move.type==='TAKE' && st.winner)?.length||0, players: st.players.map(p=>p.id), pairKey: st.players.length===2? st.players.map(p=>p.id).sort().join(':'): undefined, profits });
+      let history: HistoryMetrics | undefined = undefined;
+      try {
+        const playerIds = st.players.map(p=>p.id);
+        // fetch last 30 matches for these players (and pair if 2p)
+        const { data: recent } = await supabaseAdmin.from('matches').select('id,players,result,finished_at').order('finished_at',{ ascending:false }).limit(150);
+        const playerMetrics: HistoryMetrics['player'] = {};
+        const pairMetrics: HistoryMetrics['pair'] = {};
+        const pairKey = st.players.length===2? playerIds.slice().sort().join(':'): undefined;
+        for(const pid of playerIds){ playerMetrics[pid] = { fastGames:0, total:0, suspiciousFlow:0, surrenderGames:0 }; }
+        if(pairKey) pairMetrics[pairKey] = { total:0, fastGames:0, suspiciousFlow:0 };
+        for(const m of recent||[]){
+          if(!Array.isArray(m.players)) continue;
+            const idsIn = m.players.map((pl:any)=>pl.id);
+            const involved = idsIn.filter((id:string)=> playerIds.includes(id));
+            if(!involved.length) continue;
+            const res = (m as any).result||{};
+            const durationGuess = res.durationSec || 0; // future: store
+            const fast = durationGuess && durationGuess < 40;
+            for(const id of involved){
+              const pm = playerMetrics[id]; if(!pm) continue; pm.total++; if(fast) pm.fastGames++; if(res.profits){ const vals = Object.values(res.profits); if(vals.length){ const max=Math.max(...vals as number[]), min=Math.min(...vals as number[]); if(max>0 && min<0 && max > Math.abs(min)*3) pm.suspiciousFlow++; } }
+              if(res.surrender) pm.surrenderGames++;
+            }
+            if(pairKey && involved.length===2 && involved.every(x=> playerIds.includes(x))){
+              const ph = pairMetrics[pairKey]; if(ph){ ph.total++; if(fast) ph.fastGames++; if(res.profits){ const vals = Object.values(res.profits); if(vals.length){ const max=Math.max(...vals as number[]), min=Math.min(...vals as number[]); if(max>0 && min<0 && max > Math.abs(min)*3) ph.suspiciousFlow++; } } }
+            }
+        }
+        history = { player: playerMetrics, pair: pairMetrics };
+      } catch{}
+      const signals = detectSignals({ durationSec, surrenders: st.log?.filter(l=> l.move.type==='TAKE' && st.winner)?.length||0, players: st.players.map(p=>p.id), pairKey: st.players.length===2? st.players.map(p=>p.id).sort().join(':'): undefined, profits, history });
       if(signals.length){ await supabaseAdmin.from('match_signals').insert({ match_id: matchId, signals }); }
     } catch{}
   } catch (e) {

@@ -123,6 +123,30 @@ export const NewGamePage: React.FC<{ onRestart?: ()=>void; initialNick?: string;
     prevNetRef.current = netStatus;
   },[netStatus, push]);
   const activeState = inOnline? snapshot.state : localState;
+
+  // Подгружаем профиль после завершения онлайн партии чтобы получить обновлённый рейтинг/лигу
+  useEffect(()=>{
+    if(gameEnded && inOnline){
+      const t = setTimeout(()=> profile.reload(), 1200);
+      return ()=> clearTimeout(t);
+    }
+  },[gameEnded, inOnline, profile]);
+
+  // Тосты для повышения / понижения лиги
+  const prevProfileRef = useRef<{ league?:string; rating?:number }>({});
+  useEffect(()=>{
+    if(profile.loading) return;
+    const prev = prevProfileRef.current;
+    const curLeague = profile.league;
+    if(prev.league && curLeague && prev.league!==curLeague){
+      const order = ['Silver','Gold','Ruby','Emerald','Sapphire','Higher'];
+      const promo = order.indexOf(curLeague) > order.indexOf(prev.league);
+      const msg = promo? `Повышение: ${curLeague} ↑` : `Понижение: ${curLeague} ↓`;
+      push(msg, promo? 'success':'warn', { dedupeKey: 'league_change_'+curLeague, ttl: 10000 });
+      setAriaAnnounce(promo? `Лига повышена до ${curLeague}`:`Лига понижена до ${curLeague}`);
+    }
+    prevProfileRef.current = { league: curLeague, rating: profile.rating };
+  },[profile.league, profile.rating, profile.loading, push]);
   // Звуковые события по последнему ходу (fallback если не отыграно в onPlay)
   useEffect(()=>{
     const log = activeState?.log; if(!log || !log.length) return;
@@ -378,6 +402,12 @@ export const NewGamePage: React.FC<{ onRestart?: ()=>void; initialNick?: string;
         <div className="flex items-center gap-4 flex-wrap">
           <h1 className="text-2xl font-semibold">Дурак Онлайн</h1>
           <div className="ml-auto flex gap-2 items-center text-xs">
+            {!profile.loading && (
+              <div className="relative flex items-center gap-1 bg-white/5 px-2 py-1 rounded select-none ring-1 ring-white/10">
+                <span title="Лига" aria-label={`Лига: ${profile.league||'—'}`}>{profile.league==='Silver'? '🥈': profile.league==='Gold'? '🥇': profile.league==='Ruby'? '💎': profile.league==='Emerald'? '🟢': profile.league==='Sapphire'? '🔷': profile.league==='Higher'? '🏆':'—'}</span>
+                <span className="tabular-nums" title="Рейтинг">{profile.rating}</span>
+              </div>
+            )}
             {wallet && !wallet.loading && <div className="flex items-center gap-1 bg-white/5 px-2 py-1 rounded relative" aria-label={`Монеты: ${wallet.coins}`}>
               <span className="tabular-nums font-medium">{wallet.coins}</span>
               <span className="text-[10px] opacity-70">💰</span>

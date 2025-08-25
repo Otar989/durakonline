@@ -7,6 +7,7 @@ import Modal from './Modal';
 import Link from 'next/link';
 import { Leaderboard } from './Leaderboard';
 import { MatchHistory } from './MatchHistory';
+import { SignalsPanel } from './SignalsPanel';
 
 interface Props { }
 
@@ -21,12 +22,27 @@ export const Lobby: React.FC<Props> = () => {
   const { theme, setTheme, sound, toggleSound, animations, toggleAnimations, ensureAudioUnlocked, play } = useSettings() as any;
   const [hasPersist,setHasPersist] = useState(false);
   const [lb,setLb] = useState<any[]>([]);
+  const [lbLeague,setLbLeague] = useState<string>('');
+  const [autoRefresh,setAutoRefresh] = useState(true);
+  const [lastRefresh,setLastRefresh] = useState<number>(0);
   const [deviceId,setDeviceId] = useState<string>('');
   useEffect(()=>{ try { if(typeof window!=='undefined' && localStorage.getItem('durak_persist_v2')) setHasPersist(true);} catch{} },[]);
   // одноразовый unlock + ambient
   useEffect(()=>{ function first(){ ensureAudioUnlocked().then(()=> play('ambient')); } window.addEventListener('pointerdown', first, { once:true }); return ()=> window.removeEventListener('pointerdown', first); },[ensureAudioUnlocked, play]);
 
-  useEffect(()=>{ fetch('/api/leaderboard?limit=10').then(r=> r.json()).then(j=>{ if(j.ok) setLb(j.entries); }).catch(()=>{}); },[]);
+  useEffect(()=>{ const q = `/api/leaderboard?limit=10${lbLeague? `&league=${encodeURIComponent(lbLeague)}`:''}`; fetch(q).then(r=> r.json()).then(j=>{ if(j.ok) setLb(j.entries); }).catch(()=>{}); setLastRefresh(Date.now()); },[lbLeague]);
+
+  // автообновление каждые 30s
+  useEffect(()=>{
+    if(!autoRefresh) return;
+    const t = setInterval(()=>{
+      const q = `/api/leaderboard?limit=10${lbLeague? `&league=${encodeURIComponent(lbLeague)}`:''}`; fetch(q).then(r=> r.json()).then(j=>{ if(j.ok) setLb(j.entries); }).catch(()=>{});
+      // вспомогательные панели
+      try { const d = localStorage.getItem('device_id'); if(d){ fetch(`/api/history?device=${encodeURIComponent(d)}&limit=20`).catch(()=>{}); fetch(`/api/signals?device=${encodeURIComponent(d)}&limit=20`).catch(()=>{}); } } catch{}
+      setLastRefresh(Date.now());
+    },30000);
+    return ()=> clearInterval(t);
+  },[autoRefresh, lbLeague]);
 
   useEffect(()=>{ try { const d = localStorage.getItem('device_id') || (()=>{ const v = 'dev_'+Math.random().toString(36).slice(2,10); localStorage.setItem('device_id', v); return v; })(); setDeviceId(d);} catch{} },[]);
 
@@ -98,8 +114,27 @@ export const Lobby: React.FC<Props> = () => {
             <li>Настройки (звук/тема/анимации) сохраняются.</li>
           </ul>}
         </LobbyCard>
-        <div className="hidden md:block md:col-span-1"><Leaderboard entries={lb} /></div>
-        <div className="hidden md:block md:col-span-1"><MatchHistory deviceId={deviceId} /></div>
+        <div className="hidden md:block md:col-span-1">
+          <div className="mb-2 flex items-center gap-2">
+            <select value={lbLeague} onChange={e=> setLbLeague(e.target.value)} className="input !py-1 !px-2 text-[11px]">
+              <option value="">Все лиги</option>
+              <option value="Silver">Silver</option>
+              <option value="Gold">Gold</option>
+              <option value="Ruby">Ruby</option>
+              <option value="Emerald">Emerald</option>
+              <option value="Sapphire">Sapphire</option>
+              <option value="Higher">Higher</option>
+            </select>
+            <label className="flex items-center gap-1 text-[10px]"><input type="checkbox" checked={autoRefresh} onChange={e=> setAutoRefresh(e.target.checked)} /> авто</label>
+            <button onClick={()=>{ const q = `/api/leaderboard?limit=10${lbLeague? `&league=${encodeURIComponent(lbLeague)}`:''}`; fetch(q).then(r=> r.json()).then(j=>{ if(j.ok) setLb(j.entries); }).catch(()=>{}); setLastRefresh(Date.now()); }} className="px-2 py-1 rounded bg-white/10 hover:bg-white/20 text-[10px]">Обн.</button>
+          </div>
+          <Leaderboard entries={lb} league={lbLeague||undefined} />
+          <p className="text-[9px] opacity-40 mt-1">Обновлено: {new Date(lastRefresh).toLocaleTimeString()}</p>
+        </div>
+        <div className="hidden md:block md:col-span-1 flex flex-col gap-4">
+          <MatchHistory deviceId={deviceId} />
+          <SignalsPanel deviceId={deviceId} />
+        </div>
       </div>
       <Modal open={showRules} onClose={()=> setShowRules(false)} title="Правила (кратко)" id="rules-lobby">
         <ul className="list-disc pl-5 space-y-1 text-xs">
