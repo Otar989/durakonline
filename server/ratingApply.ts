@@ -1,6 +1,7 @@
 import { GameState } from '../game-core/types';
 import { supabaseAdmin } from './db';
 import { deltaR, League } from './rating';
+import { detectSignals } from './antiabuse';
 
 interface ProfitResult { [pid: string]: number }
 
@@ -81,6 +82,14 @@ export async function applyRatings(matchId: string, st: GameState){
       if(reward>0){ await supabaseAdmin.from('wallets').update({ coins: wallet.coins + reward, updated_at: new Date().toISOString() }).eq('user_id', id); }
     }
     if(rows.length) await supabaseAdmin.from('ratings').insert(rows);
+    // anti-abuse signals logging
+    try {
+      const startTs = st.log?.[0]?.t || Date.now();
+      const endTs = Date.now();
+      const durationSec = Math.round((endTs - startTs)/1000);
+      const signals = detectSignals({ durationSec, surrenders: st.log?.filter(l=> l.move.type==='TAKE' && st.winner)?.length||0, players: st.players.map(p=>p.id), pairKey: st.players.length===2? st.players.map(p=>p.id).sort().join(':'): undefined, profits });
+      if(signals.length){ await supabaseAdmin.from('match_signals').insert({ match_id: matchId, signals }); }
+    } catch{}
   } catch (e) {
     // swallow
   }
