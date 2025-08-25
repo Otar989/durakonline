@@ -6,6 +6,7 @@ import SettingsToggles from './SettingsToggles';
 import Modal from './Modal';
 import Link from 'next/link';
 import { Leaderboard } from './Leaderboard';
+import { MatchHistory } from './MatchHistory';
 
 interface Props { }
 
@@ -20,11 +21,14 @@ export const Lobby: React.FC<Props> = () => {
   const { theme, setTheme, sound, toggleSound, animations, toggleAnimations, ensureAudioUnlocked, play } = useSettings() as any;
   const [hasPersist,setHasPersist] = useState(false);
   const [lb,setLb] = useState<any[]>([]);
+  const [deviceId,setDeviceId] = useState<string>('');
   useEffect(()=>{ try { if(typeof window!=='undefined' && localStorage.getItem('durak_persist_v2')) setHasPersist(true);} catch{} },[]);
   // одноразовый unlock + ambient
   useEffect(()=>{ function first(){ ensureAudioUnlocked().then(()=> play('ambient')); } window.addEventListener('pointerdown', first, { once:true }); return ()=> window.removeEventListener('pointerdown', first); },[ensureAudioUnlocked, play]);
 
   useEffect(()=>{ fetch('/api/leaderboard?limit=10').then(r=> r.json()).then(j=>{ if(j.ok) setLb(j.entries); }).catch(()=>{}); },[]);
+
+  useEffect(()=>{ try { const d = localStorage.getItem('device_id') || (()=>{ const v = 'dev_'+Math.random().toString(36).slice(2,10); localStorage.setItem('device_id', v); return v; })(); setDeviceId(d);} catch{} },[]);
 
   const startGameFromLobby = useCallback(()=>{
     if(!nick.trim()) return;
@@ -60,7 +64,7 @@ export const Lobby: React.FC<Props> = () => {
           <button onClick={()=> setShowRules(true)} className="px-3 py-2 rounded bg-white/10 hover:bg-white/20 text-sm">Правила</button>
         </div>
       </header>
-      <div className="grid gap-6 md:grid-cols-3">
+      <div className="grid gap-6 md:grid-cols-4">
         <LobbyCard title="Игрок">
           <label className="flex flex-col gap-1 text-sm">Ник
             <input value={nick} onChange={e=> setNick(e.target.value)} maxLength={16} className="input" placeholder="Введите ник" />
@@ -94,7 +98,8 @@ export const Lobby: React.FC<Props> = () => {
             <li>Настройки (звук/тема/анимации) сохраняются.</li>
           </ul>}
         </LobbyCard>
-        <div className="hidden md:block"><Leaderboard entries={lb} /></div>
+        <div className="hidden md:block md:col-span-1"><Leaderboard entries={lb} /></div>
+        <div className="hidden md:block md:col-span-1"><MatchHistory deviceId={deviceId} /></div>
       </div>
       <Modal open={showRules} onClose={()=> setShowRules(false)} title="Правила (кратко)" id="rules-lobby">
         <ul className="list-disc pl-5 space-y-1 text-xs">

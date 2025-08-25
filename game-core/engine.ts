@@ -233,8 +233,9 @@ export function applyMove(st: GameState, move: Move, playerId: string): GameStat
         if(pair.defend) st.discard.push(pair.defend);
       }
       st.table = [];
-      refill(st);
-  // defender становится новым атакующим; защитник сдвигается по кругу
+  // добор выполняется по старым ролям (атакующий добирает первым)
+  refill(st);
+  // теперь ротация ролей: defender -> attacker
   const order = st.players.map(p=>p.id);
   const defIdx = order.indexOf(st.defender);
   st.attacker = st.defender;
