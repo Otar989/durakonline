@@ -282,12 +282,10 @@ export const NewGamePage: React.FC<{ onRestart?: ()=>void; initialNick?: string;
   const [showGestures,setShowGestures] = useState(false);
   useEffect(()=>{
     if(typeof window==='undefined') return;
-  const seen = typeof window!=='undefined'? localStorage.getItem('durak_gesture_help_v1'): null;
-    if(!seen){
-      // показываем только на узких экранах
-      if(window.innerWidth < 780){ setShowGestures(true); }
-    }
-  },[]);
+    const key = premium? 'durak_gesture_help_v2':'durak_gesture_help_v1';
+    const seen = localStorage.getItem(key);
+    if(!seen && window.innerWidth < 780){ setShowGestures(true); }
+  },[premium]);
   useEffect(()=>{
     const last = activeState?.log?.[activeState.log.length-1];
     if(!last) return;
@@ -454,7 +452,9 @@ export const NewGamePage: React.FC<{ onRestart?: ()=>void; initialNick?: string;
               {mode==='ONLINE' && roomId && !activeState && <button className="text-[10px] underline opacity-80" onClick={()=>{ try { navigator.clipboard.writeText(window.location.origin+'?room='+roomId); push('Ссылка скопирована','success'); } catch{} }}>Скопировать ссылку</button>}
             </div>
           </div>}
-          <ToastHost queue={toasts} />
+          {/* Gesture hint chip (premium) */}
+          {showGestures && <button onClick={()=>{ setShowGestures(false); try { localStorage.setItem('durak_gesture_help_v2','1'); } catch{} }} className="fixed bottom-24 left-1/2 -translate-x-1/2 px-4 py-2 rounded-full bg-gradient-to-r from-fuchsia-600/70 to-sky-600/70 backdrop-blur border border-white/20 text-[11px] shadow-lg">Свайпы: ← атака/БИТО • → взять • ↑ единственная защита • ↓ взять</button>}
+          <ToastHost queue={toasts} premium />
           <Modal open={showRules} onClose={()=> setShowRules(false)} title="Правила (кратко)" id="rules-modal">
             <ul className="list-disc pl-5 space-y-1 text-xs">
               <li>36 карт (6–A), козырь — масть открытой карты талона.</li>
