@@ -456,7 +456,8 @@ export const NewGamePage: React.FC<{ onRestart?: ()=>void; initialNick?: string;
       {gameEnded?.winner && <p className="text-sm">Победил: <b>{gameEnded.winner}</b>{gameEnded.loser? ` — Дурак: ${gameEnded.loser}`:''}</p>}
       {!gameEnded?.winner && <p className="text-sm">Обе руки пусты.</p>}
       {wallet && !wallet.loading && <div className="text-xs opacity-80 space-y-1">
-        <div>Баланс: {wallet.coins}💰 (daily стрик: {wallet.dailyStreak}) {isPremium && <span className="ml-2 px-2 py-0.5 rounded bg-amber-400/20 text-amber-300 text-[10px]">⭐ Premium до {new Date(wallet.premiumUntil!).toLocaleDateString()}</span>}</div>
+  <div>Баланс: {wallet.coins}💰 (daily стрик: {wallet.dailyStreak}) {isPremium && <span className="ml-2 px-2 py-0.5 rounded bg-amber-400/20 text-amber-300 text-[10px]">⭐ Premium до {new Date(wallet.premiumUntil!).toLocaleDateString()}</span>}</div>
+  {/* placeholder: уровень и опыт нужны из профиля, пока нет прямого fetch — будущий API /api/profile */}
         {isPremium && <div className="text-[10px] opacity-60">Бонус к рейтингу/монетам активен</div>}
       </div>}
       <div className="flex justify-center gap-2">

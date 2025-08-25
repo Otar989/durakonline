@@ -74,7 +74,13 @@ export async function applyRatings(matchId: string, st: GameState){
       // update profile rating/streak
       const newRating = ctx.rating + dR;
       const newStreak = profit>0? ctx.streak+1 : 0;
-      await supabaseAdmin.from('profiles').update({ rating: newRating, streak: newStreak, updated_at: new Date().toISOString() }).eq('user_id', id);
+  // experience: profit*100 (rough) + deltaR rounded
+  const gainExp = Math.round(profit*100 + dR);
+  const { data: curExpRow } = await supabaseAdmin.from('profiles').select('experience').eq('user_id', id).maybeSingle();
+  const curExp = Number(curExpRow?.experience)||0;
+  const newExp = curExp + gainExp;
+  const newLevel = Math.floor(newExp/1000)+1;
+  await supabaseAdmin.from('profiles').update({ rating: newRating, streak: newStreak, experience: newExp, level: newLevel, updated_at: new Date().toISOString() }).eq('user_id', id);
       // economy reward
       const wallet = await fetchOrInitWallet(id);
       let reward = Math.floor(profit * 10);
