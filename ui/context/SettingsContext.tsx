@@ -79,6 +79,8 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       const anim = localStorage.getItem('durak_anim'); if(anim==='off') setAnimations(false);
     } catch{}
     setReady(true);
+  // включаем плавные переходы темы только после первой отрисовки чтобы избежать вспышки
+  requestAnimationFrame(()=>{ document.documentElement.classList.add('theme-transition'); });
   },[]);
 
   // apply theme
