@@ -1,9 +1,12 @@
 "use client";
 import React, { useMemo } from 'react';
 import { motion as m } from 'framer-motion';
+import { Card, Move } from '../../../game-core/types';
+import { PlayingCard } from '../../components/TrumpPile';
 
 export interface FanCard { id:string; r:string; s:string; playable?: boolean; trump?: boolean }
-interface FanHandProps { cards: FanCard[]; onPlay:(c:FanCard)=>void; scale?: number; curveRadius?: number; selectedId?: string|null; onSelect?:(id:string)=>void; }
+interface FanHandProps { cards?: FanCard[]; onPlay?:(c:FanCard)=>void; scale?: number; curveRadius?: number; selectedId?: string|null; onSelect?:(id:string)=>void; }
+interface Props { hand: Card[]; moves: Move[]; play: (m:Move)=>void; trumpSuit: string; }
 
 // Функция распределения карт по дуге
 function computeFan(cards: FanCard[], curveRadius:number){
@@ -20,12 +23,14 @@ function computeFan(cards: FanCard[], curveRadius:number){
   });
 }
 
-export const FanHand: React.FC<FanHandProps> = ({ cards, onPlay, scale=1, curveRadius=340, selectedId, onSelect }) => {
+export const FanHand: React.FC<FanHandProps & Props> = ({ cards = [], onPlay, scale=1, curveRadius=340, selectedId, onSelect, hand, moves, play, trumpSuit }) => {
   const layout = useMemo(()=> computeFan(cards, curveRadius), [cards, curveRadius]);
+  // simple fan geometry: rotate around center
+  const angleSpan = Math.min(110, hand.length*12);
   return (
     <div className="relative w-full flex justify-center py-4 select-none" style={{ perspective:1200 }}>
       <div className="relative" style={{ height: 220*scale }}>
-        {layout.map(pos=>{
+        {onPlay && layout.map(pos=>{
           const card = cards.find(c=> c.id===pos.id)!;
           const playable = !!card.playable;
           const selected = selectedId===card.id;
@@ -46,6 +51,25 @@ export const FanHand: React.FC<FanHandProps> = ({ cards, onPlay, scale=1, curveR
               </div>
             </m.div>
           );
+        })}
+        {hand.map((c,i)=>{
+          const pct = hand.length===1? 0.5: i/(hand.length-1);
+          const angle = -angleSpan/2 + pct*angleSpan;
+          const x = 50 + (Math.sin(angle*Math.PI/180))*35; // percentage
+          const y = 50 + (Math.cos(angle*Math.PI/180))*25; // percentage
+          const id = c.r+c.s;
+          const attack = moves.find(m=> m.type==='ATTACK' && m.card.r===c.r && m.card.s===c.s);
+          const translate = moves.find(m=> m.type==='TRANSLATE' && m.card.r===c.r && m.card.s===c.s);
+          const defend = moves.find(m=> m.type==='DEFEND' && m.card.r===c.r && m.card.s===c.s);
+          const mv = attack||translate||defend;
+          return <button key={id} style={{ position:'absolute', left:x+'%', top:y+'%', transform:`translate(-50%, -50%) rotate(${angle}deg)` }}
+            className={`pointer-events-auto transition-transform origin-center ${mv? 'hover:-translate-y-3':'opacity-40'}`}
+            onClick={()=> mv && play(mv)} aria-label={`Карта ${c.r}${c.s}`}
+          >
+            <div className="w-14">
+              <PlayingCard card={c} trumpSuit={trumpSuit} dim={!mv} />
+            </div>
+          </button>;
         })}
       </div>
     </div>

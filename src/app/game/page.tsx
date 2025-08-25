@@ -12,5 +12,5 @@ export default function GamePage(){
   },[]);
   const [instance,setInstance] = useState(0);
   const restart = () => { setInstance(i=> i+1); };
-  return <main className="max-w-7xl mx-auto p-4 md:p-6"><AppShell onRestart={restart} confirmExit><NewGamePage key={instance} onRestart={restart} initialNick={params.nick} initialRoom={params.room} initialMode={params.m} /></AppShell></main>;
+  return <main className="max-w-7xl mx-auto p-0 md:p-2 lg:p-4"><AppShell onRestart={restart} confirmExit><NewGamePage premium key={instance} onRestart={restart} initialNick={params.nick} initialRoom={params.room} initialMode={params.m} /></AppShell></main>;
 }

@@ -57,7 +57,9 @@ const LiveRegion: React.FC<{ message: string }> = ({ message }) => (
   <div aria-live="polite" aria-atomic="true" className="sr-only" role="status">{message}</div>
 );
 
-export const NewGamePage: React.FC<{ onRestart?: ()=>void; initialNick?: string; initialRoom?: string; initialMode?: string }> = ({ onRestart, initialNick, initialRoom, initialMode }) => {
+import PremiumGameShell from '../premium/components/PremiumGameShell';
+
+export const NewGamePage: React.FC<{ onRestart?: ()=>void; initialNick?: string; initialRoom?: string; initialMode?: string; premium?: boolean }> = ({ onRestart, initialNick, initialRoom, initialMode, premium }) => {
   const [roomId,setRoomId] = useState<string | null>(initialRoom || null);
   const [allowTranslationOpt,setAllowTranslationOpt] = useState<boolean|undefined>(undefined);
   const [nick,setNick] = useState(initialNick || 'Player');
@@ -407,6 +409,78 @@ export const NewGamePage: React.FC<{ onRestart?: ()=>void; initialNick?: string;
     );
   };
 
+  // PREMIUM RENDER PATH
+  if(premium){
+    const mePlayer = activeState?.players.find(p=> p.id===myId);
+    const playUnified = (m:Move)=> { inOnline? playMove(m): playLocal(m); };
+    return (
+      <FlipProviderDynamic>
+        <div ref={gestureRef} className="relative">
+          <LiveRegion message={ariaAnnounce} />
+          <DragLive />
+          <PremiumGameShell
+            state={activeState||null}
+            meId={myId||''}
+            moves={moves as Move[]}
+            play={playUnified}
+            trumpSuit={activeState?.trump.s}
+            bot={inOnline? { skill: (snapshot as any)?.effectiveBotSkill, wins:(snapshot as any)?.botStats?.wins, losses:(snapshot as any)?.botStats?.losses }: undefined}
+            network={socketState}
+          />
+          {!activeState && <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+            <div className="pointer-events-auto flex flex-col items-center gap-4 p-6 rounded-2xl bg-neutral-900/80 backdrop-blur border border-white/10">
+              <h2 className="text-sm font-semibold">Новая партия</h2>
+              <div className="flex gap-3 text-[11px] flex-wrap justify-center">
+                <label className="flex items-center gap-1"><span className="opacity-70">Ник</span><input value={nick} onChange={e=> setNick(e.target.value)} className="bg-white/5 rounded px-2 py-1 outline-none w-28" /></label>
+                <label className="flex items-center gap-1 cursor-pointer"><input type="checkbox" checked={withTrick} onChange={e=> setWithTrick(e.target.checked)} /> Чит</label>
+                <label className="flex items-center gap-1 cursor-pointer"><input type="checkbox" checked={limitFive} onChange={e=> setLimitFive(e.target.checked)} /> 5 до побоя</label>
+                <label className="flex items-center gap-1 cursor-pointer"><input type="checkbox" checked={!!allowTranslationOpt} onChange={e=> setAllowTranslationOpt(e.target.checked)} /> Перевод</label>
+                <label className="flex items-center gap-1 cursor-pointer"><span>Bot</span>
+                  <select value={botSkill} onChange={e=> setBotSkill(e.target.value as any)} className="bg-white/5 rounded px-1 py-0.5 outline-none">
+                    <option value="auto">auto</option>
+                    <option value="easy">easy</option>
+                    <option value="normal">normal</option>
+                    <option value="hard">hard</option>
+                  </select>
+                </label>
+                <label className="flex items-center gap-1 cursor-pointer"><span>Mode</span>
+                  <select value={mode} onChange={e=> { const v = e.target.value as 'ONLINE'|'OFFLINE'; setMode(v); if(v==='ONLINE' && !roomId) setRoomId('room_'+Math.random().toString(36).slice(2,8)); }} className="bg-white/5 rounded px-1 py-0.5 outline-none">
+                    <option value="OFFLINE">OFFLINE</option>
+                    <option value="ONLINE">ONLINE</option>
+                  </select>
+                </label>
+              </div>
+              <button className="px-5 py-2 rounded-full bg-gradient-to-r from-fuchsia-500 to-sky-500 text-sm font-medium shadow-md hover:shadow-lg active:scale-95 transition" onClick={startUnified} disabled={!!activeState}>Играть</button>
+              {mode==='ONLINE' && roomId && !activeState && <button className="text-[10px] underline opacity-80" onClick={()=>{ try { navigator.clipboard.writeText(window.location.origin+'?room='+roomId); push('Ссылка скопирована','success'); } catch{} }}>Скопировать ссылку</button>}
+            </div>
+          </div>}
+          <ToastHost queue={toasts} />
+          <Modal open={showRules} onClose={()=> setShowRules(false)} title="Правила (кратко)" id="rules-modal">
+            <ul className="list-disc pl-5 space-y-1 text-xs">
+              <li>36 карт (6–A), козырь — масть открытой карты талона.</li>
+              <li>Первым ходит самый младший козырь.</li>
+              <li>Подкидывать только ранги на столе, всего ≤6 и не больше карт у защитника.</li>
+              <li>Перевод до первой защиты (если включено) — карта того же ранга, роли меняются.</li>
+              <li>«Бито» когда все атаки покрыты; иначе защитник может «ВЗЯТЬ».</li>
+            </ul>
+          </Modal>
+          <ConfettiBurst show={!!gameEnded?.winner} />
+          <Modal open={!!gameEnded} onClose={()=> setGameEnded(null)} title={gameEnded?.winner? 'Результат партии':'Ничья'} id="result-modal">
+            <div className="text-center space-y-3">
+              {gameEnded?.winner && <p className="text-sm">Победил: <b>{gameEnded.winner}</b>{gameEnded.loser? ` — Дурак: ${gameEnded.loser}`:''}</p>}
+              {!gameEnded?.winner && <p className="text-sm">Обе руки пусты.</p>}
+              <div className="flex justify-center gap-2">
+                <button className="btn" onClick={()=>{ setGameEnded(null); startUnified(); }}>Новая</button>
+                {onRestart && <button className="px-4 py-2 rounded bg-white/10 hover:bg-white/20 text-sm" onClick={()=>{ setGameEnded(null); onRestart(); }}>Сброс</button>}
+              </div>
+            </div>
+          </Modal>
+        </div>
+      </FlipProviderDynamic>
+    );
+  }
+
+  // LEGACY (non-premium) RENDER PATH
   return (
   <FlipProviderDynamic>
   <div ref={gestureRef} className="max-w-6xl mx-auto p-6 flex flex-col gap-6">
