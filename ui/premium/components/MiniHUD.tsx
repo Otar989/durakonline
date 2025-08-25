@@ -3,11 +3,11 @@ import React from 'react';
 import { GameState } from '../../../game-core/types';
 
 interface Props { state: GameState; meId: string; }
-export const MiniHUD: React.FC<Props> = ({ state, meId }) => {
+const InnerMiniHUD: React.FC<Props> = ({ state, meId }) => {
   const me = state.players.find(p=>p.id===meId);
   const opps = state.players.filter(p=>p.id!==meId);
   return (
-    <div className="flex gap-2 overflow-x-auto px-1 py-1 text-[10px]">
+  <div className="flex gap-2 overflow-x-auto px-1 py-1 text-[10px]" role="status" aria-label="Игровой статус">
       <div className="px-2 py-1 rounded bg-white/5 flex items-center gap-1">Козырь <b>{state.trump.r}{state.trump.s}</b></div>
       <div className="px-2 py-1 rounded bg-white/5">Колода {state.deck.length}</div>
       <div className="px-2 py-1 rounded bg-white/5">Бито {state.discard.length}</div>
@@ -16,4 +16,14 @@ export const MiniHUD: React.FC<Props> = ({ state, meId }) => {
     </div>
   );
 };
+function eqState(a:GameState,b:GameState){
+  // fast shallow checks relevant to HUD display only
+  if(a.trump.r!==b.trump.r || a.trump.s!==b.trump.s) return false;
+  if(a.deck.length!==b.deck.length || a.discard.length!==b.discard.length) return false;
+  if(a.players.length!==b.players.length) return false;
+  for(let i=0;i<a.players.length;i++){ if(a.players[i].hand.length!==b.players[i].hand.length || a.players[i].id!==b.players[i].id) return false; }
+  if(a.attacker!==b.attacker || a.defender!==b.defender) return false;
+  return true;
+}
+export const MiniHUD = React.memo(InnerMiniHUD, (p,n)=> p.meId===n.meId && eqState(p.state,n.state));
 export default MiniHUD;

@@ -12,4 +12,8 @@
   .float-soft[data-variant='fast'] { animation-duration:4.5s; }
   .float-soft[data-variant='slow'] { animation-duration:7.5s; }
   .reduced-motion .float-soft { animation:none; }
+  .badge-move { position:absolute; top:-6px; right:-6px; font-size:0.55rem; letter-spacing:.5px; font-weight:600; padding:2px 4px; border-radius:0.5rem; backdrop-filter:blur(4px); box-shadow:0 0 0 1px rgba(255,255,255,0.15),0 2px 4px -1px rgba(0,0,0,0.4); }
+  .badge-translate { background:linear-gradient(140deg,#d946ef66,#6366f166); color:#fdf4ff; }
+  .badge-cheat { background:linear-gradient(140deg,#dc262666,#ef444466); color:#fff5f5; }
+  .hand-card-wrapper { position:relative; }
 }

@@ -14,6 +14,7 @@ const InnerPremiumBoard: React.FC<Props> = ({ table, trumpSuit, selectableDefend
   const { flyCard } = useFlip()||{};
   const [flashDef,setFlashDef] = useState<string[]>([]);
   const attackRanks = useMemo(()=> Array.from(new Set(table.map(p=> p.attack.r))), [table]);
+  const liveRef = useRef<HTMLDivElement|null>(null);
   // Flights (reuse subset of legacy logic)
   useEffect(()=>{
     if(table.length>prev.current.length){
@@ -22,6 +23,9 @@ const InnerPremiumBoard: React.FC<Props> = ({ table, trumpSuit, selectableDefend
       if(pending && diff.length && flyCard){
         const el = ref.current?.querySelector(`[data-card-id='${diff[0].attack.r+diff[0].attack.s}']`) as HTMLElement|null;
         if(el){ const tr = el.getBoundingClientRect(); flyCard(pending.from, { x:tr.x, y:tr.y, w:tr.width, h:tr.height }, { r:diff[0].attack.r, s:diff[0].attack.s }, pending.trumpSuit, pending.kind); }
+      }
+      if(liveRef.current && diff.length){
+        liveRef.current.textContent = `Новая атака ${diff[0].attack.r}${diff[0].attack.s}`;
       }
     } else if(table.length===prev.current.length){
       const newly = table.filter(p=> p.defend && !prev.current.find(o=> o.attack.r===p.attack.r && o.attack.s===p.attack.s && o.defend));
@@ -34,6 +38,9 @@ const InnerPremiumBoard: React.FC<Props> = ({ table, trumpSuit, selectableDefend
         }
         const ids = newly.map(p=> p.defend!.r+p.defend!.s);
         setFlashDef(cur=> [...cur, ...ids]);
+        if(liveRef.current){
+          liveRef.current.textContent = `Покрыто ${newly.map(p=> p.attack.r+p.attack.s).join(', ')}`;
+        }
         setTimeout(()=> setFlashDef(cur=> cur.filter(id=> !ids.includes(id))), 700);
       }
     } else if(table.length===0 && prev.current.length>0){
@@ -54,7 +61,8 @@ const InnerPremiumBoard: React.FC<Props> = ({ table, trumpSuit, selectableDefend
             flyCard({ x:fr.x, y:fr.y, w:fr.width, h:fr.height }, { x:discardAnchor.x, y:discardAnchor.y, w:discardAnchor.width, h:discardAnchor.height }, { r:pair.defend.r, s:pair.defend.s }, trumpSuit);
           }
         }
-      });
+  });
+  if(liveRef.current){ liveRef.current.textContent = 'Стол очищен'; }
     }
     prev.current = table;
   },[table, flyCard]);
@@ -72,10 +80,12 @@ const InnerPremiumBoard: React.FC<Props> = ({ table, trumpSuit, selectableDefend
   const draggedDef = dragCard && dragCard.roles?.defend? dragCard.card: null;
   return (
     <div ref={ref}
-      className={`relative w-full min-h-64 rounded-3xl p-5 grid grid-cols-3 gap-4 premium-board border border-white/10 ${translationHint? 'ring-2 ring-fuchsia-400/50 animate-pulse':''}`}
+      className={`relative w-full min-h-64 rounded-3xl p-5 grid grid-cols-3 gap-4 premium-board border border-white/10 ${translationHint? 'ring-2 ring-fuchsia-400/50 shadow-[0_0_0_4px_rgba(217,70,239,0.15)]':''}`}
       onDragOver={e=> e.preventDefault()}
       onDrop={e=>{ const raw=e.dataTransfer.getData('application/x-card'); if(!raw) return; try { const { card } = JSON.parse(raw); onAttack(card); } catch{} }}
     >
+      <div ref={liveRef} aria-live="polite" className="sr-only" />
+      {translationHint && <div className="pointer-events-none absolute inset-0 rounded-3xl bg-gradient-to-br from-fuchsia-500/10 to-purple-500/5 animate-pulse" />}
       <div className="discard-anchor absolute top-2 right-3 w-10 h-14 rounded-lg bg-gradient-to-br from-amber-500/30 to-amber-700/20 border border-amber-400/30 flex items-center justify-center text-[10px] uppercase tracking-wide font-medium text-amber-200/70">Бито</div>
       <AnimatePresence initial={false}>
       {table.map((pair,i)=>{
@@ -85,13 +95,13 @@ const InnerPremiumBoard: React.FC<Props> = ({ table, trumpSuit, selectableDefend
         return (
           <motion.div key={pair.attack.r+pair.attack.s}
             layout initial={{ opacity:0, scale:0.9 }} animate={{ opacity:1, scale:1 }} exit={{ opacity:0, scale:0.85 }}
-            className={`relative rounded-xl flex items-center justify-center bg-white/5 backdrop-blur-sm border border-white/10 h-40 ${droppable? 'ring-1 ring-sky-400/40':''} ${highlight? 'ring-2 ring-emerald-400 shadow-[0_0_0_3px_rgba(16,185,129,0.25)]':''}`}
+            className={`relative rounded-xl flex items-center justify-center bg-white/5 backdrop-blur-sm border border-white/10 h-40 ${droppable? 'ring-1 ring-sky-400/40':''} ${highlight? 'ring-2 ring-emerald-400 shadow-[0_0_0_3px_rgba(16,185,129,0.25)]':''} ${cheatSuspects?.includes(i)? 'animate-pulse ring-2 ring-rose-500/60': ''}`}
             onDragOver={e=>{ if(droppable) e.preventDefault(); }}
             onDrop={e=>{ if(!droppable) return; const raw=e.dataTransfer.getData('application/x-card'); if(!raw) return; try { const { card } = JSON.parse(raw); const m = defendOpts.find(o=> o.defendWith.r===card.r && o.defendWith.s===card.s); if(m) onDefend(m.target, m.defendWith); } catch{} }}
           >
             <div className="absolute -top-3 left-3 float-soft" data-variant={i%2===0? 'fast':'slow'} data-card-id={pair.attack.r+pair.attack.s}>
               <PlayingCard card={pair.attack} trumpSuit={trumpSuit} premium />
-              {cheatSuspects?.includes(i) && <span className="absolute -top-2 -left-2 bg-rose-600 text-white text-[10px] px-1 rounded shadow">SUS</span>}
+              {cheatSuspects?.includes(i) && <span className="absolute -top-2 -left-2 bg-rose-600 text-white text-[10px] px-1 rounded shadow" aria-label="Подозрение в читерстве">SUS</span>}
               {accuse && accuse.some(a=> a.card.r===pair.attack.r && a.card.s===pair.attack.s) && (
                 <button type="button" className="absolute -bottom-2 left-1/2 -translate-x-1/2 px-1.5 py-0.5 rounded bg-red-600 hover:bg-red-500 text-[10px] text-white shadow" onClick={()=>{ const entry = accuse.find(a=> a.card.r===pair.attack.r && a.card.s===pair.attack.s); if(entry) entry.play(); }}>⚠</button>
               )}

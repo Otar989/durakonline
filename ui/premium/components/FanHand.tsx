@@ -52,7 +52,7 @@ const InnerFanHand: React.FC<FanHandProps & Props> = ({ cards = [], onPlay, scal
             </m.div>
           );
         })}
-        {hand.map((c,i)=>{
+  {hand.map((c,i)=>{
           const pct = hand.length===1? 0.5: i/(hand.length-1);
           const angle = -angleSpan/2 + pct*angleSpan;
           const x = 50 + (Math.sin(angle*Math.PI/180))*35; // percentage
@@ -61,13 +61,16 @@ const InnerFanHand: React.FC<FanHandProps & Props> = ({ cards = [], onPlay, scal
           const attack = moves.find(m=> m.type==='ATTACK' && m.card.r===c.r && m.card.s===c.s);
           const translate = moves.find(m=> m.type==='TRANSLATE' && m.card.r===c.r && m.card.s===c.s);
           const defend = moves.find(m=> m.type==='DEFEND' && m.card.r===c.r && m.card.s===c.s);
-          const mv = attack||translate||defend;
+          const cheatAtk = moves.find(m=> m.type==='CHEAT_ATTACK' && m.card.r===c.r && m.card.s===c.s);
+          const mv = attack||translate||defend||cheatAtk;
           return <button key={id} style={{ position:'absolute', left:x+'%', top:y+'%', transform:`translate(-50%, -50%) rotate(${angle}deg)` }}
             className={`pointer-events-auto transition-transform origin-center ${mv? 'hover:-translate-y-3':'opacity-40'}`}
             onClick={()=> mv && play(mv)} aria-label={`Карта ${c.r}${c.s}`}
           >
-            <div className="w-16">
+            <div className="w-16 hand-card-wrapper">
               <PlayingCard card={c} trumpSuit={trumpSuit} dim={!mv} premium />
+              {translate && <span className="badge-move badge-translate" aria-label="Доступен перевод">TR</span>}
+              {cheatAtk && <span className="badge-move badge-cheat" aria-label="Чит-атака">CH</span>}
             </div>
           </button>;
         })}
