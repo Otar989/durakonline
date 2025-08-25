@@ -63,6 +63,7 @@ export const NewGamePage: React.FC<{ onRestart?: ()=>void; initialNick?: string;
   const [nick,setNick] = useState(initialNick || 'Player');
   const [withTrick,setWithTrick] = useState<boolean>(false);
   const [limitFive,setLimitFive] = useState<boolean>(false);
+  const [botSkill,setBotSkill] = useState<'auto'|'easy'|'normal'|'hard'>('auto');
   const [mode,setMode] = useState<'ONLINE'|'OFFLINE'>(initialMode==='online'? 'ONLINE':'OFFLINE');
   const [showRules,setShowRules] = useState(false);
   const [showLog,setShowLog] = useState(true);
@@ -253,6 +254,7 @@ export const NewGamePage: React.FC<{ onRestart?: ()=>void; initialNick?: string;
   if(typeof raw.allowTranslation==='boolean') setAllowTranslationOpt(raw.allowTranslation);
   if(typeof raw.withTrick==='boolean') setWithTrick(raw.withTrick);
   if(typeof raw.limitFiveBeforeBeat==='boolean') setLimitFive(raw.limitFiveBeforeBeat);
+    if(['auto','easy','normal','hard'].includes(raw.botSkill)) setBotSkill(raw.botSkill);
         if(raw.roomId && !roomId) setRoomId(String(raw.roomId));
       } catch{}
     }
@@ -265,8 +267,7 @@ export const NewGamePage: React.FC<{ onRestart?: ()=>void; initialNick?: string;
     } else {
       const generated = roomId || 'room_'+Math.random().toString(36).slice(2,8);
       setRoomId(generated);
-  setTimeout(()=> startGame({ allowTranslation: allowTranslationOpt, withBot:true, withTrick, limitFiveBeforeBeat: limitFive }), 200);
-  setTimeout(()=> startGame({ allowTranslation: allowTranslationOpt, withBot:true, withTrick, limitFiveBeforeBeat: limitFive }), 200);
+  setTimeout(()=> startGame({ allowTranslation: allowTranslationOpt, withBot:true, withTrick, limitFiveBeforeBeat: limitFive, botSkill }), 200);
     }
   };
 
