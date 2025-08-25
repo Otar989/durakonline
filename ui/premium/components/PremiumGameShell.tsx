@@ -13,6 +13,7 @@ import PlayerPanel from './PlayerPanel';
 import DeckTrumpCluster from './DeckTrumpCluster';
 import DiscardZone from './DiscardZone';
 import MiniLog from './MiniLog';
+import EndgameOverlay from './EndgameOverlay';
 
 interface Props {
   state: GameState | null;
@@ -70,7 +71,8 @@ export const PremiumGameShell: React.FC<Props> = ({ state, meId, moves, play, tr
   {me && <FanHand hand={me.hand} moves={moves} play={play} trumpSuit={trumpSuit||state?.trump.s||''} />}
       <ActionBar moves={moves} play={play} />
   {state && <MiniLog entries={state.log as any} />}
-    </div>
+  <EndgameOverlay state={state} meId={meId} />
+  </div>
   );
 };
 export default PremiumGameShell;

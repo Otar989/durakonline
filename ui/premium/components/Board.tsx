@@ -78,8 +78,25 @@ const InnerPremiumBoard: React.FC<Props> = ({ table, trumpSuit, selectableDefend
   },[]);
   const canAttackDragged = dragCard? (dragCard.roles?.attack && (table.length===0 || attackRanks.includes(dragCard.card.r))): false;
   const draggedDef = dragCard && dragCard.roles?.defend? dragCard.card: null;
+  // Portrait detection via ResizeObserver (collapses lanes vertically)
+  const [portrait,setPortrait] = useState(false);
+  useEffect(()=>{
+    if(!ref.current) return; const el = ref.current;
+    const ro = new ResizeObserver(entries=>{
+      const cr = entries[0].contentRect; setPortrait(cr.width < 560); // threshold
+    });
+    ro.observe(el); return ()=> ro.disconnect();
+  },[]);
+  const needsDefense = table.some(p=> !p.defend);
+  const [lines,setLines] = useState<{ id:string; attack:string; defend:string }[]>([]);
+  useEffect(()=>{
+    const arr: { id:string; attack:string; defend:string }[] = [];
+    table.forEach(pair=>{ if(pair.defend) arr.push({ id: pair.attack.r+pair.attack.s, attack: pair.attack.r+pair.attack.s, defend: pair.defend.r+pair.defend.s }); });
+    setLines(arr);
+  },[table]);
   return (
     <div ref={ref}
+      data-portrait={portrait||undefined}
       className={`relative w-full min-h-64 rounded-3xl p-5 premium-board border border-white/10 ${translationHint? 'ring-2 ring-fuchsia-400/50 shadow-[0_0_0_4px_rgba(217,70,239,0.15)]':''}`}
       onDragOver={e=> e.preventDefault()}
       onDrop={e=>{ const raw=e.dataTransfer.getData('application/x-card'); if(!raw) return; try { const { card } = JSON.parse(raw); onAttack(card); } catch{} }}
@@ -88,12 +105,15 @@ const InnerPremiumBoard: React.FC<Props> = ({ table, trumpSuit, selectableDefend
       {translationHint && <div className="pointer-events-none absolute inset-0 rounded-3xl bg-gradient-to-br from-fuchsia-500/10 to-purple-500/5 animate-pulse" />}
       <div className="discard-anchor absolute top-2 right-3 w-10 h-14 rounded-lg bg-gradient-to-br from-amber-500/30 to-amber-700/20 border border-amber-400/30 flex items-center justify-center text-[10px] uppercase tracking-wide font-medium text-amber-200/70">Бито</div>
       {/* Лейны */}
-      <div className="absolute inset-0 pointer-events-none grid grid-cols-2 gap-4 opacity-[0.08]">
-        <div className="rounded-2xl bg-sky-400" aria-hidden />
-        <div className="rounded-2xl bg-emerald-400" aria-hidden />
+      <div className={`absolute inset-0 pointer-events-none ${portrait? 'grid grid-rows-2 gap-3':'grid grid-cols-2 gap-4'} opacity-[0.07]`}>
+        <div className={`rounded-2xl bg-sky-400 transition-opacity ${needsDefense? 'opacity-30':'opacity-60'}`} aria-hidden />
+        <div className={`rounded-2xl bg-emerald-400 transition-opacity ${needsDefense? 'opacity-70 animate-pulse':'opacity-25'}`} aria-hidden />
       </div>
-      <div className="relative grid grid-cols-2 gap-4">
+  <div className={`relative ${portrait? 'flex flex-col gap-3':'grid grid-cols-2 gap-4'}`}>
         <div className="space-y-4" aria-label="Полоса атаки">
+          <div className="sticky top-0 z-10 flex items-center gap-2 text-[10px] uppercase tracking-wide font-medium text-sky-200/80 pl-1">
+            <span className="px-2 py-0.5 rounded-full bg-sky-500/15 border border-sky-400/30 backdrop-blur-sm">Атака</span>
+          </div>
           <AnimatePresence initial={false}>
           {table.map((pair,i)=> (
             <motion.div key={'atk'+pair.attack.r+pair.attack.s}
@@ -106,12 +126,17 @@ const InnerPremiumBoard: React.FC<Props> = ({ table, trumpSuit, selectableDefend
                 {accuse && accuse.some(a=> a.card.r===pair.attack.r && a.card.s===pair.attack.s) && (
                   <button type="button" className="absolute -bottom-2 left-1/2 -translate-x-1/2 px-1.5 py-0.5 rounded bg-red-600 hover:bg-red-500 text-[10px] text-white shadow" onClick={()=>{ const entry = accuse.find(a=> a.card.r===pair.attack.r && a.card.s===pair.attack.s); if(entry) entry.play(); }}>⚠</button>
                 )}
+                {pair.defend && !portrait && <span className="absolute top-1/2 -right-3 -translate-y-1/2 text-xs text-emerald-300/70">➜</span>}
+                {pair.defend && portrait && <span className="absolute -bottom-3 left-1/2 -translate-x-1/2 text-[10px] text-emerald-300/70">↓</span>}
               </div>
             </motion.div>
           ))}
           </AnimatePresence>
         </div>
-        <div className="space-y-4" aria-label="Полоса защиты">
+        <div className="space-y-4" aria-label="Полоса защиты" data-active={needsDefense||undefined}>
+          <div className="sticky top-0 z-10 flex items-center gap-2 text-[10px] uppercase tracking-wide font-medium text-emerald-200/80 pl-1">
+            <span className={`px-2 py-0.5 rounded-full border backdrop-blur-sm ${needsDefense? 'bg-emerald-500/25 border-emerald-400/50 shadow-[0_0_0_1px_rgba(16,185,129,0.4)] animate-pulse':'bg-emerald-500/10 border-emerald-400/30'}`}>Защита{needsDefense? '*':''}</span>
+          </div>
           <AnimatePresence initial={false}>
           {table.map((pair,i)=>{
             const defendOpts = selectableDefend.filter(s=> s.target.r===pair.attack.r && s.target.s===pair.attack.s);
@@ -142,6 +167,23 @@ const InnerPremiumBoard: React.FC<Props> = ({ table, trumpSuit, selectableDefend
           </AnimatePresence>
         </div>
       </div>
+      {/* SVG connection lines overlay (attack->defend) */}
+      {lines.length>0 && <svg className="pointer-events-none absolute inset-0 w-full h-full" aria-hidden>
+        {lines.map(l=>{
+          const aEl = ref.current?.querySelector(`[data-card-id='${l.attack}']`);
+            const dEl = ref.current?.querySelector(`[data-card-id='${l.defend}']`);
+            if(!aEl || !dEl) return null;
+            const ar = (aEl as HTMLElement).getBoundingClientRect();
+            const dr = (dEl as HTMLElement).getBoundingClientRect();
+            // convert to svg coords (svg covers same box, so page coords translate via offset)
+            const host = ref.current!.getBoundingClientRect();
+            const x1 = ar.right - host.left; const y1 = ar.top + ar.height/2 - host.top;
+            const x2 = dr.left - host.left; const y2 = dr.top + dr.height/2 - host.top;
+            const mx = (x1+x2)/2; const c1y = y1 + (y2 - y1)*0.15;
+            const path = `M ${x1} ${y1} Q ${mx} ${c1y} ${x2} ${y2}`;
+            return <path key={l.id} d={path} stroke="rgba(52,211,153,0.6)" strokeWidth={3} strokeLinecap="round" fill="none" className="mix-blend-screen" />;
+        })}
+      </svg>}
       {table.length===0 && <div className={`absolute inset-0 flex items-center justify-center pointer-events-none text-xs ${dragCard? (canAttackDragged? 'text-emerald-300':'text-red-400'):'opacity-40'}`}>{dragCard? (canAttackDragged? 'Атакуйте':'Нельзя атаковать'):'Пустой стол'}</div>}
     </div>
   );
