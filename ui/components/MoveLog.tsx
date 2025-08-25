@@ -33,7 +33,7 @@ export const MoveLog: React.FC<{ entries: Entry[]|undefined; me?: string }> = ({
   </div>;
 };
 
-const sym = { ATTACK:'⚔️', DEFEND:'🛡️', TAKE:'📥', END_TURN:'✅', TRANSLATE:'🔁' } as const;
+const sym = { ATTACK:'⚔️', DEFEND:'🛡️', TAKE:'📥', END_TURN:'✅', TRANSLATE:'🔁', CHEAT_ATTACK:'🕳️', ACCUSE:'⚠️' } as const;
 
 function CardSpan({ r, s }: { r:string; s:string }){
   return <span className="inline-block px-1 rounded bg-white/5 border border-white/10 mx-0.5">{r}{s}</span>;
@@ -45,7 +45,9 @@ const MoveBadge: React.FC<{ move: Move }> = ({ move }) => {
     case 'DEFEND': return <span className="flex items-center gap-1 text-sky-200"><span>{sym.DEFEND}</span> {<CardSpan r={move.target.r} s={move.target.s} />} → <CardSpan r={move.card.r} s={move.card.s} /></span>;
     case 'TAKE': return <span className="flex items-center gap-1 text-red-300"><span>{sym.TAKE}</span> берёт</span>;
     case 'END_TURN': return <span className="flex items-center gap-1 text-emerald-300"><span>{sym.END_TURN}</span> бито</span>;
-    case 'TRANSLATE': return <span className="flex items-center gap-1 text-fuchsia-300"><span>{sym.TRANSLATE}</span> перевод <CardSpan r={move.card.r} s={move.card.s} /></span>;
+  case 'TRANSLATE': return <span className="flex items-center gap-1 text-fuchsia-300"><span>{sym.TRANSLATE}</span> перевод <CardSpan r={move.card.r} s={move.card.s} /></span>;
+  case 'CHEAT_ATTACK': return <span className="flex items-center gap-1 text-rose-300"><span>{sym.CHEAT_ATTACK}</span> чит-атака <CardSpan r={move.card.r} s={move.card.s} /></span>;
+  case 'ACCUSE': return <span className="flex items-center gap-1 text-rose-200"><span>{sym.ACCUSE}</span> обвиняет <CardSpan r={move.card.r} s={move.card.s} /></span>;
   }
   const _never: never = move; return _never;
 };

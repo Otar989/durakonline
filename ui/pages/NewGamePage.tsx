@@ -122,6 +122,8 @@ export const NewGamePage: React.FC<{ onRestart?: ()=>void; initialNick?: string;
     else if(m.type==='TAKE') playSound('take');
     else if(m.type==='END_TURN') playSound('bito');
   else if(m.type==='TRANSLATE') playSound('translate');
+  else if(m.type==='CHEAT_ATTACK') playSound('card');
+  else if(m.type==='ACCUSE') { if(activeState.cheat?.accusations?.length){ const lastAcc = activeState.cheat.accusations[activeState.cheat.accusations.length-1]; if(lastAcc.success){ push(`Читер уличён: ${lastAcc.against}`,'success'); playSound('win'); } else { push(`Ложное обвинение: ${lastAcc.by}`,'warn'); playSound('illegal'); } } }
   },[activeState?.log?.length, playSound]);
   const myId = inOnline? snapshot.players[0]?.id : 'p1';
   const moves = useMemo(()=> activeState && myId? legalMoves(activeState, myId): [], [activeState, myId]);
@@ -292,6 +294,7 @@ export const NewGamePage: React.FC<{ onRestart?: ()=>void; initialNick?: string;
     return <Sidebar trump={activeState.trump} deckCount={activeState.deck.length} discard={activeState.discard} opponent={opp? { nick: opp.nick, handCount: opp.hand.length, isBot: (opp as any).bot || (opp.nick||'').toLowerCase().includes('bot'), isOffline: (opp as any).offline }: null} />;
   })() : null;
 
+  const accuseMoves = useMemo(()=> (moves as Move[]).filter(m=> m.type==='ACCUSE') as Extract<Move,{type:'ACCUSE'}>[], [moves]);
   const tableNode = activeState ? (
     <div>
       <TableBoard table={activeState.table} trumpSuit={activeState.trump.s} translationHint={!!canTranslate}
@@ -304,6 +307,8 @@ export const NewGamePage: React.FC<{ onRestart?: ()=>void; initialNick?: string;
           const atk = (moves as Move[]).find((m): m is Extract<Move,{type:'ATTACK'}>=> m.type==='ATTACK' && m.card.r===card.r && m.card.s===card.s);
           if(atk){ inOnline? playMove(atk): playLocal(atk); }
         }}
+        accuse={accuseMoves.map(a=> ({ moveId: a.card.r+a.card.s+a.targetPlayer, card:a.card, targetPlayer:a.targetPlayer, play: ()=> { inOnline? playMove(a): playLocal(a); } }))}
+        suspectIndices={activeState.cheat?.suspects?.filter(s=> s.cheat).map(s=> s.attackIndex)}
       />
     </div>
   ) : null;

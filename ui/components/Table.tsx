@@ -5,8 +5,9 @@ import { Pair, Card } from '../../game-core/types';
 import { PlayingCard } from './TrumpPile';
 import { AnimatePresence, motion } from 'framer-motion';
 
-interface Props { table: Pair[]; trumpSuit: string; onDefend: (_target: Card, _card: Card)=>void; selectableDefend: { target: Card; defendWith: Card }[]; onAttackDrop?: (_card: Card)=>void; translationHint?: boolean }
-export const TableBoard: React.FC<Props> = ({ table, trumpSuit, onDefend, selectableDefend, onAttackDrop, translationHint }) => {
+interface AccuseEntry { moveId: string; card: Card; targetPlayer: string; play: ()=>void }
+interface Props { table: Pair[]; trumpSuit: string; onDefend: (_target: Card, _card: Card)=>void; selectableDefend: { target: Card; defendWith: Card }[]; onAttackDrop?: (_card: Card)=>void; translationHint?: boolean; accuse?: AccuseEntry[]; suspectIndices?: number[] }
+export const TableBoard: React.FC<Props> = ({ table, trumpSuit, onDefend, selectableDefend, onAttackDrop, translationHint, accuse, suspectIndices }) => {
   const [flashInvalid,setFlashInvalid] = useState(false);
   const prevTableRef = useRef<Pair[]>(table);
   const [clearing,setClearing] = useState<Card[]>([]);
@@ -124,7 +125,17 @@ export const TableBoard: React.FC<Props> = ({ table, trumpSuit, onDefend, select
               } catch{}
             }}
             >
-            <div className="absolute left-0 top-2" data-card-id={pair.attack.r+pair.attack.s}><PlayingCard card={pair.attack} trumpSuit={trumpSuit} /></div>
+            <div className={`absolute left-0 top-2 ${suspectIndices?.includes(i)? 'ring-2 ring-rose-500 rounded':''}`} data-card-id={pair.attack.r+pair.attack.s}>
+              <PlayingCard card={pair.attack} trumpSuit={trumpSuit} />
+              {suspectIndices?.includes(i) && <span className="absolute -top-2 -left-2 bg-rose-600 text-white text-[10px] px-1 rounded shadow">SUS</span>}
+              {accuse && accuse.some(a=> a.card.r===pair.attack.r && a.card.s===pair.attack.s) && (
+                <button type="button" className="absolute -bottom-2 left-1/2 -translate-x-1/2 px-1.5 py-0.5 rounded bg-red-600 hover:bg-red-500 text-[10px] text-white shadow focus-visible:outline focus-visible:outline-2 focus-visible:outline-amber-400"
+                  onClick={()=>{
+                    const entry = accuse.find(a=> a.card.r===pair.attack.r && a.card.s===pair.attack.s);
+                    if(entry){ entry.play(); try { document.dispatchEvent(new CustomEvent('durak-accuse',{ detail:{ card: entry.card, target: entry.targetPlayer } })); } catch{} }
+                  }} aria-label={`Обвинить ход ${pair.attack.r}${pair.attack.s}`}>⚠</button>
+              )}
+            </div>
             {pair.defend && <div className={`absolute left-6 top-4 rotate-6 ${flashDefendIds.includes(pair.defend.r+pair.defend.s)? 'animate-[pulse_0.7s_ease-out] ring-2 ring-emerald-400 rounded':''}`} data-card-id={pair.defend.r+pair.defend.s}><PlayingCard card={pair.defend} trumpSuit={trumpSuit} /></div>}
             {!pair.defend && droppable && <button
               type="button"

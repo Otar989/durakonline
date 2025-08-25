@@ -3,6 +3,7 @@ import { Server } from 'socket.io';
 import { initGame, applyMove, legalMoves } from '../game-core/engine';
 import { Move, GameState } from '../game-core/types';
 import { insertMatch } from './db';
+import { applyRatings } from './ratingApply';
 import { randomBytes } from 'crypto';
 
 interface PlayerMeta { id:string; nick:string; socketId:string; clientId?:string; offline?:boolean }
@@ -81,10 +82,10 @@ io.on('connection', socket=>{
       applyMove(room.state, move, pid);
       touch(room);
       io.to(roomId).emit('move_applied', { state: room.state, lastMove: move });
-      if(room.state.phase==='finished'){
+    if(room.state.phase==='finished'){
         io.to(roomId).emit('game_over', { state: room.state, winner: room.state.winner, loser: room.state.loser });
         // async persist match (MVP)
-        try { void insertMatch({
+  try { void insertMatch({
           started_at: new Date(room.state.log?.[0]?.t || Date.now()),
           finished_at: new Date(),
           mode: room.state.options?.withTrick? 'cheat': (room.state.allowTranslation? 'passing':'basic'),
@@ -94,7 +95,7 @@ io.on('connection', socket=>{
           result: { winner: room.state.winner, loser: room.state.loser, order: room.state.finished },
           state_hash: stateHash(room.state),
           logs: (room.state.log||[]).slice(-50),
-        }); } catch{}
+  }).then(ins=>{ if((ins as any)?.data?.id){ void applyRatings((ins as any).data.id, room.state!); } }); } catch{}
       }
       // если бот участвует и его очередь — сделать ход спустя задержку
       if(room.bot && room.state.phase==='playing'){
@@ -110,8 +111,7 @@ io.on('connection', socket=>{
                 io.to(room.id).emit('move_applied', { state: room.state, lastMove: pick });
                 if(room.state.phase==='finished'){
                   io.to(room.id).emit('game_over', { state: room.state, winner: room.state.winner, loser: room.state.loser });
-                  try {
-                    void insertMatch({
+                  try { void insertMatch({
                       started_at: new Date(room.state.log?.[0]?.t || Date.now()),
                       finished_at: new Date(),
                       mode: room.state.options?.withTrick? 'cheat': (room.state.allowTranslation? 'passing':'basic'),
@@ -121,7 +121,7 @@ io.on('connection', socket=>{
                       result: { winner: room.state.winner, loser: room.state.loser, order: room.state.finished },
                       state_hash: stateHash(room.state),
                       logs: (room.state.log||[]).slice(-50)
-                    });
+                    }).then(ins=>{ if((ins as any)?.data?.id){ void applyRatings((ins as any).data.id, room.state!); } });
                   } catch{}
                 }
               }
@@ -140,8 +140,7 @@ io.on('connection', socket=>{
     room.state.winner = otherId(room.state, pid);
     room.state.log = room.state.log || []; room.state.log.push({ by: pid, move: { type: 'TAKE' } as any, t: Date.now() });
     io.to(roomId).emit('game_over', { state: room.state, winner: room.state.winner, loser: room.state.loser });
-    try {
-      void insertMatch({
+    try { void insertMatch({
         started_at: new Date(room.state.log?.[0]?.t || Date.now()),
         finished_at: new Date(),
   mode: room.state.options?.withTrick? 'cheat': (room.state.allowTranslation? 'passing':'basic'),
@@ -151,7 +150,7 @@ io.on('connection', socket=>{
         result: { winner: room.state.winner, loser: room.state.loser, surrender: true, order: room.state.finished },
         state_hash: stateHash(room.state),
         logs: (room.state.log||[]).slice(-50)
-      });
+      }).then(ins=>{ if((ins as any)?.data?.id){ void applyRatings((ins as any).data.id, room.state!); } });
     } catch{}
   });
 
@@ -238,7 +237,28 @@ function tryBotTurn(room: Room){
   setTimeout(()=>{
     if(!room.state) return; try {
       const lm = legalMoves(room.state!, room.bot!.id);
-      const pick = pickBotMove(room.state!, lm, room.bot!.id); if(pick){ applyMove(room.state!, pick, room.bot!.id); io.to(room.id).emit('move_applied', { state: room.state, lastMove: pick }); if(room.state.phase==='finished'){ io.to(room.id).emit('game_over', { state: room.state, winner: room.state.winner, loser: room.state.loser }); try { void insertMatch({ started_at: new Date(room.state.log?.[0]?.t || Date.now()), finished_at: new Date(), mode: room.state.allowTranslation? 'passing':'basic', deck_size: 36, room_id: room.id, players: room.state.players.map(p=>({ id:p.id, nick:p.nick })), result: { winner: room.state.winner, loser: room.state.loser, order: room.state.finished }, state_hash: stateHash(room.state), logs: (room.state.log||[]).slice(-50) }); } catch{} } tryBotTurn(room); }
+      const pick = pickBotMove(room.state!, lm, room.bot!.id);
+      if(pick){
+        applyMove(room.state!, pick, room.bot!.id);
+        io.to(room.id).emit('move_applied', { state: room.state, lastMove: pick });
+        if(room.state.phase==='finished'){
+          io.to(room.id).emit('game_over', { state: room.state, winner: room.state.winner, loser: room.state.loser });
+          try {
+            void insertMatch({
+              started_at: new Date(room.state.log?.[0]?.t || Date.now()),
+              finished_at: new Date(),
+              mode: room.state.options?.withTrick? 'cheat': (room.state.allowTranslation? 'passing':'basic'),
+              deck_size: (room.state.options?.deckSize)||36,
+              room_id: room.id,
+              players: room.state.players.map(p=>({ id:p.id, nick:p.nick })),
+              result: { winner: room.state.winner, loser: room.state.loser, order: room.state.finished },
+              state_hash: stateHash(room.state),
+              logs: (room.state.log||[]).slice(-50)
+            }).then(ins=>{ if((ins as any)?.data?.id){ void applyRatings((ins as any).data.id, room.state!); } });
+          } catch{}
+        }
+        tryBotTurn(room);
+      }
     } catch{}
   }, 550);
 }
