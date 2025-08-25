@@ -16,6 +16,7 @@ interface Room {
   waitBotTimer?: NodeJS.Timeout;
   busy?: boolean; // простая защита от гонок
   lastMoveAt?: Record<string, number>; // для rate-limit
+  options?: { allowTranslation?: boolean; withTrick?: boolean; limitFiveBeforeBeat?: boolean; deckSize?: 24|36|52; maxPlayers?: number };
 }
 
 const rooms = new Map<string, Room>();
@@ -37,7 +38,8 @@ io.on('connection', socket=>{
       const pm = room.players.get(pid)!; pm.socketId = socket.id; room.players.set(pid, pm);
       socket.join(roomId); touch(room); socket.emit('room_state', snapshot(room)); socket.emit('invite_link', { url: `${process.env.PUBLIC_ORIGIN||'http://localhost:3000'}?room=${roomId}` }); return;
     }
-    if(room.players.size>=2){ socket.emit('room_full'); return; }
+  const maxPlayers = room.options?.maxPlayers || 6;
+  if(room.players.size>=maxPlayers){ socket.emit('room_full'); return; }
     room.players.set(pid, { id: pid, nick, socketId: socket.id, clientId });
     socket.join(roomId);
     touch(room);
@@ -46,14 +48,16 @@ io.on('connection', socket=>{
     scheduleAutoBot(room);
   });
 
-  socket.on('start_game', ({ roomId, withBot, allowTranslation }: { roomId:string; withBot?:boolean; allowTranslation?: boolean })=>{
+  socket.on('start_game', ({ roomId, withBot, allowTranslation, withTrick, limitFiveBeforeBeat, deckSize }: { roomId:string; withBot?:boolean; allowTranslation?: boolean; withTrick?: boolean; limitFiveBeforeBeat?: boolean; deckSize?:24|36|52 })=>{
     const room = rooms.get(roomId); if(!room) return;
     if(room.state) return;
+    // fix опции (persist in room.options)
+    room.options = { ...(room.options||{}), allowTranslation, withTrick, limitFiveBeforeBeat, deckSize, maxPlayers: room.options?.maxPlayers };
     if(withBot && !room.bot){ room.bot = { id:'bot', nick:'Bot' }; }
     const list = [...room.players.values()].map(p=>({ id:p.id, nick:p.nick }));
     if(room.bot) list.push(room.bot);
-    if(list.length!==2) return; // need exactly 2 to start
-    room.state = initGame(list, true, { allowTranslation: !!allowTranslation });
+    if(list.length < 2) return; // нужно минимум 2
+    room.state = initGame(list, true, { allowTranslation: !!allowTranslation, withTrick: !!withTrick, limitFiveBeforeBeat: !!limitFiveBeforeBeat, deckSize: (deckSize||36) as any });
     touch(room);
     io.to(roomId).emit('game_started', snapshot(room));
     io.to(roomId).emit('invite_link', { url: `${process.env.PUBLIC_ORIGIN||'http://localhost:3000'}?room=${roomId}` });
@@ -83,8 +87,8 @@ io.on('connection', socket=>{
         try { void insertMatch({
           started_at: new Date(room.state.log?.[0]?.t || Date.now()),
           finished_at: new Date(),
-          mode: room.state.allowTranslation? 'passing':'basic',
-          deck_size: 36, // current engine
+          mode: room.state.options?.withTrick? 'cheat': (room.state.allowTranslation? 'passing':'basic'),
+          deck_size: (room.state.options?.deckSize)||36,
           room_id: roomId,
           players: room.state.players.map(p=>({ id:p.id, nick:p.nick })),
           result: { winner: room.state.winner, loser: room.state.loser, order: room.state.finished },
@@ -110,8 +114,8 @@ io.on('connection', socket=>{
                     void insertMatch({
                       started_at: new Date(room.state.log?.[0]?.t || Date.now()),
                       finished_at: new Date(),
-                      mode: room.state.allowTranslation? 'passing':'basic',
-                      deck_size: 36,
+                      mode: room.state.options?.withTrick? 'cheat': (room.state.allowTranslation? 'passing':'basic'),
+                      deck_size: (room.state.options?.deckSize)||36,
                       room_id: room.id,
                       players: room.state.players.map(p=>({ id:p.id, nick:p.nick })),
                       result: { winner: room.state.winner, loser: room.state.loser, order: room.state.finished },
@@ -140,8 +144,8 @@ io.on('connection', socket=>{
       void insertMatch({
         started_at: new Date(room.state.log?.[0]?.t || Date.now()),
         finished_at: new Date(),
-        mode: room.state.allowTranslation? 'passing':'basic',
-        deck_size: 36,
+  mode: room.state.options?.withTrick? 'cheat': (room.state.allowTranslation? 'passing':'basic'),
+  deck_size: (room.state.options?.deckSize)||36,
         room_id: roomId,
         players: room.state.players.map(p=>({ id:p.id, nick:p.nick })),
         result: { winner: room.state.winner, loser: room.state.loser, surrender: true, order: room.state.finished },
