@@ -19,6 +19,7 @@ interface Room {
   lastMoveAt?: Record<string, number>; // для rate-limit
   options?: { allowTranslation?: boolean; withTrick?: boolean; limitFiveBeforeBeat?: boolean; deckSize?: 24|36|52; maxPlayers?: number; botSkill?: 'auto'|'easy'|'normal'|'hard'; };
   botStats?: { wins:number; losses:number };
+  effectiveBotSkill?: 'easy'|'normal'|'hard';
 }
 
 const rooms = new Map<string, Room>();
@@ -50,13 +51,16 @@ io.on('connection', socket=>{
     scheduleAutoBot(room);
   });
 
-  socket.on('start_game', ({ roomId, withBot, allowTranslation, withTrick, limitFiveBeforeBeat, deckSize }: { roomId:string; withBot?:boolean; allowTranslation?: boolean; withTrick?: boolean; limitFiveBeforeBeat?: boolean; deckSize?:24|36|52 })=>{
   socket.on('start_game', ({ roomId, withBot, allowTranslation, withTrick, limitFiveBeforeBeat, deckSize, botSkill }: { roomId:string; withBot?:boolean; allowTranslation?: boolean; withTrick?: boolean; limitFiveBeforeBeat?: boolean; deckSize?:24|36|52; botSkill?: 'auto'|'easy'|'normal'|'hard' })=>{
     const room = rooms.get(roomId); if(!room) return;
     if(room.state) return;
     // fix опции (persist in room.options)
     room.options = { ...(room.options||{}), allowTranslation, withTrick, limitFiveBeforeBeat, deckSize, botSkill: botSkill||room.options?.botSkill, maxPlayers: room.options?.maxPlayers };
     if(withBot && !room.bot){ room.bot = { id:'bot', nick:'Bot' }; }
+    // compute initial effective difficulty for snapshot (auto адаптация на основе winrate)
+    if(room.bot){
+      room.effectiveBotSkill = computeEffectiveSkill(room);
+    }
     const list = [...room.players.values()].map(p=>({ id:p.id, nick:p.nick }));
     if(room.bot) list.push(room.bot);
     if(list.length < 2) return; // нужно минимум 2
@@ -218,7 +222,7 @@ io.on('connection', socket=>{
 });
 
 function snapshot(room: Room){
-  return { state: room.state, players: [...room.players.values()].map(p=>({ id:p.id, nick:p.nick })), bot: room.bot? { id: room.bot.id, nick: room.bot.nick }: null };
+  return { state: room.state, players: [...room.players.values()].map(p=>({ id:p.id, nick:p.nick })), bot: room.bot? { id: room.bot.id, nick: room.bot.nick }: null, effectiveBotSkill: room.effectiveBotSkill };
 }
 
 function stateHash(st: GameState | null): string {
@@ -284,13 +288,8 @@ function pickBotMove(state: GameState, moves: Move[], pid: string): Move | undef
   let effective: 'easy'|'normal'|'hard' = 'normal';
   const room = [...rooms.values()].find(r=> r.state===state);
   if(room){
-    const cfg = room.options?.botSkill||'auto';
-    if(cfg==='easy'||cfg==='normal'||cfg==='hard') effective = cfg;
-    else if(cfg==='auto' && room.botStats){
-      const total = room.botStats.wins + room.botStats.losses;
-      const wr = total? room.botStats.wins/total: 0.5;
-      if(wr>0.65) effective = 'hard'; else if(wr<0.45) effective='easy'; else effective='normal';
-    }
+    effective = computeEffectiveSkill(room);
+    if(room.effectiveBotSkill!==effective){ room.effectiveBotSkill = effective; io.to(room.id).emit('room_state', snapshot(room)); }
   }
 
   // 1. Обвинение (ACCUSE) если доступно и есть подозрительные ходы
@@ -367,6 +366,17 @@ function compareCard(a: any, b: any, trump: string){
   return rankOrder(a.r)-rankOrder(b.r);
 }
 
+function computeEffectiveSkill(room: Room): 'easy'|'normal'|'hard' {
+  const cfg = room.options?.botSkill || 'auto';
+  if(cfg==='easy'||cfg==='normal'||cfg==='hard') return cfg;
+  // auto: winrate thresholds
+  if(room.botStats){
+    const total = room.botStats.wins + room.botStats.losses;
+    const wr = total? room.botStats.wins/total: 0.5;
+    if(wr>0.65) return 'hard'; if(wr<0.45) return 'easy'; return 'normal';
+  }
+  return 'normal';
+}
 function evaluateDefenseServer(state: GameState, move: Move, pid: string){
   try {
     const cloned: GameState = JSON.parse(JSON.stringify(state));
@@ -378,7 +388,7 @@ function evaluateDefenseServer(state: GameState, move: Move, pid: string){
     return projected;
   } catch { return 1000; }
 }
-}); // закрытие io.on('connection')
+// end helpers
 
 const port = Number(process.env.PORT||4001);
 httpServer.listen(port, ()=> console.warn('Socket server on', port));

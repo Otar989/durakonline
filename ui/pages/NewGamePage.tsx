@@ -375,6 +375,7 @@ export const NewGamePage: React.FC<{ onRestart?: ()=>void; initialNick?: string;
       <label className="flex items-center gap-2 cursor-pointer text-[11px]"><input type="checkbox" checked={showLog} onChange={e=> setShowLog(e.target.checked)} /> Лог</label>
   {activeState && <span className="opacity-60 text-[11px]">Козырь: {activeState.trump.r}{activeState.trump.s}</span>}
   {activeState && <span className="opacity-60 text-[11px]">Колода: {activeState.deck.length}</span>}
+  {inOnline && (snapshot as any)?.effectiveBotSkill && <span className="opacity-60 text-[11px]">Бот: {(snapshot as any).effectiveBotSkill}</span>}
   {!activeState && <label className="flex items-center gap-1 text-[11px]"><input type="checkbox" checked={withTrick} onChange={e=> setWithTrick(e.target.checked)} /> Чит</label>}
   {!activeState && <label className="flex items-center gap-1 text-[11px]"><input type="checkbox" checked={limitFive} onChange={e=> setLimitFive(e.target.checked)} /> 5 до побоя</label>}
     </div>
