@@ -36,6 +36,25 @@ export const PremiumBoard: React.FC<Props> = ({ table, trumpSuit, selectableDefe
         setFlashDef(cur=> [...cur, ...ids]);
         setTimeout(()=> setFlashDef(cur=> cur.filter(id=> !ids.includes(id))), 700);
       }
+    } else if(table.length===0 && prev.current.length>0){
+      // clearing: animate all previous pairs to discard anchor
+      const host = ref.current;
+      prev.current.forEach(pair=>{
+        if(!flyCard) return;
+        const attackEl = host?.querySelector(`[data-card-id='${pair.attack.r+pair.attack.s}']`) as HTMLElement|null;
+        const discardAnchor = host?.querySelector('.discard-anchor')?.getBoundingClientRect();
+        if(attackEl && discardAnchor){
+          const fr = attackEl.getBoundingClientRect();
+            flyCard({ x:fr.x, y:fr.y, w:fr.width, h:fr.height }, { x:discardAnchor.x, y:discardAnchor.y, w:discardAnchor.width, h:discardAnchor.height }, { r:pair.attack.r, s:pair.attack.s }, trumpSuit);
+        }
+        if(pair.defend){
+          const defendEl = host?.querySelector(`[data-card-id='${pair.defend.r+pair.defend.s}']`) as HTMLElement|null;
+          if(defendEl && discardAnchor){
+            const fr = defendEl.getBoundingClientRect();
+            flyCard({ x:fr.x, y:fr.y, w:fr.width, h:fr.height }, { x:discardAnchor.x, y:discardAnchor.y, w:discardAnchor.width, h:discardAnchor.height }, { r:pair.defend.r, s:pair.defend.s }, trumpSuit);
+          }
+        }
+      });
     }
     prev.current = table;
   },[table, flyCard]);
@@ -57,6 +76,7 @@ export const PremiumBoard: React.FC<Props> = ({ table, trumpSuit, selectableDefe
       onDragOver={e=> e.preventDefault()}
       onDrop={e=>{ const raw=e.dataTransfer.getData('application/x-card'); if(!raw) return; try { const { card } = JSON.parse(raw); onAttack(card); } catch{} }}
     >
+      <div className="discard-anchor absolute top-2 right-3 w-10 h-14 rounded-lg bg-gradient-to-br from-amber-500/30 to-amber-700/20 border border-amber-400/30 flex items-center justify-center text-[10px] uppercase tracking-wide font-medium text-amber-200/70">Бито</div>
       <AnimatePresence initial={false}>
       {table.map((pair,i)=>{
         const defendOpts = selectableDefend.filter(s=> s.target.r===pair.attack.r && s.target.s===pair.attack.s);

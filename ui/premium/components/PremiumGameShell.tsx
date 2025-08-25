@@ -1,5 +1,6 @@
 "use client";
 import React, { useRef } from 'react';
+import '../styles/premium-cards.css';
 import { GameState, Move } from '../../../game-core/types';
 import { useGestures } from '../hooks/useGestures';
 import TopBar from './TopBar';
