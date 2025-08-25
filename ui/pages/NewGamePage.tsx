@@ -58,6 +58,8 @@ export const NewGamePage: React.FC<{ onRestart?: ()=>void; initialNick?: string;
   const [roomId,setRoomId] = useState<string | null>(initialRoom || null);
   const [allowTranslationOpt,setAllowTranslationOpt] = useState<boolean|undefined>(undefined);
   const [nick,setNick] = useState(initialNick || 'Player');
+  const [withTrick,setWithTrick] = useState<boolean>(false);
+  const [limitFive,setLimitFive] = useState<boolean>(false);
   const [mode,setMode] = useState<'ONLINE'|'OFFLINE'>(initialMode==='online'? 'ONLINE':'OFFLINE');
   const [showRules,setShowRules] = useState(false);
   const [showLog,setShowLog] = useState(true);
@@ -212,7 +214,9 @@ export const NewGamePage: React.FC<{ onRestart?: ()=>void; initialNick?: string;
     if(cfg){
       try {
         const raw = JSON.parse(decodeURIComponent(atob(cfg)));
-        if(typeof raw.allowTranslation==='boolean') setAllowTranslationOpt(raw.allowTranslation);
+  if(typeof raw.allowTranslation==='boolean') setAllowTranslationOpt(raw.allowTranslation);
+  if(typeof raw.withTrick==='boolean') setWithTrick(raw.withTrick);
+  if(typeof raw.limitFiveBeforeBeat==='boolean') setLimitFive(raw.limitFiveBeforeBeat);
         if(raw.roomId && !roomId) setRoomId(String(raw.roomId));
       } catch{}
     }
@@ -220,12 +224,12 @@ export const NewGamePage: React.FC<{ onRestart?: ()=>void; initialNick?: string;
 
   const startUnified = () => {
     if(mode==='OFFLINE'){
-      startLocal({ allowTranslation: allowTranslationOpt });
+  startLocal({ allowTranslation: allowTranslationOpt, withTrick, limitFiveBeforeBeat: limitFive });
       push(`Первым ходит ${(localState?.meta?.firstAttacker)||'...'} (младший козырь)`,'info');
     } else {
       const generated = roomId || 'room_'+Math.random().toString(36).slice(2,8);
       setRoomId(generated);
-      setTimeout(()=> startGame({ allowTranslation: allowTranslationOpt, withBot:true }), 200);
+  setTimeout(()=> startGame({ allowTranslation: allowTranslationOpt, withBot:true, withTrick, limitFiveBeforeBeat: limitFive }), 200);
     }
   };
 
@@ -327,8 +331,10 @@ export const NewGamePage: React.FC<{ onRestart?: ()=>void; initialNick?: string;
     <div className="glass p-3 rounded-2xl text-xs flex flex-wrap gap-3 items-center justify-start">
       <label className="flex items-center gap-2 cursor-pointer text-[11px]"><input type="checkbox" checked={autosort} onChange={e=> setAutosort(e.target.checked)} /> Авто-сорт</label>
       <label className="flex items-center gap-2 cursor-pointer text-[11px]"><input type="checkbox" checked={showLog} onChange={e=> setShowLog(e.target.checked)} /> Лог</label>
-      {activeState && <span className="opacity-60 text-[11px]">Козырь: {activeState.trump.r}{activeState.trump.s}</span>}
-      {activeState && <span className="opacity-60 text-[11px]">Колода: {activeState.deck.length}</span>}
+  {activeState && <span className="opacity-60 text-[11px]">Козырь: {activeState.trump.r}{activeState.trump.s}</span>}
+  {activeState && <span className="opacity-60 text-[11px]">Колода: {activeState.deck.length}</span>}
+  {!activeState && <label className="flex items-center gap-1 text-[11px]"><input type="checkbox" checked={withTrick} onChange={e=> setWithTrick(e.target.checked)} /> Чит</label>}
+  {!activeState && <label className="flex items-center gap-1 text-[11px]"><input type="checkbox" checked={limitFive} onChange={e=> setLimitFive(e.target.checked)} /> 5 до побоя</label>}
     </div>
   );
 

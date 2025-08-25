@@ -10,6 +10,10 @@ export const Hand: React.FC<Props> = React.memo(({ hand, legal, onPlay, trumpSui
     (legal.filter(m=>m.type==='ATTACK') as Extract<Move,{type:'ATTACK'}>[])
       .map(m=> m.card.r+m.card.s)
   );
+  const legalCheat = new Set(
+    (legal.filter(m=>m.type==='CHEAT_ATTACK') as Extract<Move,{type:'CHEAT_ATTACK'}>[])
+      .map(m=> m.card.r+m.card.s)
+  );
   const legalDef = legal.filter(m=>m.type==='DEFEND') as Extract<Move,{type:'DEFEND'}>[];
   const translateMoves = legal.filter(m=> m.type==='TRANSLATE') as Extract<Move,{type:'TRANSLATE'}>[];
   const translateCards = new Set(translateMoves.map(m=> m.card.r+m.card.s));
@@ -37,7 +41,8 @@ export const Hand: React.FC<Props> = React.memo(({ hand, legal, onPlay, trumpSui
   <AnimatePresence initial={false}>
   {displayHand.map((c,idx)=>{
       const id = c.r+c.s;
-      const attackable = legalAttack.has(id);
+  const attackable = legalAttack.has(id);
+  const cheatAttackable = legalCheat.has(id);
   const defendable = legalDef.find(m=> m.card.r===c.r && m.card.s===c.s);
   const defendCoversHover = hoverAttack && defendable && defendable.target.r===hoverAttack.r && defendable.target.s===hoverAttack.s;
   // перевод: подсвечиваем если перевод разрешён и есть hover атака того же ранга (до первой защиты) — логика упрощена: если есть любой translate move и карта именно translate
@@ -51,19 +56,20 @@ export const Hand: React.FC<Props> = React.memo(({ hand, legal, onPlay, trumpSui
         animate={{ opacity:1, y:0, scale:1 }}
         exit={{ opacity:0, y:-8, scale:0.85 }}
         whileTap={{ scale:0.92 }}
-        disabled={!attackable && !defendable && !canTranslate}
-        draggable={attackable || !!defendable || canTranslate}
+  disabled={!attackable && !defendable && !canTranslate && !cheatAttackable}
+  draggable={attackable || !!defendable || canTranslate || cheatAttackable}
   onDragStart={(e: React.DragEvent)=>{ e.dataTransfer.setData('application/x-card', data); try { document.dispatchEvent(new CustomEvent('durak-drag-card',{ detail:{ id, card:c, roles:{ attack:attackable, defend:!!defendable, translate:canTranslate } } })); } catch{} }}
   onDragEnd={()=>{ try { document.dispatchEvent(new CustomEvent('durak-drag-card-end',{ detail:{ id } })); } catch{} }}
   onClick={(e)=>{ onChangeSelected?.(idx); if(attackable || defendable || canTranslate){
             const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
             let kind: 'attack'|'defend'|'translate' = attackable? 'attack': defendable? 'defend':'translate';
             setPendingFlight({ id, card:{ r:c.r, s:c.s }, kind, from:{ x:rect.x, y:rect.y, w:rect.width, h:rect.height }, trumpSuit });
-            if(attackable) onPlay({ type:'ATTACK', card: c }); else if(defendable) onPlay(defendable); else if(canTranslate) onPlay({ type:'TRANSLATE', card: c } as Move);
+    if(attackable) onPlay({ type:'ATTACK', card: c }); else if(cheatAttackable) onPlay({ type:'CHEAT_ATTACK', card: c } as Move); else if(defendable) onPlay(defendable); else if(canTranslate) onPlay({ type:'TRANSLATE', card: c } as Move);
           } else { onSelectCard?.(c); } }}
-  aria-label={`Карта ${c.r}${c.s}${attackable? ' (можно атаковать)':''}${defendable? ' (можно защитить)':''}${canTranslate? ' (можно перевести)':''}`}
-  className={`transition-all disabled:opacity-30 rounded relative focus:outline-none focus:ring-2 focus:ring-sky-300 ${attackable? 'ring-2 ring-emerald-400': defendable? (defendCoversHover? 'ring-2 ring-emerald-400 animate-pulse':'ring-2 ring-sky-400'): canTranslate? (translateHover? 'ring-2 ring-emerald-400 animate-pulse':'ring-2 ring-fuchsia-400 animate-pulse') : ''} ${selectedIndex===idx? 'outline outline-2 outline-amber-400':''}`}>        
+  aria-label={`Карта ${c.r}${c.s}${attackable? ' (можно атаковать)':''}${cheatAttackable? ' (возможна тайная атака)':''}${defendable? ' (можно защитить)':''}${canTranslate? ' (можно перевести)':''}`}
+  className={`transition-all disabled:opacity-30 rounded relative focus:outline-none focus:ring-2 focus:ring-sky-300 ${cheatAttackable? 'ring-2 ring-rose-500/70 animate-pulse': attackable? 'ring-2 ring-emerald-400': defendable? (defendCoversHover? 'ring-2 ring-emerald-400 animate-pulse':'ring-2 ring-sky-400'): canTranslate? (translateHover? 'ring-2 ring-emerald-400 animate-pulse':'ring-2 ring-fuchsia-400 animate-pulse') : ''} ${selectedIndex===idx? 'outline outline-2 outline-amber-400':''}`}>        
         <PlayingCard card={c} trumpSuit={undefined} dim={false} />
+    {cheatAttackable && !attackable && <span className="absolute -top-1 -left-1 text-[10px] bg-rose-600 text-white px-1 rounded" title="Чит-атака">CH</span>}
         {defendable && <span className="absolute -top-1 -right-1 text-[10px] bg-sky-500 text-white px-1 rounded">D</span>}
         {canTranslate && <span className="absolute -bottom-1 -right-1 text-[10px] bg-fuchsia-600 text-white px-1 rounded">TR</span>}
       </motion.button>;

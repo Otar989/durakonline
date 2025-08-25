@@ -8,9 +8,9 @@ export function useLocalGame(){
   const [me] = useState('p1');
   const [mode,setMode] = useState<'idle'|'playing'|'finished'>('idle');
 
-  const start = useCallback((opts?: { allowTranslation?: boolean; hydrate?: GameState })=>{
+  const start = useCallback((opts?: { allowTranslation?: boolean; withTrick?: boolean; limitFiveBeforeBeat?: boolean; hydrate?: GameState })=>{
     if(opts?.hydrate){ setState(opts.hydrate); setMode('playing'); return; }
-    const st = initGame([{id:'p1',nick:'Вы'},{id:'bot',nick:'Бот'}], true, { allowTranslation: !!opts?.allowTranslation });
+    const st = initGame([{id:'p1',nick:'Вы'},{id:'bot',nick:'Бот'}], true, { allowTranslation: !!opts?.allowTranslation, withTrick: !!opts?.withTrick, limitFiveBeforeBeat: !!opts?.limitFiveBeforeBeat });
     setState(st); setMode('playing');
   },[]);
 

@@ -8,6 +8,8 @@ interface CreateSettings {
   speed: 'slow'|'normal'|'fast';
   allowTranslation: boolean;
   private: boolean;
+  withTrick: boolean;
+  limitFiveBeforeBeat: boolean;
 }
 
 function randomId(len=5){
@@ -21,7 +23,7 @@ export default function CreateGamePage(){
   const router = useRouter();
   const [roomId,setRoomId] = useState(randomId());
   const [nick,setNick] = useState('');
-  const [settings,setSettings] = useState<CreateSettings>({ maxPlayers:6, deckSize:36, speed:'normal', allowTranslation:true, private:false });
+  const [settings,setSettings] = useState<CreateSettings>({ maxPlayers:6, deckSize:36, speed:'normal', allowTranslation:true, private:false, withTrick:false, limitFiveBeforeBeat:false });
   const update = <K extends keyof CreateSettings>(k:K,v:CreateSettings[K])=> setSettings(s=>({...s,[k]:v}));
 
   useEffect(()=>{ if(typeof window!=='undefined'){ const saved = localStorage.getItem('durak_nick'); if(saved) setNick(saved); } },[]);
@@ -65,6 +67,8 @@ export default function CreateGamePage(){
               </div>
             </Field>
             <Toggle label="Переводной" checked={settings.allowTranslation} onChange={v=>update('allowTranslation', v)} />
+            <Toggle label="Чит-режим" checked={settings.withTrick} onChange={v=>update('withTrick', v)} />
+            <Toggle label="Лимит 5 до побоя" checked={settings.limitFiveBeforeBeat} onChange={v=>update('limitFiveBeforeBeat', v)} />
             <Toggle label="Приватная комната" checked={settings.private} onChange={v=>update('private', v)} />
             <div className="mt-4 text-xs opacity-70 leading-relaxed">
               Эти настройки закодируются в ссылке и применятся автоматически при входе в лобби. Вы сможете их уточнить перед стартом.
