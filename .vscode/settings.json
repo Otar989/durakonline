@@ -1,8 +1,11 @@
 {
   "files.associations": {
     "*.postgres.sql": "postgresql",
-  "*rls_raw_games*.sql": "postgresql",
-  "raw_games_policies.sql": "postgresql"
+    "0002_schema_core.sql": "postgresql",
+    "0003_economy_daily.sql": "postgresql",
+    "0004_progression_levels.sql": "postgresql",
+    "*rls_raw_games*.sql": "postgresql",
+    "raw_games_policies.sql": "postgresql"
   },
   "sql.telemetry.disableTelemetry": true,
   "[postgresql]": {
@@ -12,5 +15,7 @@
     "comments": false,
     "strings": true,
     "other": true
-  }
+  },
+  "mssql.connections": [],
+  "mssql.enableDiagnostics": false
 }
