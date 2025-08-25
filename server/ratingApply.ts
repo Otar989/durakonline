@@ -48,10 +48,22 @@ export async function applyRatings(matchId: string, st: GameState){
     const profits = computeProfits(st);
     const ids = Object.keys(profits);
     if(!ids.length) return;
+    // persist profits back into match.result for analytics / anti-abuse
+    try {
+      const curResult: any = (st as any).result || {};
+      await supabaseAdmin.from('matches').update({ result: { ...curResult, profits } }).eq('id', matchId);
+    } catch{}
     const contexts: Record<string, PlayerContext> = {};
     for(const id of ids){ contexts[id] = await fetchOrInitProfile(id); }
     const hasPremiumInMatch = ids.some(id=> contexts[id].premium_until && new Date(contexts[id].premium_until!) > new Date());
     const rows: any[] = [];
+    // simple wallet fetch/init + reward formula
+    async function fetchOrInitWallet(user_id:string){
+      const { data } = await supabaseAdmin!.from('wallets').select('*').eq('user_id', user_id).maybeSingle();
+      if(!data){ await supabaseAdmin!.from('wallets').insert({ user_id, coins:0, credits:0 }); return { coins:0, credits:0 }; }
+      return { coins: Number(data.coins)||0, credits: Number(data.credits)||0 };
+    }
+    // reward = floor(profit * 10) (assumption, can tune later), premium doubles reward for that player
     for(const id of ids){
       const ctx = contexts[id];
       const isWinner = st.winner===id || (st.winner==null && ctx.rating); // draw -> no streak change (will reset below)
@@ -62,6 +74,11 @@ export async function applyRatings(matchId: string, st: GameState){
       const newRating = ctx.rating + dR;
       const newStreak = profit>0? ctx.streak+1 : 0;
       await supabaseAdmin.from('profiles').update({ rating: newRating, streak: newStreak, updated_at: new Date().toISOString() }).eq('user_id', id);
+      // economy reward
+      const wallet = await fetchOrInitWallet(id);
+      let reward = Math.floor(profit * 10);
+      if(ctx.premium_until && new Date(ctx.premium_until) > new Date()) reward = reward * 2;
+      if(reward>0){ await supabaseAdmin.from('wallets').update({ coins: wallet.coins + reward, updated_at: new Date().toISOString() }).eq('user_id', id); }
     }
     if(rows.length) await supabaseAdmin.from('ratings').insert(rows);
   } catch (e) {
