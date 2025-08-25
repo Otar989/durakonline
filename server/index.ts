@@ -106,6 +106,10 @@ io.on('connection', socket=>{
         if(room.bot){
           room.botStats = room.botStats || { wins:0, losses:0 };
           if(room.state.winner===room.bot.id) room.botStats.wins++; else if(room.state.loser===room.bot.id) room.botStats.losses++;
+          const prevSkill = room.effectiveBotSkill;
+          room.effectiveBotSkill = computeEffectiveSkill(room);
+          io.to(room.id).emit('room_state', snapshot(room));
+          if(prevSkill!==room.effectiveBotSkill){ io.to(room.id).emit('bot_skill_changed', { skill: room.effectiveBotSkill }); }
         }
       }
       // если бот участвует и его очередь — сделать ход спустя задержку
@@ -134,7 +138,14 @@ io.on('connection', socket=>{
                       state_hash: stateHash(room.state),
                       logs: (room.state.log||[]).slice(-50)
                     }).then(ins=>{ if((ins as any)?.data?.id){ void applyRatings((ins as any).data.id, room.state!); } });
-                    if(room.bot){ room.botStats = room.botStats || { wins:0, losses:0 }; if(room.state.winner===room.bot.id) room.botStats.wins++; else if(room.state.loser===room.bot.id) room.botStats.losses++; }
+                    if(room.bot){
+                      room.botStats = room.botStats || { wins:0, losses:0 };
+                      if(room.state.winner===room.bot.id) room.botStats.wins++; else if(room.state.loser===room.bot.id) room.botStats.losses++;
+                      const prevSkill = room.effectiveBotSkill;
+                      room.effectiveBotSkill = computeEffectiveSkill(room);
+                      io.to(room.id).emit('room_state', snapshot(room));
+                      if(prevSkill!==room.effectiveBotSkill){ io.to(room.id).emit('bot_skill_changed', { skill: room.effectiveBotSkill }); }
+                    }
                   } catch{}
                 }
               }
@@ -165,6 +176,14 @@ io.on('connection', socket=>{
         logs: (room.state.log||[]).slice(-50)
       }).then(ins=>{ if((ins as any)?.data?.id){ void applyRatings((ins as any).data.id, room.state!); } });
     } catch{}
+    if(room.bot){
+      room.botStats = room.botStats || { wins:0, losses:0 };
+      if(room.state.winner===room.bot.id) room.botStats.wins++; else if(room.state.loser===room.bot.id) room.botStats.losses++;
+      const prevSkill = room.effectiveBotSkill;
+      room.effectiveBotSkill = computeEffectiveSkill(room);
+      io.to(room.id).emit('room_state', snapshot(room));
+      if(prevSkill!==room.effectiveBotSkill){ io.to(room.id).emit('bot_skill_changed', { skill: room.effectiveBotSkill }); }
+    }
   });
 
   socket.on('ping', ({ roomId, nonce }: { roomId:string; nonce?:string })=>{
@@ -222,7 +241,7 @@ io.on('connection', socket=>{
 });
 
 function snapshot(room: Room){
-  return { state: room.state, players: [...room.players.values()].map(p=>({ id:p.id, nick:p.nick })), bot: room.bot? { id: room.bot.id, nick: room.bot.nick }: null, effectiveBotSkill: room.effectiveBotSkill };
+  return { state: room.state, players: [...room.players.values()].map(p=>({ id:p.id, nick:p.nick })), bot: room.bot? { id: room.bot.id, nick: room.bot.nick }: null, effectiveBotSkill: room.effectiveBotSkill, botStats: room.botStats };
 }
 
 function stateHash(st: GameState | null): string {
@@ -268,7 +287,14 @@ function tryBotTurn(room: Room){
               state_hash: stateHash(room.state),
               logs: (room.state.log||[]).slice(-50)
             }).then(ins=>{ if((ins as any)?.data?.id){ void applyRatings((ins as any).data.id, room.state!); } });
-            if(room.bot){ room.botStats = room.botStats || { wins:0, losses:0 }; if(room.state.winner===room.bot.id) room.botStats.wins++; else if(room.state.loser===room.bot.id) room.botStats.losses++; }
+            if(room.bot){
+              room.botStats = room.botStats || { wins:0, losses:0 };
+              if(room.state.winner===room.bot.id) room.botStats.wins++; else if(room.state.loser===room.bot.id) room.botStats.losses++;
+              const prevSkill = room.effectiveBotSkill;
+              room.effectiveBotSkill = computeEffectiveSkill(room);
+              io.to(room.id).emit('room_state', snapshot(room));
+              if(prevSkill!==room.effectiveBotSkill){ io.to(room.id).emit('bot_skill_changed', { skill: room.effectiveBotSkill }); }
+            }
           } catch{}
         }
         tryBotTurn(room);
