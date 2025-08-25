@@ -68,12 +68,14 @@ export const NewGamePage: React.FC<{ onRestart?: ()=>void; initialNick?: string;
   const [botSkill,setBotSkill] = useState<'auto'|'easy'|'normal'|'hard'>('auto');
   const [maxOnTable,setMaxOnTable] = useState<number>(6);
   const [speed,setSpeed] = useState<'slow'|'normal'|'fast'>('normal');
+  const [deckSize,setDeckSize] = useState<24|36|52>(36);
   const [mode,setMode] = useState<'ONLINE'|'OFFLINE'>(initialMode==='online'? 'ONLINE':'OFFLINE');
+  const [withBot,setWithBot] = useState<boolean>(true);
   const [showRules,setShowRules] = useState(false);
   const [showLog,setShowLog] = useState(true);
   const [autosort,setAutosort] = useState(true);
   const [gameEnded,setGameEnded] = useState<{ winner?:string|null; loser?:string|null }|null>(null);
-  const { state: localState, start: startLocal, play: playLocal } = useLocalGame();
+  const { state: localState, start: startLocal, play: playLocal, turnEndsAt: localTurnEndsAt } = useLocalGame(speed);
   const { snapshot, socketState, startGame, playMove, requestSync } = useSocketGame(roomId, nick);
   // device id для wallet (повторно используем client_id)
   const [deviceId,setDeviceId] = useState('');
@@ -258,9 +260,10 @@ export const NewGamePage: React.FC<{ onRestart?: ()=>void; initialNick?: string;
         if(typeof raw.allowTranslation==='boolean') setAllowTranslationOpt(raw.allowTranslation);
         if(typeof raw.withTrick==='boolean') setWithTrick(raw.withTrick);
         if(typeof raw.limitFiveBeforeBeat==='boolean') setLimitFive(raw.limitFiveBeforeBeat);
-        if(['auto','easy','normal','hard'].includes(raw.botSkill)) setBotSkill(raw.botSkill);
+  if(['auto','easy','normal','hard'].includes(raw.botSkill)) setBotSkill(raw.botSkill);
   if(raw.maxOnTable && Number(raw.maxOnTable)>=4) setMaxOnTable(Number(raw.maxOnTable));
   if(['slow','normal','fast'].includes(raw.speed)) setSpeed(raw.speed);
+  if([24,36,52].includes(raw.deckSize)) setDeckSize(raw.deckSize);
         if(raw.roomId && !roomId) setRoomId(String(raw.roomId));
       } catch{}
     }
@@ -273,20 +276,26 @@ export const NewGamePage: React.FC<{ onRestart?: ()=>void; initialNick?: string;
     } else {
       const generated = roomId || 'room_'+Math.random().toString(36).slice(2,8);
       setRoomId(generated);
-  setTimeout(()=> startGame({ allowTranslation: allowTranslationOpt, withBot:true, withTrick, limitFiveBeforeBeat: limitFive, botSkill, maxOnTable, speed }), 200);
-  // ===== TURN TIMER =====
+  setTimeout(()=> startGame({ allowTranslation: allowTranslationOpt, withBot: withBot, withTrick, limitFiveBeforeBeat: limitFive, botSkill, maxOnTable, speed, deckSize }), 200);
+    }
+  };
+  // ===== TURN TIMER (глобально, вне startUnified) =====
   const [remainingMs,setRemainingMs] = useState<number|undefined>();
   useEffect(()=>{
-    if(!inOnline){ setRemainingMs(undefined); return; }
+    if(!inOnline){
+      if(localTurnEndsAt){ setRemainingMs(Math.max(0, localTurnEndsAt - Date.now())); }
+      else setRemainingMs(undefined);
+      return;
+    }
     const ends = (snapshot as any)?.turnEndsAt as number | undefined | null;
     if(!ends){ setRemainingMs(undefined); return; }
     const tick = ()=>{ const ms = ends - Date.now(); setRemainingMs(ms>0? ms:0); };
     tick();
     const id = setInterval(tick, 500);
     return ()=> clearInterval(id);
-  },[inOnline, (snapshot as any)?.turnEndsAt, snapshot.state?.attacker, snapshot.state?.defender]);
-    }
-  };
+  },[inOnline, (snapshot as any)?.turnEndsAt, snapshot.state?.attacker, snapshot.state?.defender, localTurnEndsAt]);
+  const speedMs = speed==='fast'? 15000 : speed==='slow'? 60000 : 30000;
+  const turnProgress = remainingMs!==undefined? remainingMs / speedMs : undefined;
 
   const hasAttack = moves.some(mv=>mv.type==='ATTACK');
   const hasDefend = !hasAttack && moves.some(mv=>mv.type==='DEFEND');
@@ -407,6 +416,19 @@ export const NewGamePage: React.FC<{ onRestart?: ()=>void; initialNick?: string;
       )}
       {!activeState && <label className="flex items-center gap-1 text-[11px]"><input type="checkbox" checked={withTrick} onChange={e=> setWithTrick(e.target.checked)} /> Чит</label>}
       {!activeState && <label className="flex items-center gap-1 text-[11px]"><input type="checkbox" checked={limitFive} onChange={e=> setLimitFive(e.target.checked)} /> 5 до побоя</label>}
+      {!activeState && mode==='ONLINE' && <div className="flex items-center gap-1 text-[11px]">
+        <span className="opacity-60">Скорость:</span>
+        {(['slow','normal','fast'] as const).map(s=> <button key={s} onClick={()=> setSpeed(s)} className={`px-2 py-0.5 rounded-full border ${speed===s? 'bg-emerald-500/30 border-emerald-400':'bg-white/5 border-white/10'} capitalize`}>{s}</button>)}
+      </div>}
+      {!activeState && <div className="flex items-center gap-1 text-[11px]">
+        <span className="opacity-60">Колода:</span>
+        {[24,36,52].map(ds=> <button key={ds} onClick={()=> setDeckSize(ds as 24|36|52)} className={`px-2 py-0.5 rounded-full border ${deckSize===ds? 'bg-sky-500/30 border-sky-400':'bg-white/5 border-white/10'}`}>{ds}</button>)}
+      </div>}
+      {!activeState && <div className="flex items-center gap-1 text-[11px]">
+        <span className="opacity-60">Атак макс:</span>
+        {[6,8].map(n=> <button key={n} onClick={()=> setMaxOnTable(n)} className={`px-2 py-0.5 rounded-full border ${maxOnTable===n? 'bg-fuchsia-500/30 border-fuchsia-400':'bg-white/5 border-white/10'}`}>{n}</button>)}
+      </div>}
+      {!activeState && mode==='ONLINE' && <label className="flex items-center gap-1 text-[11px]"><input type="checkbox" checked={withBot} onChange={e=> setWithBot(e.target.checked)} /> Бот</label>}
     </div>
   );
 
@@ -444,30 +466,71 @@ export const NewGamePage: React.FC<{ onRestart?: ()=>void; initialNick?: string;
             network={socketState}
           />
           {!activeState && <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <div className="pointer-events-auto flex flex-col items-center gap-4 p-6 rounded-2xl bg-neutral-900/80 backdrop-blur border border-white/10">
-              <h2 className="text-sm font-semibold">Новая партия</h2>
-              <div className="flex gap-3 text-[11px] flex-wrap justify-center">
-                <label className="flex items-center gap-1"><span className="opacity-70">Ник</span><input value={nick} onChange={e=> setNick(e.target.value)} className="bg-white/5 rounded px-2 py-1 outline-none w-28" /></label>
-                <label className="flex items-center gap-1 cursor-pointer"><input type="checkbox" checked={withTrick} onChange={e=> setWithTrick(e.target.checked)} /> Чит</label>
-                <label className="flex items-center gap-1 cursor-pointer"><input type="checkbox" checked={limitFive} onChange={e=> setLimitFive(e.target.checked)} /> 5 до побоя</label>
-                <label className="flex items-center gap-1 cursor-pointer"><input type="checkbox" checked={!!allowTranslationOpt} onChange={e=> setAllowTranslationOpt(e.target.checked)} /> Перевод</label>
-                <label className="flex items-center gap-1 cursor-pointer"><span>Bot</span>
-                  <select value={botSkill} onChange={e=> setBotSkill(e.target.value as any)} className="bg-white/5 rounded px-1 py-0.5 outline-none">
+            <div className="pointer-events-auto flex flex-col gap-5 p-6 rounded-2xl bg-neutral-900/85 backdrop-blur border border-white/10 w-full max-w-2xl">
+              <h2 className="text-sm font-semibold">Лобби</h2>
+              <div className="grid gap-4 text-[11px]" style={{ gridTemplateColumns:'repeat(auto-fit,minmax(140px,1fr))' }}>
+                <label className="flex flex-col gap-1">
+                  <span className="opacity-60">Ник</span>
+                  <input value={nick} onChange={e=> setNick(e.target.value)} className="bg-white/5 rounded px-2 py-1 outline-none" />
+                </label>
+                <label className="flex flex-col gap-1"><span className="opacity-60">Режим</span>
+                  <select value={mode} onChange={e=> { const v = e.target.value as 'ONLINE'|'OFFLINE'; setMode(v); if(v==='ONLINE' && !roomId) setRoomId('room_'+Math.random().toString(36).slice(2,8)); }} className="bg-white/5 rounded px-2 py-1 outline-none">
+                    <option value="OFFLINE">OFFLINE</option>
+                    <option value="ONLINE">ONLINE</option>
+                  </select>
+                </label>
+                <label className="flex flex-col gap-1"><span className="opacity-60">Скорость</span>
+                  <select value={speed} onChange={e=> setSpeed(e.target.value as any)} className="bg-white/5 rounded px-2 py-1 outline-none">
+                    <option value="slow">slow</option>
+                    <option value="normal">normal</option>
+                    <option value="fast">fast</option>
+                  </select>
+                </label>
+                <label className="flex flex-col gap-1"><span className="opacity-60">Колода</span>
+                  <select value={deckSize} onChange={e=> setDeckSize(Number(e.target.value) as any)} className="bg-white/5 rounded px-2 py-1 outline-none">
+                    <option value={24}>24</option>
+                    <option value={36}>36</option>
+                    <option value={52}>52</option>
+                  </select>
+                </label>
+                <label className="flex flex-col gap-1"><span className="opacity-60">Макс. стол</span>
+                  <select value={maxOnTable} onChange={e=> setMaxOnTable(Number(e.target.value))} className="bg-white/5 rounded px-2 py-1 outline-none">
+                    <option value={6}>6</option>
+                    <option value={8}>8</option>
+                  </select>
+                </label>
+                <label className="flex flex-col gap-1"><span className="opacity-60">Бот</span>
+                  <select value={botSkill} onChange={e=> setBotSkill(e.target.value as any)} className="bg-white/5 rounded px-2 py-1 outline-none">
                     <option value="auto">auto</option>
                     <option value="easy">easy</option>
                     <option value="normal">normal</option>
                     <option value="hard">hard</option>
                   </select>
                 </label>
-                <label className="flex items-center gap-1 cursor-pointer"><span>Mode</span>
-                  <select value={mode} onChange={e=> { const v = e.target.value as 'ONLINE'|'OFFLINE'; setMode(v); if(v==='ONLINE' && !roomId) setRoomId('room_'+Math.random().toString(36).slice(2,8)); }} className="bg-white/5 rounded px-1 py-0.5 outline-none">
-                    <option value="OFFLINE">OFFLINE</option>
-                    <option value="ONLINE">ONLINE</option>
-                  </select>
-                </label>
               </div>
-              <button className="px-5 py-2 rounded-full bg-gradient-to-r from-fuchsia-500 to-sky-500 text-sm font-medium shadow-md hover:shadow-lg active:scale-95 transition" onClick={startUnified} disabled={!!activeState}>Играть</button>
-              {mode==='ONLINE' && roomId && !activeState && <button className="text-[10px] underline opacity-80" onClick={()=>{ try { navigator.clipboard.writeText(window.location.origin+'?room='+roomId); push('Ссылка скопирована','success'); } catch{} }}>Скопировать ссылку</button>}
+              <div className="flex flex-wrap gap-4 items-center text-[11px]">
+                <label className="flex items-center gap-1 cursor-pointer"><input type="checkbox" checked={withTrick} onChange={e=> setWithTrick(e.target.checked)} /> Чит</label>
+                <label className="flex items-center gap-1 cursor-pointer"><input type="checkbox" checked={limitFive} onChange={e=> setLimitFive(e.target.checked)} /> 5 до побоя</label>
+                <label className="flex items-center gap-1 cursor-pointer"><input type="checkbox" checked={!!allowTranslationOpt} onChange={e=> setAllowTranslationOpt(e.target.checked)} /> Перевод</label>
+                <label className="flex items-center gap-1 cursor-pointer"><input type="checkbox" checked={withBot} onChange={e=> setWithBot(e.target.checked)} /> Бот</label>
+              </div>
+              {mode==='ONLINE' && <div className="flex flex-col gap-2 bg-white/5 rounded p-3 max-h-40 overflow-auto" aria-label="Игроки">
+                <div className="flex items-center justify-between text-[10px] uppercase tracking-wide opacity-60">
+                  <span>Игроки</span><span>{snapshot.players.length}{withBot? '+B':''}</span>
+                </div>
+                <ul className="space-y-1">
+                  {snapshot.players.map(p=> <li key={p.id} className="flex items-center gap-2 text-[11px]"><span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />{p.nick}</li>)}
+                  {withBot && <li className="flex items-center gap-2 text-[11px]"><span className="w-1.5 h-1.5 rounded-full bg-fuchsia-400" />Bot</li>}
+                </ul>
+                {roomId && <div className="mt-2 flex items-center gap-2">
+                  <input readOnly value={window.location.origin+`?room=${roomId}`} className="flex-1 bg-black/30 rounded px-2 py-1 text-[10px] outline-none" />
+                  <button className="px-2 py-1 text-[10px] rounded bg-white/10 hover:bg-white/20" onClick={()=>{ try { navigator.clipboard.writeText(window.location.origin+`?room=${roomId}`); push('Ссылка скопирована','success'); } catch{} }}>Copy</button>
+                </div>}
+              </div>}
+              <div className="flex gap-3 items-center">
+                <button className="px-5 py-2 rounded-full bg-gradient-to-r from-fuchsia-500 to-sky-500 text-sm font-medium shadow-md disabled:opacity-40" onClick={startUnified} disabled={!!activeState || (mode==='ONLINE' && snapshot.players.length + (withBot?1:0) < 2)}>Старт</button>
+                <button className="text-[10px] underline opacity-70 hover:opacity-100" onClick={()=>{ setWithTrick(false); setLimitFive(false); setAllowTranslationOpt(true); setSpeed('normal'); setDeckSize(36); setMaxOnTable(6); setBotSkill('auto'); }}>Сброс</button>
+              </div>
             </div>
           </div>}
           {/* Gesture hint chip (premium) */}
@@ -553,7 +616,7 @@ export const NewGamePage: React.FC<{ onRestart?: ()=>void; initialNick?: string;
   <StatusBar mode={netStatus} turnOwner={activeState? activeState.attacker: undefined} hint={hint} allowTranslation={!!activeState?.allowTranslation}
           attackerNick={activeState? activeState.players.find(p=>p.id===activeState.attacker)?.nick: undefined}
           defenderNick={activeState? activeState.players.find(p=>p.id===activeState.defender)?.nick: undefined}
-          remainingMs={remainingMs}
+          remainingMs={remainingMs} turnProgress={turnProgress} totalMs={speedMs}
         />
       </header>
   <GameLayout sidebar={sidebarNode} table={tableNode} log={logNode} hand={handNode} topBar={topBarNode} />
