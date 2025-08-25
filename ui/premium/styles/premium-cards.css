@@ -3,5 +3,6 @@
   .card-premium .card-face-premium { position:relative; width:100%; height:100%; border-radius:0.85rem; background:radial-gradient(circle at 30% 25%, rgba(255,255,255,0.25), rgba(255,255,255,0.05)); display:flex; flex-direction:column; align-items:center; justify-content:center; font-weight:600; font-size:1.25rem; }
   .card-premium .rank { position:absolute; top:6px; left:8px; font-size:.8rem; }
   .card-premium .suit { position:absolute; bottom:6px; right:8px; font-size:.8rem; }
+  .card-premium .suit:contains("♥"), .card-premium .suit:contains("♦"), .card-premium .rank:contains("♥"), .card-premium .rank:contains("♦") { color:#f87171; }
   .premium-board { background:radial-gradient(circle at 50% 35%, rgba(255,255,255,0.08), rgba(0,0,0,0.4)); }
 }

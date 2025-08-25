@@ -1,5 +1,5 @@
 "use client";
-import React, { useRef } from 'react';
+import React, { useRef, useMemo } from 'react';
 import '../styles/premium-cards.css';
 import { GameState, Move } from '../../../game-core/types';
 import { useGestures } from '../hooks/useGestures';
@@ -28,7 +28,7 @@ export const PremiumGameShell: React.FC<Props> = ({ state, meId, moves, play, tr
       <TopBar bot={bot||undefined} network={network} />
       {state && <MiniHUD state={state} meId={meId} />}
       <div className="flex-1 min-h-[300px]">
-        {state? <PremiumBoard table={state.table} trumpSuit={state.trump.s} selectableDefend={moves.filter(m=> m.type==='DEFEND').map(m=> ({ target:(m as any).target, defendWith:(m as any).card }))} onDefend={(t,c)=>{ const mv = moves.find(m=> m.type==='DEFEND' && (m as any).card.r===c.r && (m as any).card.s===c.s && (m as any).target.r===t.r && (m as any).target.s===t.s); if(mv) play(mv); }} onAttack={(card)=>{ const atk = moves.find(m=> m.type==='ATTACK' && (m as any).card.r===card.r && (m as any).card.s===card.s); if(atk) play(atk); }} translationHint={!!state.allowTranslation} /> : <div className="h-full rounded-2xl bg-gradient-to-br from-neutral-800/60 to-neutral-900/40 border border-white/10 flex items-center justify-center text-xs opacity-50">Начните игру</div>}
+  {state? (()=>{ const defendMap = useMemo(()=> moves.filter(m=> m.type==='DEFEND').map(m=> ({ target:(m as any).target, defendWith:(m as any).card })), [moves]); return <PremiumBoard table={state.table} trumpSuit={state.trump.s} selectableDefend={defendMap} onDefend={(t,c)=>{ const mv = moves.find(m=> m.type==='DEFEND' && (m as any).card.r===c.r && (m as any).card.s===c.s && (m as any).target.r===t.r && (m as any).target.s===t.s); if(mv) play(mv); }} onAttack={(card)=>{ const atk = moves.find(m=> m.type==='ATTACK' && (m as any).card.r===card.r && (m as any).card.s===card.s); if(atk) play(atk); }} translationHint={!!state.allowTranslation} /> })(): <div className="h-full rounded-2xl bg-gradient-to-br from-neutral-800/60 to-neutral-900/40 border border-white/10 flex items-center justify-center text-xs opacity-50">Начните игру</div>}
       </div>
   {me && <FanHand hand={me.hand} moves={moves} play={play} trumpSuit={trumpSuit||state?.trump.s||''} />}
       <ActionBar moves={moves} play={play} />

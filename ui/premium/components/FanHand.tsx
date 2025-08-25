@@ -66,8 +66,8 @@ export const FanHand: React.FC<FanHandProps & Props> = ({ cards = [], onPlay, sc
             className={`pointer-events-auto transition-transform origin-center ${mv? 'hover:-translate-y-3':'opacity-40'}`}
             onClick={()=> mv && play(mv)} aria-label={`Карта ${c.r}${c.s}`}
           >
-            <div className="w-14">
-              <PlayingCard card={c} trumpSuit={trumpSuit} dim={!mv} />
+            <div className="w-16">
+              <PlayingCard card={c} trumpSuit={trumpSuit} dim={!mv} premium />
             </div>
           </button>;
         })}

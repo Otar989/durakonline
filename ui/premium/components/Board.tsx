@@ -90,13 +90,13 @@ export const PremiumBoard: React.FC<Props> = ({ table, trumpSuit, selectableDefe
             onDrop={e=>{ if(!droppable) return; const raw=e.dataTransfer.getData('application/x-card'); if(!raw) return; try { const { card } = JSON.parse(raw); const m = defendOpts.find(o=> o.defendWith.r===card.r && o.defendWith.s===card.s); if(m) onDefend(m.target, m.defendWith); } catch{} }}
           >
             <div className="absolute -top-3 left-3" data-card-id={pair.attack.r+pair.attack.s}>
-              <PlayingCard card={pair.attack} trumpSuit={trumpSuit} />
+              <PlayingCard card={pair.attack} trumpSuit={trumpSuit} premium />
               {cheatSuspects?.includes(i) && <span className="absolute -top-2 -left-2 bg-rose-600 text-white text-[10px] px-1 rounded shadow">SUS</span>}
               {accuse && accuse.some(a=> a.card.r===pair.attack.r && a.card.s===pair.attack.s) && (
                 <button type="button" className="absolute -bottom-2 left-1/2 -translate-x-1/2 px-1.5 py-0.5 rounded bg-red-600 hover:bg-red-500 text-[10px] text-white shadow" onClick={()=>{ const entry = accuse.find(a=> a.card.r===pair.attack.r && a.card.s===pair.attack.s); if(entry) entry.play(); }}>⚠</button>
               )}
             </div>
-            {pair.defend && <div className={`absolute left-12 top-6 rotate-6 ${flashDef.includes(pair.defend.r+pair.defend.s)? 'animate-[pulse_0.7s_ease-out] ring-2 ring-emerald-400 rounded':''}`} data-card-id={pair.defend.r+pair.defend.s}><PlayingCard card={pair.defend} trumpSuit={trumpSuit} /></div>}
+            {pair.defend && <div className={`absolute left-12 top-6 rotate-6 ${flashDef.includes(pair.defend.r+pair.defend.s)? 'animate-[pulse_0.7s_ease-out] ring-2 ring-emerald-400 rounded':''}`} data-card-id={pair.defend.r+pair.defend.s}><PlayingCard card={pair.defend} trumpSuit={trumpSuit} premium /></div>}
             {!pair.defend && droppable && <button className="absolute inset-0 rounded-xl" aria-label="Защитить" onClick={()=>{ if(defendOpts.length===1) onDefend(defendOpts[0].target, defendOpts[0].defendWith); }} />}
           </motion.div>
         );
