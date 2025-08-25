@@ -11,6 +11,7 @@ interface CreateSettings {
   withTrick: boolean;
   limitFiveBeforeBeat: boolean;
   botSkill?: 'auto'|'easy'|'normal'|'hard';
+  maxOnTable?: number; // NEW
 }
 
 function randomId(len=5){
@@ -24,7 +25,7 @@ export default function CreateGamePage(){
   const router = useRouter();
   const [roomId,setRoomId] = useState(randomId());
   const [nick,setNick] = useState('');
-  const [settings,setSettings] = useState<CreateSettings>({ maxPlayers:6, deckSize:36, speed:'normal', allowTranslation:true, private:false, withTrick:false, limitFiveBeforeBeat:false, botSkill:'auto' });
+  const [settings,setSettings] = useState<CreateSettings>({ maxPlayers:6, deckSize:36, speed:'normal', allowTranslation:true, private:false, withTrick:false, limitFiveBeforeBeat:false, botSkill:'auto', maxOnTable: 6 });
   const update = <K extends keyof CreateSettings>(k:K,v:CreateSettings[K])=> setSettings(s=>({...s,[k]:v}));
 
   useEffect(()=>{ if(typeof window!=='undefined'){ const saved = localStorage.getItem('durak_nick'); if(saved) setNick(saved); } },[]);
@@ -58,6 +59,11 @@ export default function CreateGamePage(){
             <Field label="Размер колоды">
               <div className="flex gap-2 flex-wrap">
                 {[24,36,52].map(n=> <Chip key={n} active={settings.deckSize===n} onClick={()=>update('deckSize', n as 24|36|52)}>{n}</Chip>)}
+              </div>
+            </Field>
+            <Field label="Макс. карт на столе (за ход)">
+              <div className="flex gap-2 flex-wrap">
+                {[6,8].map(n=> <Chip key={n} active={(settings.maxOnTable||6)===n} onClick={()=>update('maxOnTable', n)}>{n}</Chip>)}
               </div>
             </Field>
           </div>

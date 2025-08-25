@@ -12,6 +12,7 @@ export interface GameOptions {
   deckSize?: 24 | 36 | 52;
   limitFiveBeforeBeat?: boolean; // максимум 5 карт на столе до первой защиты в текущем розыгрыше
   withTrick?: boolean; // чит-режим
+  maxOnTable?: number; // НОВОЕ: общий лимит карт на столе за ход (по умолчанию 6)
 }
 
 export interface GameState {
@@ -33,7 +34,7 @@ export interface GameState {
   cheat?: {
     flagged: Record<string, boolean>; // игроки уже уличённые в читерстве
     accusations: { by: string; against: string; card: Card; success: boolean; t: number }[]; // история обвинений
-  suspects?: { attackIndex: number; by: string; cheat?: boolean }[]; // список подозрительных карт (индексы в table)
+    suspects?: { attackIndex: number; by: string; cheat?: boolean }[]; // список подозрительных карт (индексы в table)
   };
   log?: { by: string; move: Move; t: number }[]; // minimal chronological log
   meta?: { firstAttacker: string; lowestTrump: Card }; // стартовая инфо (для UX тостов)

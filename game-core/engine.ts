@@ -41,7 +41,7 @@ export function initGame(players: { id: string; nick: string }[], seedShuffle = 
   const gs: GameState = {
     deck, discard: [], trump, players: ps, attacker, defender, table: [], phase:'playing', loser:null, winner:null, finished:[], turnDefenderInitialHand: handOf(ps, defender).length,
     allowTranslation: !!opts?.allowTranslation,
-  options: { deckSize, allowTranslation: opts?.allowTranslation, limitFiveBeforeBeat: opts?.limitFiveBeforeBeat, withTrick: opts?.withTrick },
+    options: { deckSize, allowTranslation: opts?.allowTranslation, limitFiveBeforeBeat: opts?.limitFiveBeforeBeat, withTrick: opts?.withTrick, maxOnTable: opts?.maxOnTable ?? 6 },
     firstDefensePlayedThisTurn: false,
     log: [],
     meta: { firstAttacker: attacker, lowestTrump: lowestInfo?.card || trump }
@@ -87,7 +87,7 @@ export function legalMoves(st: GameState, playerId: string): Move[] {
   const isAttacker = st.attacker===playerId;
   const isDefender = st.defender===playerId;
   const tableCount = st.table.length;
-  let limit = Math.min(6, st.turnDefenderInitialHand);
+  let limit = Math.min(st.options?.maxOnTable ?? 6, st.turnDefenderInitialHand);
   const anyDefense = st.table.some(p=> p.defend);
   if(st.options?.limitFiveBeforeBeat && !anyDefense) limit = Math.min(limit, 5);
   if(isAttacker){

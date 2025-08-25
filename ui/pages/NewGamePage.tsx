@@ -66,6 +66,7 @@ export const NewGamePage: React.FC<{ onRestart?: ()=>void; initialNick?: string;
   const [withTrick,setWithTrick] = useState<boolean>(false);
   const [limitFive,setLimitFive] = useState<boolean>(false);
   const [botSkill,setBotSkill] = useState<'auto'|'easy'|'normal'|'hard'>('auto');
+  const [maxOnTable,setMaxOnTable] = useState<number>(6);
   const [mode,setMode] = useState<'ONLINE'|'OFFLINE'>(initialMode==='online'? 'ONLINE':'OFFLINE');
   const [showRules,setShowRules] = useState(false);
   const [showLog,setShowLog] = useState(true);
@@ -253,10 +254,11 @@ export const NewGamePage: React.FC<{ onRestart?: ()=>void; initialNick?: string;
     if(cfg){
       try {
         const raw = JSON.parse(decodeURIComponent(atob(cfg)));
-  if(typeof raw.allowTranslation==='boolean') setAllowTranslationOpt(raw.allowTranslation);
-  if(typeof raw.withTrick==='boolean') setWithTrick(raw.withTrick);
-  if(typeof raw.limitFiveBeforeBeat==='boolean') setLimitFive(raw.limitFiveBeforeBeat);
-    if(['auto','easy','normal','hard'].includes(raw.botSkill)) setBotSkill(raw.botSkill);
+        if(typeof raw.allowTranslation==='boolean') setAllowTranslationOpt(raw.allowTranslation);
+        if(typeof raw.withTrick==='boolean') setWithTrick(raw.withTrick);
+        if(typeof raw.limitFiveBeforeBeat==='boolean') setLimitFive(raw.limitFiveBeforeBeat);
+        if(['auto','easy','normal','hard'].includes(raw.botSkill)) setBotSkill(raw.botSkill);
+        if(raw.maxOnTable && Number(raw.maxOnTable)>=4) setMaxOnTable(Number(raw.maxOnTable));
         if(raw.roomId && !roomId) setRoomId(String(raw.roomId));
       } catch{}
     }
@@ -264,12 +266,12 @@ export const NewGamePage: React.FC<{ onRestart?: ()=>void; initialNick?: string;
 
   const startUnified = () => {
     if(mode==='OFFLINE'){
-  startLocal({ allowTranslation: allowTranslationOpt, withTrick, limitFiveBeforeBeat: limitFive });
+      startLocal({ allowTranslation: allowTranslationOpt, withTrick, limitFiveBeforeBeat: limitFive });
       push(`Первым ходит ${(localState?.meta?.firstAttacker)||'...'} (младший козырь)`,'info');
     } else {
       const generated = roomId || 'room_'+Math.random().toString(36).slice(2,8);
       setRoomId(generated);
-  setTimeout(()=> startGame({ allowTranslation: allowTranslationOpt, withBot:true, withTrick, limitFiveBeforeBeat: limitFive, botSkill }), 200);
+      setTimeout(()=> startGame({ allowTranslation: allowTranslationOpt, withBot:true, withTrick, limitFiveBeforeBeat: limitFive, botSkill, maxOnTable }), 200);
     }
   };
 
@@ -380,15 +382,16 @@ export const NewGamePage: React.FC<{ onRestart?: ()=>void; initialNick?: string;
     <div className="glass p-3 rounded-2xl text-xs flex flex-wrap gap-3 items-center justify-start">
       <label className="flex items-center gap-2 cursor-pointer text-[11px]"><input type="checkbox" checked={autosort} onChange={e=> setAutosort(e.target.checked)} /> Авто-сорт</label>
       <label className="flex items-center gap-2 cursor-pointer text-[11px]"><input type="checkbox" checked={showLog} onChange={e=> setShowLog(e.target.checked)} /> Лог</label>
-  {activeState && <span className="opacity-60 text-[11px]">Козырь: {activeState.trump.r}{activeState.trump.s}</span>}
-  {activeState && <span className="opacity-60 text-[11px]">Колода: {activeState.deck.length}</span>}
-  {inOnline && (snapshot as any)?.effectiveBotSkill && (
-    <span className="opacity-60 text-[11px]" title={snapshot?.botStats? `W:${(snapshot as any).botStats?.wins} L:${(snapshot as any).botStats?.losses}`:'Сложность бота'}>
-      Бот: {(snapshot as any).effectiveBotSkill}{(snapshot as any).botStats? ` (${(snapshot as any).botStats.wins}:${(snapshot as any).botStats.losses})`: ''}
-    </span>
-  )}
-  {!activeState && <label className="flex items-center gap-1 text-[11px]"><input type="checkbox" checked={withTrick} onChange={e=> setWithTrick(e.target.checked)} /> Чит</label>}
-  {!activeState && <label className="flex items-center gap-1 text-[11px]"><input type="checkbox" checked={limitFive} onChange={e=> setLimitFive(e.target.checked)} /> 5 до побоя</label>}
+      {activeState && <span className="opacity-60 text-[11px]">Козырь: {activeState.trump.r}{activeState.trump.s}</span>}
+      {activeState && <span className="opacity-60 text-[11px]">Колода: {activeState.deck.length}</span>}
+      {activeState && <span className="opacity-60 text-[11px]">Лимит на ход: {activeState.options?.maxOnTable ?? 6}</span>}
+      {inOnline && (snapshot as any)?.effectiveBotSkill && (
+        <span className="opacity-60 text-[11px]" title={snapshot?.botStats? `W:${(snapshot as any).botStats?.wins} L:${(snapshot as any).botStats?.losses}`:'Сложность бота'}>
+          Бот: {(snapshot as any).effectiveBotSkill}{(snapshot as any).botStats? ` (${(snapshot as any).botStats.wins}:${(snapshot as any).botStats.losses})`: ''}
+        </span>
+      )}
+      {!activeState && <label className="flex items-center gap-1 text-[11px]"><input type="checkbox" checked={withTrick} onChange={e=> setWithTrick(e.target.checked)} /> Чит</label>}
+      {!activeState && <label className="flex items-center gap-1 text-[11px]"><input type="checkbox" checked={limitFive} onChange={e=> setLimitFive(e.target.checked)} /> 5 до побоя</label>}
     </div>
   );
 

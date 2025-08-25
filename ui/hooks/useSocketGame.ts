@@ -62,8 +62,8 @@ export function useSocketGame(roomId: string | null, nick: string){
 
   useEffect(()=>{ if(roomId) connect(); return ()=>{ if(sref.current) sref.current.disconnect(); if(timeoutRef.current) clearTimeout(timeoutRef.current); }; },[roomId, connect]);
 
-  const startGame = (opts?: { withBot?: boolean; allowTranslation?: boolean; withTrick?: boolean; limitFiveBeforeBeat?: boolean; botSkill?: 'auto'|'easy'|'normal'|'hard' }) => {
-    if(sref.current && roomId) sref.current.emit('start_game', { roomId, withBot: opts?.withBot, allowTranslation: opts?.allowTranslation, withTrick: opts?.withTrick, limitFiveBeforeBeat: opts?.limitFiveBeforeBeat, botSkill: opts?.botSkill });
+  const startGame = (opts?: { withBot?: boolean; allowTranslation?: boolean; withTrick?: boolean; limitFiveBeforeBeat?: boolean; botSkill?: 'auto'|'easy'|'normal'|'hard'; maxOnTable?: number }) => {
+    if(sref.current && roomId) sref.current.emit('start_game', { roomId, withBot: opts?.withBot, allowTranslation: opts?.allowTranslation, withTrick: opts?.withTrick, limitFiveBeforeBeat: opts?.limitFiveBeforeBeat, botSkill: opts?.botSkill, maxOnTable: opts?.maxOnTable });
   };
   const playMove = (move: Move) => { if(sref.current && roomId) sref.current.emit('play_move', { roomId, move }); };
 

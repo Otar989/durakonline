@@ -17,7 +17,7 @@ interface Room {
   waitBotTimer?: NodeJS.Timeout;
   busy?: boolean; // простая защита от гонок
   lastMoveAt?: Record<string, number>; // для rate-limit
-  options?: { allowTranslation?: boolean; withTrick?: boolean; limitFiveBeforeBeat?: boolean; deckSize?: 24|36|52; maxPlayers?: number; botSkill?: 'auto'|'easy'|'normal'|'hard'; };
+  options?: { allowTranslation?: boolean; withTrick?: boolean; limitFiveBeforeBeat?: boolean; deckSize?: 24|36|52; maxPlayers?: number; botSkill?: 'auto'|'easy'|'normal'|'hard'; maxOnTable?: number };
   botStats?: { wins:number; losses:number };
   effectiveBotSkill?: 'easy'|'normal'|'hard';
 }
@@ -51,11 +51,11 @@ io.on('connection', socket=>{
     scheduleAutoBot(room);
   });
 
-  socket.on('start_game', ({ roomId, withBot, allowTranslation, withTrick, limitFiveBeforeBeat, deckSize, botSkill }: { roomId:string; withBot?:boolean; allowTranslation?: boolean; withTrick?: boolean; limitFiveBeforeBeat?: boolean; deckSize?:24|36|52; botSkill?: 'auto'|'easy'|'normal'|'hard' })=>{
+  socket.on('start_game', ({ roomId, withBot, allowTranslation, withTrick, limitFiveBeforeBeat, deckSize, botSkill, maxOnTable }: { roomId:string; withBot?:boolean; allowTranslation?: boolean; withTrick?: boolean; limitFiveBeforeBeat?: boolean; deckSize?:24|36|52; botSkill?: 'auto'|'easy'|'normal'|'hard'; maxOnTable?: number })=>{
     const room = rooms.get(roomId); if(!room) return;
     if(room.state) return;
     // fix опции (persist in room.options)
-    room.options = { ...(room.options||{}), allowTranslation, withTrick, limitFiveBeforeBeat, deckSize, botSkill: botSkill||room.options?.botSkill, maxPlayers: room.options?.maxPlayers };
+    room.options = { ...(room.options||{}), allowTranslation, withTrick, limitFiveBeforeBeat, deckSize, botSkill: botSkill||room.options?.botSkill, maxPlayers: room.options?.maxPlayers, maxOnTable: maxOnTable ?? (room.options?.maxOnTable ?? 6) };
     if(withBot && !room.bot){ room.bot = { id:'bot', nick:'Bot' }; }
     // compute initial effective difficulty for snapshot (auto адаптация на основе winrate)
     if(room.bot){
@@ -64,7 +64,7 @@ io.on('connection', socket=>{
     const list = [...room.players.values()].map(p=>({ id:p.id, nick:p.nick }));
     if(room.bot) list.push(room.bot);
     if(list.length < 2) return; // нужно минимум 2
-    room.state = initGame(list, true, { allowTranslation: !!allowTranslation, withTrick: !!withTrick, limitFiveBeforeBeat: !!limitFiveBeforeBeat, deckSize: (deckSize||36) as any });
+    room.state = initGame(list, true, { allowTranslation: !!allowTranslation, withTrick: !!withTrick, limitFiveBeforeBeat: !!limitFiveBeforeBeat, deckSize: (deckSize||36) as any, maxOnTable: room.options.maxOnTable });
     touch(room);
     io.to(roomId).emit('game_started', snapshot(room));
     io.to(roomId).emit('invite_link', { url: `${process.env.PUBLIC_ORIGIN||'http://localhost:3000'}?room=${roomId}` });
@@ -75,7 +75,7 @@ io.on('connection', socket=>{
     if(room.busy) return; // простая блокировка
     room.busy = true;
     try {
-      const pid = [...room.players.values()].find(p=>p.socketId===socket.id)?.id || (room.bot?.id===socket.id? room.bot.id: socket.id);
+      const pid = [...room.players.values()].find(p=>p.socketId===socket.id)?.id || (room.bot?.id===socket.id? room.bot!.id: socket.id);
       // rate limit: не чаще 5 действий в 3 секунды (пакетно)
       const now = Date.now();
       room.lastMoveAt = room.lastMoveAt || {};
