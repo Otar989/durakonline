@@ -96,9 +96,10 @@ export function legalMoves(st: GameState, playerId: string): Move[] {
     // Attack / add cards
     if(tableCount < limit){
       const ranksOnTable = new Set(st.table.flatMap(p=>[p.attack.r, p.defend?.r].filter(Boolean) as Rank[]));
+      const attackBuffer: Move[] = [];
       for(const c of meHand){
         const normal = (tableCount===0 || ranksOnTable.has(c.r));
-        if(normal) moves.push({ type:'ATTACK', card: c });
+        if(normal) attackBuffer.push({ type:'ATTACK', card: c });
         if(st.options?.withTrick){
           if(!normal) moves.push({ type:'CHEAT_ATTACK', card: c } as Move);
           else if(tableCount===0){
@@ -107,6 +108,13 @@ export function legalMoves(st: GameState, playerId: string): Move[] {
           }
         }
       }
+      // сортировка: нетрампы сначала, затем по возрастанию ранга для повышения вероятности наличия защиты
+      attackBuffer.sort((a,b)=>{
+        const at = (a as any).card.s===st.trump.s; const bt = (b as any).card.s===st.trump.s;
+        if(at!==bt) return at?1:-1;
+        return RANKS.indexOf((a as any).card.r) - RANKS.indexOf((b as any).card.r);
+      });
+      moves.push(...attackBuffer);
     }
   } else if(isDefender){
     let hasUndefended = false;
