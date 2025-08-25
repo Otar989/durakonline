@@ -1,6 +1,7 @@
 import { GameState } from '../game-core/types';
 import { supabaseAdmin } from './db';
 import { deltaR, League } from './rating';
+import { adjustLeague } from './leagueRules';
 import { detectSignals } from './antiabuse';
 
 interface ProfitResult { [pid: string]: number }
@@ -46,6 +47,9 @@ async function fetchOrInitProfile(user_id: string): Promise<PlayerContext> {
 export async function applyRatings(matchId: string, st: GameState){
   if(!supabaseAdmin) return;
   try {
+  const seasonId = process.env.CURRENT_SEASON_ID || 'default';
+  // ensure season row (idempotent)
+  try { await supabaseAdmin.from('seasons').upsert({ id: seasonId, started_at: new Date().toISOString(), ends_at: new Date(Date.now()+1000*60*60*24*90).toISOString() }); } catch{}
     const profits = computeProfits(st);
     const ids = Object.keys(profits);
     if(!ids.length) return;
@@ -72,15 +76,24 @@ export async function applyRatings(matchId: string, st: GameState){
       const dR = deltaR({ league: ctx.league, profit, hasPremiumInMatch, isSelfPremium: !!(ctx.premium_until && new Date(ctx.premium_until) > new Date()), streak: ctx.streak });
       rows.push({ user_id: id, match_id: matchId, delta: dR, k: 0, profit, multipliers: { league: ctx.league, streak: ctx.streak } });
       // update profile rating/streak
-      const newRating = ctx.rating + dR;
-      const newStreak = profit>0? ctx.streak+1 : 0;
+  const newRating = ctx.rating + dR;
+  const newStreak = profit>0? ctx.streak+1 : 0;
+  const { newLeague, changed, reason } = adjustLeague(ctx.league, newRating);
   // experience: profit*100 (rough) + deltaR rounded
   const gainExp = Math.round(profit*100 + dR);
   const { data: curExpRow } = await supabaseAdmin.from('profiles').select('experience').eq('user_id', id).maybeSingle();
   const curExp = Number(curExpRow?.experience)||0;
   const newExp = curExp + gainExp;
   const newLevel = Math.floor(newExp/1000)+1;
-  await supabaseAdmin.from('profiles').update({ rating: newRating, streak: newStreak, experience: newExp, level: newLevel, updated_at: new Date().toISOString() }).eq('user_id', id);
+  await supabaseAdmin.from('profiles').update({ rating: newRating, streak: newStreak, experience: newExp, level: newLevel, league: newLeague, updated_at: new Date().toISOString() }).eq('user_id', id);
+  // upsert leaderboard entry for season
+  try { await supabaseAdmin.from('leaderboards').upsert({ season_id: seasonId, user_id: id, rating: newRating }); } catch{}
+      if(changed){
+        try {
+          // append league change marker into match result (lightweight audit)
+          await supabaseAdmin.from('matches').update({ result: { ...(st as any).result, league_changes: [ ...((st as any).result?.league_changes||[]), { user_id: id, to: newLeague, reason } ] } }).eq('id', matchId);
+        } catch{}
+      }
       // economy reward
       const wallet = await fetchOrInitWallet(id);
       let reward = Math.floor(profit * 10);

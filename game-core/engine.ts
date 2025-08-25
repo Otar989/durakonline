@@ -92,9 +92,9 @@ export function legalMoves(st: GameState, playerId: string): Move[] {
   if(st.options?.limitFiveBeforeBeat && !anyDefense) limit = Math.min(limit, 5);
   if(isAttacker){
     // End turn if all defended and >0
-  if(tableCount>0 && st.table.every(p=>p.defend)) moves.push({ type:'END_TURN' });
+    if(tableCount>0 && st.table.every(p=>p.defend)) moves.push({ type:'END_TURN' });
     // Attack / add cards
-  if(tableCount < limit){
+    if(tableCount < limit){
       const ranksOnTable = new Set(st.table.flatMap(p=>[p.attack.r, p.defend?.r].filter(Boolean) as Rank[]));
       for(const c of meHand){
         const normal = (tableCount===0 || ranksOnTable.has(c.r));
