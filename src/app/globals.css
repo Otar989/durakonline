@@ -40,6 +40,8 @@ body {
   animation: bgMove 28s ease-in-out infinite;
 }
 
+.page-fade-out body { animation: none !important; opacity:0; transition: opacity .15s ease; }
+
 /* Theme transitions (enabled after hydration) */
 .theme-transition *, .theme-transition body { transition: background-color .5s ease, color .5s ease, border-color .5s ease, background .6s ease; }
 
@@ -205,6 +207,9 @@ button[disabled] .playing-card { cursor:not-allowed !important; filter:grayscale
 
 /* Log panel */
 .log-panel { background:rgba(0,0,0,.15); border:1px solid rgba(255,255,255,.1); padding:6px 10px; border-radius:10px; }
+
+@keyframes playerMovePulse { 0% { transform:translateY(-4px) scale(.85); opacity:0; } 50% { opacity:1; } 100% { transform:translateY(0) scale(1); opacity:1; } }
+.animate-player-move-chip { animation: playerMovePulse .4s cubic-bezier(.3,.9,.25,1) both; }
 
 
 /* Mobile tuning */

@@ -80,38 +80,68 @@ const InnerPremiumBoard: React.FC<Props> = ({ table, trumpSuit, selectableDefend
   const draggedDef = dragCard && dragCard.roles?.defend? dragCard.card: null;
   return (
     <div ref={ref}
-      className={`relative w-full min-h-64 rounded-3xl p-5 grid grid-cols-3 gap-4 premium-board border border-white/10 ${translationHint? 'ring-2 ring-fuchsia-400/50 shadow-[0_0_0_4px_rgba(217,70,239,0.15)]':''}`}
+      className={`relative w-full min-h-64 rounded-3xl p-5 premium-board border border-white/10 ${translationHint? 'ring-2 ring-fuchsia-400/50 shadow-[0_0_0_4px_rgba(217,70,239,0.15)]':''}`}
       onDragOver={e=> e.preventDefault()}
       onDrop={e=>{ const raw=e.dataTransfer.getData('application/x-card'); if(!raw) return; try { const { card } = JSON.parse(raw); onAttack(card); } catch{} }}
     >
       <div ref={liveRef} aria-live="polite" className="sr-only" />
       {translationHint && <div className="pointer-events-none absolute inset-0 rounded-3xl bg-gradient-to-br from-fuchsia-500/10 to-purple-500/5 animate-pulse" />}
       <div className="discard-anchor absolute top-2 right-3 w-10 h-14 rounded-lg bg-gradient-to-br from-amber-500/30 to-amber-700/20 border border-amber-400/30 flex items-center justify-center text-[10px] uppercase tracking-wide font-medium text-amber-200/70">Бито</div>
-      <AnimatePresence initial={false}>
-      {table.map((pair,i)=>{
-        const defendOpts = selectableDefend.filter(s=> s.target.r===pair.attack.r && s.target.s===pair.attack.s);
-        const droppable = !pair.defend && defendOpts.length>0;
-        const highlight = draggedDef && droppable && defendOpts.some(o=> o.defendWith.r===draggedDef.r && o.defendWith.s===draggedDef.s);
-        return (
-          <motion.div key={pair.attack.r+pair.attack.s}
-            layout initial={{ opacity:0, scale:0.9 }} animate={{ opacity:1, scale:1 }} exit={{ opacity:0, scale:0.85 }}
-            className={`relative rounded-xl flex items-center justify-center bg-white/5 backdrop-blur-sm border border-white/10 h-40 ${droppable? 'ring-1 ring-sky-400/40':''} ${highlight? 'ring-2 ring-emerald-400 shadow-[0_0_0_3px_rgba(16,185,129,0.25)]':''} ${cheatSuspects?.includes(i)? 'animate-pulse ring-2 ring-rose-500/60': ''}`}
-            onDragOver={e=>{ if(droppable) e.preventDefault(); }}
-            onDrop={e=>{ if(!droppable) return; const raw=e.dataTransfer.getData('application/x-card'); if(!raw) return; try { const { card } = JSON.parse(raw); const m = defendOpts.find(o=> o.defendWith.r===card.r && o.defendWith.s===card.s); if(m) onDefend(m.target, m.defendWith); } catch{} }}
-          >
-            <div className="absolute -top-3 left-3 float-soft" data-variant={i%2===0? 'fast':'slow'} data-card-id={pair.attack.r+pair.attack.s}>
-              <PlayingCard card={pair.attack} trumpSuit={trumpSuit} premium />
-              {cheatSuspects?.includes(i) && <span className="absolute -top-2 -left-2 bg-rose-600 text-white text-[10px] px-1 rounded shadow" aria-label="Подозрение в читерстве">SUS</span>}
-              {accuse && accuse.some(a=> a.card.r===pair.attack.r && a.card.s===pair.attack.s) && (
-                <button type="button" className="absolute -bottom-2 left-1/2 -translate-x-1/2 px-1.5 py-0.5 rounded bg-red-600 hover:bg-red-500 text-[10px] text-white shadow" onClick={()=>{ const entry = accuse.find(a=> a.card.r===pair.attack.r && a.card.s===pair.attack.s); if(entry) entry.play(); }}>⚠</button>
-              )}
-            </div>
-            {pair.defend && <div className={`absolute left-12 top-6 rotate-6 float-soft ${flashDef.includes(pair.defend.r+pair.defend.s)? 'animate-[pulse_0.7s_ease-out] ring-2 ring-emerald-400 rounded':''}`} data-variant={i%2===0? 'slow':'fast'} data-card-id={pair.defend.r+pair.defend.s}><PlayingCard card={pair.defend} trumpSuit={trumpSuit} premium /></div>}
-            {!pair.defend && droppable && <button className="absolute inset-0 rounded-xl" aria-label="Защитить" onClick={()=>{ if(defendOpts.length===1) onDefend(defendOpts[0].target, defendOpts[0].defendWith); }} />}
-          </motion.div>
-        );
-      })}
-      </AnimatePresence>
+      {/* Лейны */}
+      <div className="absolute inset-0 pointer-events-none grid grid-cols-2 gap-4 opacity-[0.08]">
+        <div className="rounded-2xl bg-sky-400" aria-hidden />
+        <div className="rounded-2xl bg-emerald-400" aria-hidden />
+      </div>
+      <div className="relative grid grid-cols-2 gap-4">
+        <div className="space-y-4" aria-label="Полоса атаки">
+          <AnimatePresence initial={false}>
+          {table.map((pair,i)=> (
+            <motion.div key={'atk'+pair.attack.r+pair.attack.s}
+              layout initial={{ opacity:0, x:-20, scale:.95 }} animate={{ opacity:1, x:0, scale:1 }} exit={{ opacity:0, x:-25, scale:.9 }}
+              className={`relative h-32 flex items-center pl-2 ${cheatSuspects?.includes(i)? 'animate-pulse':''}`}
+            >
+              <div className="relative float-soft" data-variant={i%2===0? 'fast':'slow'} data-card-id={pair.attack.r+pair.attack.s}>
+                <PlayingCard card={pair.attack} trumpSuit={trumpSuit} premium />
+                {cheatSuspects?.includes(i) && <span className="absolute -top-2 -left-2 bg-rose-600 text-white text-[10px] px-1 rounded shadow" aria-label="Подозрение в читерстве">SUS</span>}
+                {accuse && accuse.some(a=> a.card.r===pair.attack.r && a.card.s===pair.attack.s) && (
+                  <button type="button" className="absolute -bottom-2 left-1/2 -translate-x-1/2 px-1.5 py-0.5 rounded bg-red-600 hover:bg-red-500 text-[10px] text-white shadow" onClick={()=>{ const entry = accuse.find(a=> a.card.r===pair.attack.r && a.card.s===pair.attack.s); if(entry) entry.play(); }}>⚠</button>
+                )}
+              </div>
+            </motion.div>
+          ))}
+          </AnimatePresence>
+        </div>
+        <div className="space-y-4" aria-label="Полоса защиты">
+          <AnimatePresence initial={false}>
+          {table.map((pair,i)=>{
+            const defendOpts = selectableDefend.filter(s=> s.target.r===pair.attack.r && s.target.s===pair.attack.s);
+            const droppable = !pair.defend && defendOpts.length>0;
+            const highlight = draggedDef && droppable && defendOpts.some(o=> o.defendWith.r===draggedDef.r && o.defendWith.s===draggedDef.s);
+            return (
+              <motion.div key={'def'+pair.attack.r+pair.attack.s}
+                layout initial={{ opacity:0, x:20, scale:.95 }} animate={{ opacity:1, x:0, scale:1 }} exit={{ opacity:0, x:25, scale:.9 }}
+                className={`relative h-32 flex items-center ${droppable? '': ''}`}
+              >
+                {pair.defend ? (
+                  <div className={`relative ml-2 float-soft ${flashDef.includes(pair.defend.r+pair.defend.s)? 'animate-[pulse_0.7s_ease-out] ring-2 ring-emerald-400 rounded':''}`} data-variant={i%2===0? 'slow':'fast'} data-card-id={pair.defend.r+pair.defend.s}>
+                    <PlayingCard card={pair.defend} trumpSuit={trumpSuit} premium />
+                  </div>
+                ) : (
+                  <div
+                    className={`ml-2 w-[var(--card-w)] h-[var(--card-h)] max-w-[110px] max-h-[160px] rounded-xl border border-dashed flex items-center justify-center text-[10px] uppercase tracking-wide select-none transition-colors ${droppable? 'border-emerald-400/40 text-emerald-300/70': 'border-white/10 text-white/20'} ${highlight? 'ring-2 ring-emerald-400 shadow-[0_0_0_3px_rgba(16,185,129,0.25)]':''}`}
+                    onDragOver={e=>{ if(droppable) e.preventDefault(); }}
+                    onDrop={e=>{ if(!droppable) return; const raw=e.dataTransfer.getData('application/x-card'); if(!raw) return; try { const { card } = JSON.parse(raw); const m = defendOpts.find(o=> o.defendWith.r===card.r && o.defendWith.s===card.s); if(m) onDefend(m.target, m.defendWith); } catch{} }}
+                  >
+                    {!pair.defend && droppable? 'Бить':'—'}
+                    {(!pair.defend && droppable && defendOpts.length===1) && <button className="absolute inset-0" aria-label="Защитить" onClick={()=> onDefend(defendOpts[0].target, defendOpts[0].defendWith)} />}
+                  </div>
+                )}
+              </motion.div>
+            );
+          })}
+          </AnimatePresence>
+        </div>
+      </div>
       {table.length===0 && <div className={`absolute inset-0 flex items-center justify-center pointer-events-none text-xs ${dragCard? (canAttackDragged? 'text-emerald-300':'text-red-400'):'opacity-40'}`}>{dragCard? (canAttackDragged? 'Атакуйте':'Нельзя атаковать'):'Пустой стол'}</div>}
     </div>
   );
