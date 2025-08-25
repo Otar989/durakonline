@@ -3,8 +3,13 @@ import { initGame, applyMove, legalMoves } from '../engine';
 import { GameState, Move } from '../types';
 
 function cheatAttack(st: GameState, pid: string){
-  const lm = legalMoves(st, pid);
-  const cheat = lm.find(m=> m.type==='CHEAT_ATTACK') as any;
+  // сначала делаем обычную атаку если стол пуст для воспроизводимости
+  if(st.table.length===0){
+    const first = legalMoves(st, pid).find(m=> m.type==='ATTACK') as any;
+    applyMove(st, first, pid);
+  }
+  const lm2 = legalMoves(st, pid);
+  const cheat = lm2.find(m=> m.type==='CHEAT_ATTACK') as any;
   if(!cheat) throw new Error('CHEAT_ATTACK not offered');
   applyMove(st, cheat, pid);
   return cheat.card;
@@ -13,7 +18,7 @@ function cheatAttack(st: GameState, pid: string){
 describe('With trick mode', ()=>{
   it('successful accusation flags cheater and rolls back', ()=>{
     const st = initGame([{id:'A',nick:'A'},{id:'B',nick:'B'}], true, { withTrick:true });
-    const cheatCard = cheatAttack(st, st.attacker);
+  const cheatCard = cheatAttack(st, st.attacker);
     // второй игрок обвиняет
     applyMove(st, { type:'ACCUSE', card: cheatCard, targetPlayer: st.attacker } as Move, st.defender);
     expect(st.cheat?.flagged[st.attacker]).toBe(true);

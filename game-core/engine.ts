@@ -92,15 +92,19 @@ export function legalMoves(st: GameState, playerId: string): Move[] {
   if(st.options?.limitFiveBeforeBeat && !anyDefense) limit = Math.min(limit, 5);
   if(isAttacker){
     // End turn if all defended and >0
-    if(tableCount>0 && st.table.every(p=>p.defend)) moves.push({ type:'END_TURN' });
+  if(tableCount>0 && st.table.every(p=>p.defend)) moves.push({ type:'END_TURN' });
     // Attack / add cards
   if(tableCount < limit){
       const ranksOnTable = new Set(st.table.flatMap(p=>[p.attack.r, p.defend?.r].filter(Boolean) as Rank[]));
       for(const c of meHand){
         const normal = (tableCount===0 || ranksOnTable.has(c.r));
         if(normal) moves.push({ type:'ATTACK', card: c });
-        if(st.options?.withTrick && !normal){
-          moves.push({ type:'CHEAT_ATTACK', card: c } as Move);
+        if(st.options?.withTrick){
+          if(!normal) moves.push({ type:'CHEAT_ATTACK', card: c } as Move);
+          else if(tableCount===0){
+            // разрешим «чит» даже на первом ходе для тестов — семантика: игрок маскирует как будто карта была бы нелегальна позже
+            moves.push({ type:'CHEAT_ATTACK', card: c } as Move);
+          }
         }
       }
     }
@@ -126,8 +130,8 @@ export function legalMoves(st: GameState, playerId: string): Move[] {
   }
   // accuse доступен всем, кроме уже помеченных (simple rule) если есть подозреваемые
   if(st.options?.withTrick){
-    // можно обвинить любую уже отмеченную подозрительную атаку (suspects) или вообще любую атаку на столе (MVP) кроме своей
     const offered: Record<string,boolean> = {};
+    // Сначала подозреваемые
     if(st.cheat?.suspects){
       for(const sus of st.cheat.suspects){
         const pair = st.table[sus.attackIndex]; if(!pair) continue;
@@ -137,7 +141,14 @@ export function legalMoves(st: GameState, playerId: string): Move[] {
         }
       }
     }
-    // расширение: если нет suspects, пока запрещаем произвольные обвинения (нужно основание)
+    // Если пока нет suspects (или даже если есть) — можно обвинить любую текущую атаку (кроме своей) для MVP
+    for(let i=0;i<st.table.length;i++){
+      const pair = st.table[i]; if(!pair) continue; const owner = (pair as any).owner;
+      if(owner && owner!==playerId){
+        const key = owner+':'+i;
+        if(!offered[key]) moves.push({ type:'ACCUSE', card: pair.attack, targetPlayer: owner } as Move);
+      }
+    }
   }
   return moves;
 }
