@@ -17,7 +17,8 @@ interface Room {
   waitBotTimer?: NodeJS.Timeout;
   busy?: boolean; // простая защита от гонок
   lastMoveAt?: Record<string, number>; // для rate-limit
-  options?: { allowTranslation?: boolean; withTrick?: boolean; limitFiveBeforeBeat?: boolean; deckSize?: 24|36|52; maxPlayers?: number };
+  options?: { allowTranslation?: boolean; withTrick?: boolean; limitFiveBeforeBeat?: boolean; deckSize?: 24|36|52; maxPlayers?: number; botSkill?: 'auto'|'easy'|'normal'|'hard'; };
+  botStats?: { wins:number; losses:number };
 }
 
 const rooms = new Map<string, Room>();
@@ -50,10 +51,11 @@ io.on('connection', socket=>{
   });
 
   socket.on('start_game', ({ roomId, withBot, allowTranslation, withTrick, limitFiveBeforeBeat, deckSize }: { roomId:string; withBot?:boolean; allowTranslation?: boolean; withTrick?: boolean; limitFiveBeforeBeat?: boolean; deckSize?:24|36|52 })=>{
+  socket.on('start_game', ({ roomId, withBot, allowTranslation, withTrick, limitFiveBeforeBeat, deckSize, botSkill }: { roomId:string; withBot?:boolean; allowTranslation?: boolean; withTrick?: boolean; limitFiveBeforeBeat?: boolean; deckSize?:24|36|52; botSkill?: 'auto'|'easy'|'normal'|'hard' })=>{
     const room = rooms.get(roomId); if(!room) return;
     if(room.state) return;
     // fix опции (persist in room.options)
-    room.options = { ...(room.options||{}), allowTranslation, withTrick, limitFiveBeforeBeat, deckSize, maxPlayers: room.options?.maxPlayers };
+    room.options = { ...(room.options||{}), allowTranslation, withTrick, limitFiveBeforeBeat, deckSize, botSkill: botSkill||room.options?.botSkill, maxPlayers: room.options?.maxPlayers };
     if(withBot && !room.bot){ room.bot = { id:'bot', nick:'Bot' }; }
     const list = [...room.players.values()].map(p=>({ id:p.id, nick:p.nick }));
     if(room.bot) list.push(room.bot);
@@ -96,6 +98,11 @@ io.on('connection', socket=>{
           state_hash: stateHash(room.state),
           logs: (room.state.log||[]).slice(-50),
   }).then(ins=>{ if((ins as any)?.data?.id){ void applyRatings((ins as any).data.id, room.state!); } }); } catch{}
+        // обновим статистику бота
+        if(room.bot){
+          room.botStats = room.botStats || { wins:0, losses:0 };
+          if(room.state.winner===room.bot.id) room.botStats.wins++; else if(room.state.loser===room.bot.id) room.botStats.losses++;
+        }
       }
       // если бот участвует и его очередь — сделать ход спустя задержку
       if(room.bot && room.state.phase==='playing'){
@@ -111,7 +118,8 @@ io.on('connection', socket=>{
                 io.to(room.id).emit('move_applied', { state: room.state, lastMove: pick });
                 if(room.state.phase==='finished'){
                   io.to(room.id).emit('game_over', { state: room.state, winner: room.state.winner, loser: room.state.loser });
-                  try { void insertMatch({
+                  try {
+                    void insertMatch({
                       started_at: new Date(room.state.log?.[0]?.t || Date.now()),
                       finished_at: new Date(),
                       mode: room.state.options?.withTrick? 'cheat': (room.state.allowTranslation? 'passing':'basic'),
@@ -122,6 +130,7 @@ io.on('connection', socket=>{
                       state_hash: stateHash(room.state),
                       logs: (room.state.log||[]).slice(-50)
                     }).then(ins=>{ if((ins as any)?.data?.id){ void applyRatings((ins as any).data.id, room.state!); } });
+                    if(room.bot){ room.botStats = room.botStats || { wins:0, losses:0 }; if(room.state.winner===room.bot.id) room.botStats.wins++; else if(room.state.loser===room.bot.id) room.botStats.losses++; }
                   } catch{}
                 }
               }
@@ -255,6 +264,7 @@ function tryBotTurn(room: Room){
               state_hash: stateHash(room.state),
               logs: (room.state.log||[]).slice(-50)
             }).then(ins=>{ if((ins as any)?.data?.id){ void applyRatings((ins as any).data.id, room.state!); } });
+            if(room.bot){ room.botStats = room.botStats || { wins:0, losses:0 }; if(room.state.winner===room.bot.id) room.botStats.wins++; else if(room.state.loser===room.bot.id) room.botStats.losses++; }
           } catch{}
         }
         tryBotTurn(room);
@@ -270,6 +280,18 @@ function pickBotMove(state: GameState, moves: Move[], pid: string): Move | undef
   if(!me) return moves[0];
   const defender = state.players.find(p=> p.id===state.defender);
   const attacker = state.players.find(p=> p.id===state.attacker);
+  // адаптивная сложность: вычислим effectiveSkill
+  let effective: 'easy'|'normal'|'hard' = 'normal';
+  const room = [...rooms.values()].find(r=> r.state===state);
+  if(room){
+    const cfg = room.options?.botSkill||'auto';
+    if(cfg==='easy'||cfg==='normal'||cfg==='hard') effective = cfg;
+    else if(cfg==='auto' && room.botStats){
+      const total = room.botStats.wins + room.botStats.losses;
+      const wr = total? room.botStats.wins/total: 0.5;
+      if(wr>0.65) effective = 'hard'; else if(wr<0.45) effective='easy'; else effective='normal';
+    }
+  }
 
   // 1. Обвинение (ACCUSE) если доступно и есть подозрительные ходы
   const accuse = moves.filter(m=> m.type==='ACCUSE');
@@ -279,18 +301,31 @@ function pickBotMove(state: GameState, moves: Move[], pid: string): Move | undef
     if(Math.random()<0.05){ return accuse[0]; }
   }
 
-  // 2. Защита: минимальная карта (нетрамповая предпочтительно)
+  // 2. Защита: симуляционная оценка
   const defendMoves = moves.filter(m=> m.type==='DEFEND');
   if(defendMoves.length){
-    return defendMoves.sort((a,b)=> compareCard(a.card,b.card,state.trump.s))[0];
+    let best = defendMoves[0]; let bestScore = Infinity;
+    for(const mv of defendMoves){
+      const sc = evaluateDefenseServer(state, mv, pid);
+      if(sc < bestScore){ bestScore = sc; best = mv; }
+    }
+    return best;
   }
 
-  // 3. Перевод: если я защищаюсь и перевод сохраняет мне больше карт (когда у меня >2 и у следующего игрока больше карт)
+  // 3. Перевод: оценка выгоды vs baseline защиты
   const translateMoves = moves.filter(m=> m.type==='TRANSLATE');
-  if(translateMoves.length && me.id===state.defender){
-    if(defender && attacker && defender.hand.length >= attacker.hand.length && defender.hand.length>2){
-      translateMoves.sort((a,b)=> rankOrder(a.card.r)-rankOrder(b.card.r));
-      return translateMoves[0];
+  if(translateMoves.length && me.id===state.defender && defender && attacker){
+    if(defender.hand.length>1){
+      const baseline = me.hand.length;
+      let best = translateMoves[0]; let bestGain = -Infinity;
+      for(const mv of translateMoves){
+        // грубая эвристика вероятного будущего прироста
+        const oppCanOverwhelm = attacker.hand.length - (defender.hand.length -1) >= 2;
+        const expected = me.hand.length -1 + (oppCanOverwhelm?2:0);
+        const gain = baseline - expected;
+        if(gain > bestGain){ bestGain = gain; best = mv; }
+      }
+      if(bestGain > 0){ return best; }
     }
   }
 
@@ -298,18 +333,20 @@ function pickBotMove(state: GameState, moves: Move[], pid: string): Move | undef
   const cheatAttack = moves.filter(m=> m.type==='CHEAT_ATTACK');
   if(cheatAttack.length){
     const defHand = defender?.hand.length||0;
-    if(defHand<=3 && Math.random()<0.25){ return cheatAttack[Math.floor(Math.random()*cheatAttack.length)]; }
-    if(me.hand.length>=6 && Math.random()<0.1){ return cheatAttack[0]; }
+    const base = effective==='hard'? 0.3 : effective==='normal'? 0.22 : 0.12;
+    if(defHand<=3 && Math.random()<base){ return cheatAttack[Math.floor(Math.random()*cheatAttack.length)]; }
+    if(me.hand.length>=6 && Math.random()<(base/2)){ return cheatAttack[0]; }
   }
 
-  // 5. Обычная атака: выбираем ранг с максимальной частотой в руке (для ускорения опустошения), избегаем трат высоких козырей рано
+  // 5. Атака: комбинированный скоринг
   const attackMoves = moves.filter(m=> m.type==='ATTACK');
   if(attackMoves.length){
-    const freq: Record<string, number> = {};
-    me.hand.forEach(c=>{ freq[c.r] = (freq[c.r]||0)+1; });
-    const scored = attackMoves.map(m=> ({ m, score: (freq[m.card.r]||1)*10 - (m.card.s===state.trump.s? 5:0) - rankOrder(m.card.r) }));
-    scored.sort((a,b)=> b.score - a.score);
-    return scored[0].m;
+  const freq: Record<string, number> = {}; me.hand.forEach(c=>{ freq[c.r]=(freq[c.r]||0)+1; });
+  const variant = effective==='hard'? 1: effective==='easy'? 0.5: 0.8;
+  const arr = attackMoves.map(m=> ({ m, s: (freq[m.card.r]||1)*6 + (RANKS.length - rankOrder(m.card.r))*0.5 + (freq[m.card.r]>=2?2:0) - (m.card.s===state.trump.s?4:0) }));
+  arr.sort((a,b)=> b.s-a.s);
+  const pickIndex = Math.min(arr.length-1, Math.round((1-variant)*(arr.length-1))); // easy берёт более низкий вариант
+  return arr[pickIndex].m;
   }
 
   // 6. Закончить ход если имеется
@@ -329,6 +366,19 @@ function compareCard(a: any, b: any, trump: string){
   if(at!==bt) return at? 1:-1; // non-trump first
   return rankOrder(a.r)-rankOrder(b.r);
 }
+
+function evaluateDefenseServer(state: GameState, move: Move, pid: string){
+  try {
+    const cloned: GameState = JSON.parse(JSON.stringify(state));
+    applyMove(cloned, move, pid as any);
+    const me = cloned.players.find(p=> p.id===pid); if(!me) return 999;
+    let projected = me.hand.length;
+    if(cloned.deck.length>0 && projected<6){ projected += Math.min(6-projected, cloned.deck.length); }
+    if((move as any).card?.s === cloned.trump.s){ projected += 0.3 + (rankOrder((move as any).card.r)/10); }
+    return projected;
+  } catch { return 1000; }
+}
+}); // закрытие io.on('connection')
 
 const port = Number(process.env.PORT||4001);
 httpServer.listen(port, ()=> console.warn('Socket server on', port));

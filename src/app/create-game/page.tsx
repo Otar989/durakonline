@@ -10,6 +10,7 @@ interface CreateSettings {
   private: boolean;
   withTrick: boolean;
   limitFiveBeforeBeat: boolean;
+  botSkill?: 'auto'|'easy'|'normal'|'hard';
 }
 
 function randomId(len=5){
@@ -61,9 +62,15 @@ export default function CreateGamePage(){
             </Field>
           </div>
           <div className="flex flex-col gap-4">
+  const [settings,setSettings] = useState<CreateSettings>({ maxPlayers:6, deckSize:36, speed:'normal', allowTranslation:true, private:false, withTrick:false, limitFiveBeforeBeat:false, botSkill:'auto' });
             <Field label="Скорость">
               <div className="flex gap-2 flex-wrap">
                 {(['slow','normal','fast'] as const).map(s=> <Chip key={s} active={settings.speed===s} onClick={()=>update('speed', s)}>{s}</Chip>)}
+              </div>
+            </Field>
+            <Field label="Сложность бота">
+              <div className="flex gap-2 flex-wrap">
+                {(['auto','easy','normal','hard'] as const).map(s=> <Chip key={s} active={settings.botSkill===s} onClick={()=>update('botSkill', s)}>{s}</Chip>)}
               </div>
             </Field>
             <Toggle label="Переводной" checked={settings.allowTranslation} onChange={v=>update('allowTranslation', v)} />

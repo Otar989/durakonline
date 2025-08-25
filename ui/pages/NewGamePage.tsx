@@ -266,6 +266,7 @@ export const NewGamePage: React.FC<{ onRestart?: ()=>void; initialNick?: string;
       const generated = roomId || 'room_'+Math.random().toString(36).slice(2,8);
       setRoomId(generated);
   setTimeout(()=> startGame({ allowTranslation: allowTranslationOpt, withBot:true, withTrick, limitFiveBeforeBeat: limitFive }), 200);
+  setTimeout(()=> startGame({ allowTranslation: allowTranslationOpt, withBot:true, withTrick, limitFiveBeforeBeat: limitFive }), 200);
     }
   };
 
