@@ -8,6 +8,7 @@ import MiniHUD from './MiniHUD';
 import ActionBar from './ActionBar';
 import FanHand from './FanHand';
 import PremiumBoard from './Board';
+import AccusePanel from './AccusePanel';
 import MiniLog from './MiniLog';
 
 interface Props {
@@ -40,7 +41,10 @@ export const PremiumGameShell: React.FC<Props> = ({ state, meId, moves, play, tr
       </div>
       {state && <MiniHUD state={state} meId={meId} />}
       <div className="flex-1 min-h-[300px]">
-  {state? <PremiumBoard table={state.table} trumpSuit={state.trump.s} selectableDefend={defendMap} onDefend={handleDefend} onAttack={handleAttack} translationHint={!!state.allowTranslation} /> : <div className="h-full rounded-2xl bg-gradient-to-br from-neutral-800/60 to-neutral-900/40 border border-white/10 flex items-center justify-center text-xs opacity-50">Начните игру</div>}
+  {state? <div className="relative h-full">
+    <PremiumBoard table={state.table} trumpSuit={state.trump.s} selectableDefend={defendMap} onDefend={handleDefend} onAttack={handleAttack} translationHint={!!state.allowTranslation} cheatSuspects={state.cheat?.suspects?.map(s=> s.attackIndex)} accuse={moves.filter(m=> m.type==='ACCUSE').map(m=> ({ moveId: (m as any).id||'', card:(m as any).card, targetPlayer:(m as any).targetPlayer, play: ()=> play(m) }))} />
+    <AccusePanel state={state} moves={moves} play={play} />
+  </div> : <div className="h-full rounded-2xl bg-gradient-to-br from-neutral-800/60 to-neutral-900/40 border border-white/10 flex items-center justify-center text-xs opacity-50">Начните игру</div>}
       </div>
   {me && <FanHand hand={me.hand} moves={moves} play={play} trumpSuit={trumpSuit||state?.trump.s||''} />}
       <ActionBar moves={moves} play={play} />
