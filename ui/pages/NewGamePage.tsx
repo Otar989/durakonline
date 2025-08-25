@@ -342,7 +342,7 @@ export const NewGamePage: React.FC<{ onRestart?: ()=>void; initialNick?: string;
   const accuseMoves = useMemo(()=> (moves as Move[]).filter(m=> m.type==='ACCUSE') as Extract<Move,{type:'ACCUSE'}>[], [moves]);
   const tableNode = activeState ? (
     <div>
-  {activeState.players.length>2 && <MultiOpponents meId={myId||''} players={activeState.players.map(p=> ({ id:p.id, nick:p.nick, handCount:p.hand.length, role: p.id===activeState.attacker? 'attacker': p.id===activeState.defender? 'defender':'idle', isOffline:(p as any).offline }))} />}
+      {activeState.players.length>2 && <MultiOpponents meId={myId||''} players={activeState.players.map(p=> ({ id:p.id, nick:p.nick, handCount:p.hand.length, role: p.id===activeState.attacker? 'attacker': p.id===activeState.defender? 'defender':'idle', isOffline:(p as any).offline }))} />}
       <TableBoard table={activeState.table} trumpSuit={activeState.trump.s} translationHint={!!canTranslate}
         onDefend={(target, card)=>{
           const def = (moves as Move[]).find((m): m is Extract<Move,{type:'DEFEND'}>=> m.type==='DEFEND' && m.card.r===card.r && m.card.s===card.s && m.target.r===target.r && m.target.s===target.s);
@@ -355,6 +355,8 @@ export const NewGamePage: React.FC<{ onRestart?: ()=>void; initialNick?: string;
         }}
         accuse={accuseMoves.map(a=> ({ moveId: a.card.r+a.card.s+a.targetPlayer, card:a.card, targetPlayer:a.targetPlayer, play: ()=> { inOnline? playMove(a): playLocal(a); } }))}
         suspectIndices={activeState.cheat?.suspects?.filter(s=> s.cheat).map(s=> s.attackIndex)}
+        attackLimit={activeState.options?.maxOnTable ?? 6}
+        currentCount={activeState.table.length}
       />
     </div>
   ) : null;
@@ -531,8 +533,8 @@ export const NewGamePage: React.FC<{ onRestart?: ()=>void; initialNick?: string;
         </div>
   <div className="flex gap-3 items-center">
           <button className="btn" disabled={!!activeState} onClick={startUnified}>{activeState? 'В игре':'Играть'}</button>
-          {mode==='ONLINE' && roomId && !activeState && <button className="text-xs underline" onClick={()=>{ try { navigator.clipboard.writeText(window.location.origin+'?room='+roomId); push('Ссылка скопирована','success'); } catch {} }}>Пригласить</button>}
-          {mode==='ONLINE' && roomId && !activeState && <span className="text-[11px] opacity-60 select-all">{window.location.origin+'?room='+roomId}</span>}
+          {mode==='ONLINE' && roomId && !activeState && <button className="text-xs underline" onClick={()=>{ try { navigator.clipboard.writeText(window.origin+'?room='+roomId); push('Ссылка скопирована','success'); } catch {} }}>Пригласить</button>}
+          {mode==='ONLINE' && roomId && !activeState && <span className="text-[11px] opacity-60 select-all">{window.origin+'?room='+roomId}</span>}
           {mode==='ONLINE' && roomId && activeState && <button className="text-[10px] px-2 py-1 rounded bg-white/10 hover:bg-white/20" onClick={()=> requestSync()}>SYNC</button>}
         </div>
   <StatusBar mode={netStatus} turnOwner={activeState? activeState.attacker: undefined} hint={hint} allowTranslation={!!activeState?.allowTranslation}

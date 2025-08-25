@@ -6,14 +6,16 @@ import { PlayingCard } from './TrumpPile';
 import { AnimatePresence, motion } from 'framer-motion';
 
 interface AccuseEntry { moveId: string; card: Card; targetPlayer: string; play: ()=>void }
-interface Props { table: Pair[]; trumpSuit: string; onDefend: (_target: Card, _card: Card)=>void; selectableDefend: { target: Card; defendWith: Card }[]; onAttackDrop?: (_card: Card)=>void; translationHint?: boolean; accuse?: AccuseEntry[]; suspectIndices?: number[] }
-export const TableBoard: React.FC<Props> = ({ table, trumpSuit, onDefend, selectableDefend, onAttackDrop, translationHint, accuse, suspectIndices }) => {
+interface Props { table: Pair[]; trumpSuit: string; onDefend: (_target: Card, _card: Card)=>void; selectableDefend: { target: Card; defendWith: Card }[]; onAttackDrop?: (_card: Card)=>void; translationHint?: boolean; accuse?: AccuseEntry[]; suspectIndices?: number[]; attackLimit?: number; currentCount?: number }
+export const TableBoard: React.FC<Props> = ({ table, trumpSuit, onDefend, selectableDefend, onAttackDrop, translationHint, accuse, suspectIndices, attackLimit, currentCount }) => {
   const [flashInvalid,setFlashInvalid] = useState(false);
   const prevTableRef = useRef<Pair[]>(table);
   const [clearing,setClearing] = useState<Card[]>([]);
   const [flashDefendIds,setFlashDefendIds] = useState<string[]>([]);
   const containerRef = useRef<HTMLDivElement|null>(null);
   const { flyCard } = useFlip()||{};
+
+  const limitReached = typeof attackLimit==='number' && typeof currentCount==='number' ? currentCount >= attackLimit : false;
 
   // отслеживаем момент когда стол очищён (END_TURN) и показываем анимацию исчезновения карт
   useEffect(()=>{
@@ -78,12 +80,13 @@ export const TableBoard: React.FC<Props> = ({ table, trumpSuit, onDefend, select
     document.addEventListener('durak-drag-card-end', onDragEnd as any);
     return ()=>{ document.removeEventListener('durak-drag-card', onDrag as any); document.removeEventListener('durak-drag-card-end', onDragEnd as any); };
   },[]);
-  const canAttackWithDragged = dragCard? (dragCard.roles?.attack && (table.length===0 || attackRanks.includes(dragCard.card.r))) : false;
+  const canAttackWithDragged = dragCard? (dragCard.roles?.attack && (table.length===0 || attackRanks.includes(dragCard.card.r)) && !limitReached) : false;
   const draggedDefendCard = dragCard && dragCard.roles?.defend? dragCard.card: null;
   return (
-  <div ref={containerRef} className={`flex flex-wrap gap-4 p-4 rounded-xl glass min-h-[140px] relative ${translationHint? 'ring-2 ring-fuchsia-400/60 animate-pulse':''} ${dragCard && canAttackWithDragged? 'ring-2 ring-emerald-400/60': dragCard? 'ring-2 ring-red-500/40':''}`}
+  <div ref={containerRef} className={`flex flex-wrap gap-4 p-4 rounded-xl glass min-h-[140px] relative ${translationHint? 'ring-2 ring-fuchsia-400/60 animate-pulse':''} ${dragCard && canAttackWithDragged? 'ring-2 ring-emerald-400/60': dragCard? (limitReached? 'ring-2 ring-amber-400/60':'ring-2 ring-red-500/40'):''}`}
       role="region" aria-label="Стол" aria-live="polite"
       onDragOver={e=>{ // разрешаем дроп если либо атака возможна (пустой стол) либо защита в конкретные пары
+        if(limitReached){ e.preventDefault(); return; }
         e.preventDefault();
       }}
       onDrop={e=>{
@@ -91,7 +94,8 @@ export const TableBoard: React.FC<Props> = ({ table, trumpSuit, onDefend, select
         if(!raw) return;
         try {
           const { card } = JSON.parse(raw) as { card: Card };
-          // Попытка атаковать (дроп в пустую область) — если есть onAttackDrop и пустой стол или есть совпадающий ранг
+          // Блокируем атаку, если лимит достигнут
+          if(limitReached){ setFlashInvalid(true); setTimeout(()=> setFlashInvalid(false), 450); try { document.dispatchEvent(new CustomEvent('durak-illegal',{ detail:`Лимит ${attackLimit} на ход` })); } catch{}; return; }
           if(onAttackDrop){ onAttackDrop(card); }
         } catch{}
       }}
@@ -152,7 +156,12 @@ export const TableBoard: React.FC<Props> = ({ table, trumpSuit, onDefend, select
       })}
   </AnimatePresence>
   <div className="discard-anchor absolute -right-6 -top-6 w-8 h-8" />
-  {table.length===0 && <div className={`text-xs opacity-60 italic ${dragCard? (canAttackWithDragged? 'text-emerald-300':'text-red-400'):''}`}>{dragCard? (canAttackWithDragged? 'Бросьте для атаки':'Нельзя атаковать этим рангом'): 'Пока пусто'}</div>}
+  {typeof attackLimit==='number' && typeof currentCount==='number' && (
+    <div className="absolute -top-3 left-3 text-[10px] px-1.5 py-0.5 rounded bg-white/10 backdrop-blur border border-white/10">
+      {currentCount}/{attackLimit}
+    </div>
+  )}
+  {table.length===0 && <div className={`text-xs opacity-60 italic ${dragCard? (canAttackWithDragged? 'text-emerald-300':'text-red-400'):''}`}>{dragCard? (limitReached? `Лимит ${attackLimit} на ход`: (canAttackWithDragged? 'Бросьте для атаки':'Нельзя атаковать этим рангом')): 'Пока пусто'}</div>}
       {flashInvalid && <div className="absolute -top-5 right-2 text-[10px] text-red-400">Нельзя сюда</div>}
   {dragCard && <div className="pointer-events-none absolute inset-0 rounded-xl bg-gradient-to-br from-white/5 to-white/0" />}
     </div>
