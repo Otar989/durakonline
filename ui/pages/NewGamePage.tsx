@@ -67,6 +67,7 @@ export const NewGamePage: React.FC<{ onRestart?: ()=>void; initialNick?: string;
   const [limitFive,setLimitFive] = useState<boolean>(false);
   const [botSkill,setBotSkill] = useState<'auto'|'easy'|'normal'|'hard'>('auto');
   const [maxOnTable,setMaxOnTable] = useState<number>(6);
+  const [speed,setSpeed] = useState<'slow'|'normal'|'fast'>('normal');
   const [mode,setMode] = useState<'ONLINE'|'OFFLINE'>(initialMode==='online'? 'ONLINE':'OFFLINE');
   const [showRules,setShowRules] = useState(false);
   const [showLog,setShowLog] = useState(true);
@@ -258,7 +259,8 @@ export const NewGamePage: React.FC<{ onRestart?: ()=>void; initialNick?: string;
         if(typeof raw.withTrick==='boolean') setWithTrick(raw.withTrick);
         if(typeof raw.limitFiveBeforeBeat==='boolean') setLimitFive(raw.limitFiveBeforeBeat);
         if(['auto','easy','normal','hard'].includes(raw.botSkill)) setBotSkill(raw.botSkill);
-        if(raw.maxOnTable && Number(raw.maxOnTable)>=4) setMaxOnTable(Number(raw.maxOnTable));
+  if(raw.maxOnTable && Number(raw.maxOnTable)>=4) setMaxOnTable(Number(raw.maxOnTable));
+  if(['slow','normal','fast'].includes(raw.speed)) setSpeed(raw.speed);
         if(raw.roomId && !roomId) setRoomId(String(raw.roomId));
       } catch{}
     }
@@ -271,7 +273,18 @@ export const NewGamePage: React.FC<{ onRestart?: ()=>void; initialNick?: string;
     } else {
       const generated = roomId || 'room_'+Math.random().toString(36).slice(2,8);
       setRoomId(generated);
-      setTimeout(()=> startGame({ allowTranslation: allowTranslationOpt, withBot:true, withTrick, limitFiveBeforeBeat: limitFive, botSkill, maxOnTable }), 200);
+  setTimeout(()=> startGame({ allowTranslation: allowTranslationOpt, withBot:true, withTrick, limitFiveBeforeBeat: limitFive, botSkill, maxOnTable, speed }), 200);
+  // ===== TURN TIMER =====
+  const [remainingMs,setRemainingMs] = useState<number|undefined>();
+  useEffect(()=>{
+    if(!inOnline){ setRemainingMs(undefined); return; }
+    const ends = (snapshot as any)?.turnEndsAt as number | undefined | null;
+    if(!ends){ setRemainingMs(undefined); return; }
+    const tick = ()=>{ const ms = ends - Date.now(); setRemainingMs(ms>0? ms:0); };
+    tick();
+    const id = setInterval(tick, 500);
+    return ()=> clearInterval(id);
+  },[inOnline, (snapshot as any)?.turnEndsAt, snapshot.state?.attacker, snapshot.state?.defender]);
     }
   };
 
@@ -540,6 +553,7 @@ export const NewGamePage: React.FC<{ onRestart?: ()=>void; initialNick?: string;
   <StatusBar mode={netStatus} turnOwner={activeState? activeState.attacker: undefined} hint={hint} allowTranslation={!!activeState?.allowTranslation}
           attackerNick={activeState? activeState.players.find(p=>p.id===activeState.attacker)?.nick: undefined}
           defenderNick={activeState? activeState.players.find(p=>p.id===activeState.defender)?.nick: undefined}
+          remainingMs={remainingMs}
         />
       </header>
   <GameLayout sidebar={sidebarNode} table={tableNode} log={logNode} hand={handNode} topBar={topBarNode} />

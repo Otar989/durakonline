@@ -17,9 +17,11 @@ interface Room {
   waitBotTimer?: NodeJS.Timeout;
   busy?: boolean; // простая защита от гонок
   lastMoveAt?: Record<string, number>; // для rate-limit
-  options?: { allowTranslation?: boolean; withTrick?: boolean; limitFiveBeforeBeat?: boolean; deckSize?: 24|36|52; maxPlayers?: number; botSkill?: 'auto'|'easy'|'normal'|'hard'; maxOnTable?: number };
+  options?: { allowTranslation?: boolean; withTrick?: boolean; limitFiveBeforeBeat?: boolean; deckSize?: 24|36|52; maxPlayers?: number; botSkill?: 'auto'|'easy'|'normal'|'hard'; maxOnTable?: number; speed?: 'slow'|'normal'|'fast' };
   botStats?: { wins:number; losses:number };
   effectiveBotSkill?: 'easy'|'normal'|'hard';
+  turnTimer?: NodeJS.Timeout | null;
+  turnEndsAt?: number | null;
 }
 
 const rooms = new Map<string, Room>();
@@ -29,6 +31,41 @@ const io = new Server(httpServer, { cors:{ origin: process.env.CORS_ORIGIN?.spli
 function touch(room: Room){ room.lastActivity = Date.now(); if(room.timeout) clearTimeout(room.timeout); room.timeout = setTimeout(()=>{ rooms.delete(room.id); }, 1000*60*30); }
 
 function otherId(state: GameState, me: string){ const p = state.players.find(x=>x.id!==me); return p? p.id: null; }
+
+function speedMs(s: 'slow'|'normal'|'fast'|undefined){ return s==='fast'? 15_000 : s==='slow'? 60_000 : 30_000; }
+
+function clearTurnTimer(room: Room){ if(room.turnTimer){ clearTimeout(room.turnTimer); room.turnTimer=null; room.turnEndsAt=null; } }
+function scheduleTurnTimer(room: Room){
+  clearTurnTimer(room);
+  if(!room.state || room.state.phase!=='playing') return;
+  const ms = speedMs(room.options?.speed);
+  room.turnEndsAt = Date.now() + ms;
+  room.turnTimer = setTimeout(()=> onTurnTimeout(room), ms);
+  io.to(room.id).emit('room_state', snapshot(room));
+}
+
+function onTurnTimeout(room: Room){
+  if(!room.state || room.state.phase!=='playing') return;
+  try {
+    const st = room.state;
+    const defender = st.defender;
+    // если есть незакрытые атаки — защитник берёт, иначе атакующий завершает ход
+    const hasUndefended = st.table.some(p=> !p.defend);
+    let auto: Move | null = null;
+    if(hasUndefended){ auto = { type: 'TAKE' } as Move; }
+    else {
+      // право завершить ход у атакующего
+      auto = { type: 'END_TURN' } as Move;
+    }
+    if(auto){
+      const pid = hasUndefended? defender : st.attacker;
+      const legal = legalMoves(st, pid).some(m=> JSON.stringify(m)===JSON.stringify(auto));
+      if(legal){ applyMove(st, auto, pid); io.to(room.id).emit('move_applied', { state: st, lastMove: auto }); }
+    }
+  } catch {}
+  // после автодействия планируем следующий таймер если игра не закончена
+  if(room.state && room.state.phase==='playing') scheduleTurnTimer(room);
+}
 
 io.on('connection', socket=>{
   socket.on('join_room', ({ roomId, nick, clientId }: { roomId:string; nick:string; clientId?:string })=>{
@@ -51,44 +88,33 @@ io.on('connection', socket=>{
     scheduleAutoBot(room);
   });
 
-  socket.on('start_game', ({ roomId, withBot, allowTranslation, withTrick, limitFiveBeforeBeat, deckSize, botSkill, maxOnTable }: { roomId:string; withBot?:boolean; allowTranslation?: boolean; withTrick?: boolean; limitFiveBeforeBeat?: boolean; deckSize?:24|36|52; botSkill?: 'auto'|'easy'|'normal'|'hard'; maxOnTable?: number })=>{
+  socket.on('start_game', ({ roomId, withBot, allowTranslation, withTrick, limitFiveBeforeBeat, deckSize, botSkill, maxOnTable, speed }: { roomId:string; withBot?:boolean; allowTranslation?: boolean; withTrick?: boolean; limitFiveBeforeBeat?: boolean; deckSize?:24|36|52; botSkill?: 'auto'|'easy'|'normal'|'hard'; maxOnTable?: number; speed?: 'slow'|'normal'|'fast' })=>{
     const room = rooms.get(roomId); if(!room) return;
     if(room.state) return;
-    // fix опции (persist in room.options)
-    room.options = { ...(room.options||{}), allowTranslation, withTrick, limitFiveBeforeBeat, deckSize, botSkill: botSkill||room.options?.botSkill, maxPlayers: room.options?.maxPlayers, maxOnTable: maxOnTable ?? (room.options?.maxOnTable ?? 6) };
+    room.options = { ...(room.options||{}), allowTranslation, withTrick, limitFiveBeforeBeat, deckSize, botSkill: botSkill||room.options?.botSkill, maxPlayers: room.options?.maxPlayers, maxOnTable: maxOnTable ?? (room.options?.maxOnTable ?? 6), speed: speed || room.options?.speed || 'normal' };
     if(withBot && !room.bot){ room.bot = { id:'bot', nick:'Bot' }; }
-    // compute initial effective difficulty for snapshot (auto адаптация на основе winrate)
-    if(room.bot){
-      room.effectiveBotSkill = computeEffectiveSkill(room);
-    }
-    const list = [...room.players.values()].map(p=>({ id:p.id, nick:p.nick }));
-    if(room.bot) list.push(room.bot);
-    if(list.length < 2) return; // нужно минимум 2
+    if(room.bot){ room.effectiveBotSkill = computeEffectiveSkill(room); }
+    const list = [...room.players.values()].map(p=>({ id:p.id, nick:p.nick })); if(room.bot) list.push(room.bot);
+    if(list.length < 2) return;
     room.state = initGame(list, true, { allowTranslation: !!allowTranslation, withTrick: !!withTrick, limitFiveBeforeBeat: !!limitFiveBeforeBeat, deckSize: (deckSize||36) as any, maxOnTable: room.options.maxOnTable });
     touch(room);
     io.to(roomId).emit('game_started', snapshot(room));
     io.to(roomId).emit('invite_link', { url: `${process.env.PUBLIC_ORIGIN||'http://localhost:3000'}?room=${roomId}` });
+    scheduleTurnTimer(room);
   });
 
   socket.on('play_move', ({ roomId, move }: { roomId:string; move:Move })=>{
     const room = rooms.get(roomId); if(!room || !room.state) return;
-    if(room.busy) return; // простая блокировка
-    room.busy = true;
+    if(room.busy) return; room.busy = true;
     try {
       const pid = [...room.players.values()].find(p=>p.socketId===socket.id)?.id || (room.bot?.id===socket.id? room.bot!.id: socket.id);
-      // rate limit: не чаще 5 действий в 3 секунды (пакетно)
-      const now = Date.now();
-      room.lastMoveAt = room.lastMoveAt || {};
-      const key = pid;
-      const prev = room.lastMoveAt[key] || 0;
-      if(now - prev < 300){ socket.emit('error', { code:'RATE', message:'Too fast' }); return; }
-      room.lastMoveAt[key] = now;
-      const legal = legalMoves(room.state, pid).some(m=> JSON.stringify(m)===JSON.stringify(move));
-      if(!legal){ socket.emit('error', { code:'ILLEGAL', message:'Illegal move' }); return; }
+      const now = Date.now(); room.lastMoveAt = room.lastMoveAt || {}; const prev = room.lastMoveAt[pid] || 0; if(now - prev < 300){ socket.emit('error', { code:'RATE', message:'Too fast' }); return; } room.lastMoveAt[pid] = now;
+      const legal = legalMoves(room.state, pid).some(m=> JSON.stringify(m)===JSON.stringify(move)); if(!legal){ socket.emit('error', { code:'ILLEGAL', message:'Illegal move' }); return; }
       applyMove(room.state, move, pid);
       touch(room);
       io.to(roomId).emit('move_applied', { state: room.state, lastMove: move });
-    if(room.state.phase==='finished'){
+      clearTurnTimer(room); if(room.state.phase==='playing') scheduleTurnTimer(room);
+      if(room.state.phase==='finished'){
         io.to(roomId).emit('game_over', { state: room.state, winner: room.state.winner, loser: room.state.loser });
         // async persist match (MVP)
   try { void insertMatch({
@@ -115,43 +141,7 @@ io.on('connection', socket=>{
       // если бот участвует и его очередь — сделать ход спустя задержку
       if(room.bot && room.state.phase==='playing'){
         const needBot = room.state.attacker===room.bot.id || room.state.defender===room.bot.id;
-        if(needBot){
-          setTimeout(()=>{
-            if(!room.state) return;
-            try {
-              const lm = legalMoves(room.state!, room.bot!.id);
-              const pick = pickBotMove(room.state!, lm, room.bot!.id);
-              if(pick){
-                applyMove(room.state!, pick, room.bot!.id);
-                io.to(room.id).emit('move_applied', { state: room.state, lastMove: pick });
-                if(room.state.phase==='finished'){
-                  io.to(room.id).emit('game_over', { state: room.state, winner: room.state.winner, loser: room.state.loser });
-                  try {
-                    void insertMatch({
-                      started_at: new Date(room.state.log?.[0]?.t || Date.now()),
-                      finished_at: new Date(),
-                      mode: room.state.options?.withTrick? 'cheat': (room.state.allowTranslation? 'passing':'basic'),
-                      deck_size: (room.state.options?.deckSize)||36,
-                      room_id: room.id,
-                      players: room.state.players.map(p=>({ id:p.id, nick:p.nick })),
-                      result: { winner: room.state.winner, loser: room.state.loser, order: room.state.finished },
-                      state_hash: stateHash(room.state),
-                      logs: (room.state.log||[]).slice(-50)
-                    }).then(ins=>{ if((ins as any)?.data?.id){ void applyRatings((ins as any).data.id, room.state!); } });
-                    if(room.bot){
-                      room.botStats = room.botStats || { wins:0, losses:0 };
-                      if(room.state.winner===room.bot.id) room.botStats.wins++; else if(room.state.loser===room.bot.id) room.botStats.losses++;
-                      const prevSkill = room.effectiveBotSkill;
-                      room.effectiveBotSkill = computeEffectiveSkill(room);
-                      io.to(room.id).emit('room_state', snapshot(room));
-                      if(prevSkill!==room.effectiveBotSkill){ io.to(room.id).emit('bot_skill_changed', { skill: room.effectiveBotSkill }); }
-                    }
-                  } catch{}
-                }
-              }
-            } catch{}
-          }, 550);
-        }
+        if(needBot){ setTimeout(()=>{ if(!room.state) return; try { const lm = legalMoves(room.state!, room.bot!.id); const pick = pickBotMove(room.state!, lm, room.bot!.id); if(pick){ applyMove(room.state!, pick, room.bot!.id); io.to(room.id).emit('move_applied', { state: room.state, lastMove: pick }); if(room.state.phase==='finished'){ io.to(room.id).emit('game_over', { state: room.state, winner: room.state.winner, loser: room.state.loser }); } else { clearTurnTimer(room); scheduleTurnTimer(room); } } } catch{} }, 550); }
       }
     } finally { room.busy = false; }
   });
@@ -241,7 +231,8 @@ io.on('connection', socket=>{
 });
 
 function snapshot(room: Room){
-  return { state: room.state, players: [...room.players.values()].map(p=>({ id:p.id, nick:p.nick })), bot: room.bot? { id: room.bot.id, nick: room.bot.nick }: null, effectiveBotSkill: room.effectiveBotSkill, botStats: room.botStats };
+  return { state: room.state, players: [...room.players.values()].map(p=>({ id:p.id, nick:p.nick })), bot: room.bot? { id: room.bot.id, nick: room.bot.nick }: null, effectiveBotSkill: room.effectiveBotSkill, botStats: room.botStats, // таймер
+    turnEndsAt: room.turnEndsAt } as any;
 }
 
 function stateHash(st: GameState | null): string {

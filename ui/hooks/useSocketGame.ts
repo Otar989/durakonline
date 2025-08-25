@@ -4,7 +4,7 @@ import { GameState, Move } from '../../game-core/types';
 import { logMetric } from '../lib/metrics';
 
 // removed unused JoinOpts interface
-interface Snapshot { state: GameState|null; players:{id:string;nick:string}[]; bot?:{id:string;nick:string}|null; effectiveBotSkill?: 'easy'|'normal'|'hard'; botStats?: { wins:number; losses:number } }
+interface Snapshot { state: GameState|null; players:{id:string;nick:string}[]; bot?:{id:string;nick:string}|null; effectiveBotSkill?: 'easy'|'normal'|'hard'; botStats?: { wins:number; losses:number }; turnEndsAt?: number|null }
 
 export function useSocketGame(roomId: string | null, nick: string){
   const [socketState,setSocketState] = useState<'ONLINE'|'OFFLINE'|'RECONNECTING'>('RECONNECTING');
@@ -62,8 +62,8 @@ export function useSocketGame(roomId: string | null, nick: string){
 
   useEffect(()=>{ if(roomId) connect(); return ()=>{ if(sref.current) sref.current.disconnect(); if(timeoutRef.current) clearTimeout(timeoutRef.current); }; },[roomId, connect]);
 
-  const startGame = (opts?: { withBot?: boolean; allowTranslation?: boolean; withTrick?: boolean; limitFiveBeforeBeat?: boolean; botSkill?: 'auto'|'easy'|'normal'|'hard'; maxOnTable?: number }) => {
-    if(sref.current && roomId) sref.current.emit('start_game', { roomId, withBot: opts?.withBot, allowTranslation: opts?.allowTranslation, withTrick: opts?.withTrick, limitFiveBeforeBeat: opts?.limitFiveBeforeBeat, botSkill: opts?.botSkill, maxOnTable: opts?.maxOnTable });
+  const startGame = (opts?: { withBot?: boolean; allowTranslation?: boolean; withTrick?: boolean; limitFiveBeforeBeat?: boolean; botSkill?: 'auto'|'easy'|'normal'|'hard'; maxOnTable?: number; speed?: 'slow'|'normal'|'fast' }) => {
+    if(sref.current && roomId) sref.current.emit('start_game', { roomId, withBot: opts?.withBot, allowTranslation: opts?.allowTranslation, withTrick: opts?.withTrick, limitFiveBeforeBeat: opts?.limitFiveBeforeBeat, botSkill: opts?.botSkill, maxOnTable: opts?.maxOnTable, speed: opts?.speed });
   };
   const playMove = (move: Move) => { if(sref.current && roomId) sref.current.emit('play_move', { roomId, move }); };
 
