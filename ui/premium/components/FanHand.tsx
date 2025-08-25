@@ -23,7 +23,7 @@ function computeFan(cards: FanCard[], curveRadius:number){
   });
 }
 
-export const FanHand: React.FC<FanHandProps & Props> = ({ cards = [], onPlay, scale=1, curveRadius=340, selectedId, onSelect, hand, moves, play, trumpSuit }) => {
+const InnerFanHand: React.FC<FanHandProps & Props> = ({ cards = [], onPlay, scale=1, curveRadius=340, selectedId, onSelect, hand, moves, play, trumpSuit }) => {
   const layout = useMemo(()=> computeFan(cards, curveRadius), [cards, curveRadius]);
   // simple fan geometry: rotate around center
   const angleSpan = Math.min(110, hand.length*12);
@@ -75,4 +75,29 @@ export const FanHand: React.FC<FanHandProps & Props> = ({ cards = [], onPlay, sc
     </div>
   );
 };
+
+function eqCards(a:Card[], b:Card[]){
+  if(a.length!==b.length) return false;
+  for(let i=0;i<a.length;i++){ if(a[i].r!==b[i].r || a[i].s!==b[i].s) return false; }
+  return true;
+}
+function eqMoves(a:Move[], b:Move[]){
+  if(a.length!==b.length) return false;
+  // compare by type+card id; ignore target specifics for speed
+  for(let i=0;i<a.length;i++){
+    const ca = (a[i] as any).card; const cb = (b[i] as any).card;
+    if(a[i].type!==b[i].type) return false;
+    if(ca && cb && (ca.r!==cb.r || ca.s!==cb.s)) return false;
+  }
+  return true;
+}
+const FanHand = React.memo(InnerFanHand, (prev, next)=>{
+  return eqCards(prev.hand, next.hand)
+    && eqMoves(prev.moves, next.moves)
+    && prev.trumpSuit===next.trumpSuit
+    && prev.scale===next.scale
+    && prev.curveRadius===next.curveRadius
+    && prev.selectedId===next.selectedId;
+});
+export { FanHand };
 export default FanHand;

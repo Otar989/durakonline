@@ -26,11 +26,14 @@ export const PlayingCard: React.FC<{ card: Card; trumpSuit?: string; dim?: boole
         animate={{ opacity:1, y:0, rotate:0 }}
         exit={{ opacity:0, y:-8, rotate:4 }}
         transition={{ type:'spring', stiffness:300, damping:20, mass:0.6 }}
-        className={`card-premium relative overflow-hidden flex flex-col justify-between px-2 py-1 ${small? 'w-12 h-16':'w-[4.2rem] h-28'} ${dim? 'opacity-40':''} ${ghost? 'opacity-50':''} ${trump? 'ring-2 ring-fuchsia-400 shadow-[0_0_8px_rgba(232,121,249,0.5)]':''}`}
+        className={`card-premium relative overflow-hidden flex flex-col justify-between px-2 py-1 ${small? 'w-12 h-16':'w-[4.2rem] h-28'} ${dim? 'opacity-40':''} ${ghost? 'opacity-50':''} ${trump? 'ring-2 ring-fuchsia-400 shadow-[0_0_10px_rgba(232,121,249,0.55)]':''}`}
       >
         <span className={`rank ${isRed? 'text-rose-300':'text-slate-100'} font-semibold`}>{card.r}</span>
         <span className={`suit text-lg ${isRed? 'text-rose-300':'text-slate-200'}`}>{card.s}</span>
-        {trump && <span className="absolute inset-0 -z-10 bg-gradient-to-br from-fuchsia-500/15 to-sky-500/10" />}
+        {trump && <>
+          <span className="absolute inset-0 -z-10 bg-gradient-to-br from-fuchsia-500/15 to-sky-500/10" />
+          <span className="trump-glow pointer-events-none" />
+        </>}
       </motion.div>
     );
   }

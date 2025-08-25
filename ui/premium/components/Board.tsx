@@ -8,7 +8,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 interface Props { table: Pair[]; trumpSuit: string; selectableDefend: { target: Card; defendWith: Card }[]; onDefend:(target:Card, card:Card)=>void; onAttack:(card:Card)=>void; translationHint?: boolean; cheatSuspects?: number[]; accuse?: { moveId:string; card:Card; targetPlayer:string; play:()=>void }[] }
 
-export const PremiumBoard: React.FC<Props> = ({ table, trumpSuit, selectableDefend, onDefend, onAttack, translationHint, cheatSuspects, accuse }) => {
+const InnerPremiumBoard: React.FC<Props> = ({ table, trumpSuit, selectableDefend, onDefend, onAttack, translationHint, cheatSuspects, accuse }) => {
   const ref = useRef<HTMLDivElement|null>(null);
   const prev = useRef<Pair[]>(table);
   const { flyCard } = useFlip()||{};
@@ -89,14 +89,14 @@ export const PremiumBoard: React.FC<Props> = ({ table, trumpSuit, selectableDefe
             onDragOver={e=>{ if(droppable) e.preventDefault(); }}
             onDrop={e=>{ if(!droppable) return; const raw=e.dataTransfer.getData('application/x-card'); if(!raw) return; try { const { card } = JSON.parse(raw); const m = defendOpts.find(o=> o.defendWith.r===card.r && o.defendWith.s===card.s); if(m) onDefend(m.target, m.defendWith); } catch{} }}
           >
-            <div className="absolute -top-3 left-3" data-card-id={pair.attack.r+pair.attack.s}>
+            <div className="absolute -top-3 left-3 float-soft" data-variant={i%2===0? 'fast':'slow'} data-card-id={pair.attack.r+pair.attack.s}>
               <PlayingCard card={pair.attack} trumpSuit={trumpSuit} premium />
               {cheatSuspects?.includes(i) && <span className="absolute -top-2 -left-2 bg-rose-600 text-white text-[10px] px-1 rounded shadow">SUS</span>}
               {accuse && accuse.some(a=> a.card.r===pair.attack.r && a.card.s===pair.attack.s) && (
                 <button type="button" className="absolute -bottom-2 left-1/2 -translate-x-1/2 px-1.5 py-0.5 rounded bg-red-600 hover:bg-red-500 text-[10px] text-white shadow" onClick={()=>{ const entry = accuse.find(a=> a.card.r===pair.attack.r && a.card.s===pair.attack.s); if(entry) entry.play(); }}>⚠</button>
               )}
             </div>
-            {pair.defend && <div className={`absolute left-12 top-6 rotate-6 ${flashDef.includes(pair.defend.r+pair.defend.s)? 'animate-[pulse_0.7s_ease-out] ring-2 ring-emerald-400 rounded':''}`} data-card-id={pair.defend.r+pair.defend.s}><PlayingCard card={pair.defend} trumpSuit={trumpSuit} premium /></div>}
+            {pair.defend && <div className={`absolute left-12 top-6 rotate-6 float-soft ${flashDef.includes(pair.defend.r+pair.defend.s)? 'animate-[pulse_0.7s_ease-out] ring-2 ring-emerald-400 rounded':''}`} data-variant={i%2===0? 'slow':'fast'} data-card-id={pair.defend.r+pair.defend.s}><PlayingCard card={pair.defend} trumpSuit={trumpSuit} premium /></div>}
             {!pair.defend && droppable && <button className="absolute inset-0 rounded-xl" aria-label="Защитить" onClick={()=>{ if(defendOpts.length===1) onDefend(defendOpts[0].target, defendOpts[0].defendWith); }} />}
           </motion.div>
         );
@@ -106,4 +106,32 @@ export const PremiumBoard: React.FC<Props> = ({ table, trumpSuit, selectableDefe
     </div>
   );
 };
+
+function eqCard(a:Card,b:Card){ return a.r===b.r && a.s===b.s; }
+function eqPairs(a:Pair[], b:Pair[]){
+  if(a.length!==b.length) return false;
+  for(let i=0;i<a.length;i++){
+    if(!eqCard(a[i].attack, b[i].attack)) return false;
+    const da = a[i].defend, db = b[i].defend;
+    if(!!da!==!!db) return false;
+    if(da && db && !eqCard(da, db)) return false;
+  }
+  return true;
+}
+function eqSelectable(a:Props['selectableDefend'], b:Props['selectableDefend']){
+  if(a.length!==b.length) return false;
+  for(let i=0;i<a.length;i++){
+    if(!eqCard(a[i].target,b[i].target) || !eqCard(a[i].defendWith,b[i].defendWith)) return false;
+  }
+  return true;
+}
+const PremiumBoard = React.memo(InnerPremiumBoard, (prev, next)=>{
+  return eqPairs(prev.table, next.table)
+    && prev.trumpSuit===next.trumpSuit
+    && prev.translationHint===next.translationHint
+    && eqSelectable(prev.selectableDefend, next.selectableDefend)
+    && (prev.cheatSuspects?.join(',')||'') === (next.cheatSuspects?.join(',')||'')
+    && (prev.accuse?.length||0) === (next.accuse?.length||0); // shallow length check for accuse list (content seldom stable)
+});
+export { PremiumBoard };
 export default PremiumBoard;
