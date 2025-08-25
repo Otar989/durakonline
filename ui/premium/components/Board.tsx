@@ -88,12 +88,33 @@ const InnerPremiumBoard: React.FC<Props> = ({ table, trumpSuit, selectableDefend
     ro.observe(el); return ()=> ro.disconnect();
   },[]);
   const needsDefense = table.some(p=> !p.defend);
-  const [lines,setLines] = useState<{ id:string; attack:string; defend:string }[]>([]);
-  useEffect(()=>{
-    const arr: { id:string; attack:string; defend:string }[] = [];
-    table.forEach(pair=>{ if(pair.defend) arr.push({ id: pair.attack.r+pair.attack.s, attack: pair.attack.r+pair.attack.s, defend: pair.defend.r+pair.defend.s }); });
-    setLines(arr);
-  },[table]);
+  const [lines,setLines] = useState<{ id:string; path:string }[]>([]);
+  const recomputeLines = ()=>{
+    const host = ref.current; if(!host) return; const hostBox = host.getBoundingClientRect();
+    const next: { id:string; path:string }[] = [];
+    table.forEach(pair=>{
+      if(!pair.defend) return;
+      const aEl = host.querySelector(`[data-card-id='${pair.attack.r+pair.attack.s}']`) as HTMLElement|null;
+      const dEl = host.querySelector(`[data-card-id='${pair.defend!.r+pair.defend!.s}']`) as HTMLElement|null;
+      if(!aEl || !dEl) return;
+      const ar = aEl.getBoundingClientRect();
+      const dr = dEl.getBoundingClientRect();
+      const x1 = ar.right - hostBox.left; const y1 = ar.top + ar.height/2 - hostBox.top;
+      const x2 = dr.left - hostBox.left; const y2 = dr.top + dr.height/2 - hostBox.top;
+      const mx = (x1+x2)/2; const c1y = y1 + (y2 - y1)*0.15;
+      const path = `M ${x1} ${y1} Q ${mx} ${c1y} ${x2} ${y2}`;
+      next.push({ id: pair.attack.r+pair.attack.s, path });
+    });
+    setLines(next);
+  };
+  useEffect(()=>{ // defer to next frame to ensure card layout settled
+    const r = requestAnimationFrame(()=> recomputeLines());
+    return ()=> cancelAnimationFrame(r);
+  },[table, portrait]);
+  useEffect(()=>{ // resize listener
+    function onResize(){ recomputeLines(); }
+    window.addEventListener('resize', onResize); return ()=> window.removeEventListener('resize', onResize);
+  },[]);
   return (
     <div ref={ref}
       data-portrait={portrait||undefined}
@@ -169,20 +190,8 @@ const InnerPremiumBoard: React.FC<Props> = ({ table, trumpSuit, selectableDefend
       </div>
       {/* SVG connection lines overlay (attack->defend) */}
       {lines.length>0 && <svg className="pointer-events-none absolute inset-0 w-full h-full" aria-hidden>
-        {lines.map(l=>{
-          const aEl = ref.current?.querySelector(`[data-card-id='${l.attack}']`);
-            const dEl = ref.current?.querySelector(`[data-card-id='${l.defend}']`);
-            if(!aEl || !dEl) return null;
-            const ar = (aEl as HTMLElement).getBoundingClientRect();
-            const dr = (dEl as HTMLElement).getBoundingClientRect();
-            // convert to svg coords (svg covers same box, so page coords translate via offset)
-            const host = ref.current!.getBoundingClientRect();
-            const x1 = ar.right - host.left; const y1 = ar.top + ar.height/2 - host.top;
-            const x2 = dr.left - host.left; const y2 = dr.top + dr.height/2 - host.top;
-            const mx = (x1+x2)/2; const c1y = y1 + (y2 - y1)*0.15;
-            const path = `M ${x1} ${y1} Q ${mx} ${c1y} ${x2} ${y2}`;
-            return <path key={l.id} d={path} stroke="rgba(52,211,153,0.6)" strokeWidth={3} strokeLinecap="round" fill="none" className="mix-blend-screen" />;
-        })}
+        {lines.map(l=> <path key={l.id} d={l.path} stroke="rgba(52,211,153,0.6)" strokeWidth={3} strokeLinecap="round" fill="none" className="mix-blend-screen card-link-path" />)}
+        <style>{`.card-link-path{ stroke-dasharray:140; stroke-dashoffset:140; animation:drawCardLink .6s ease forwards; filter:drop-shadow(0 0 4px rgba(16,185,129,0.5)); }@keyframes drawCardLink{to{stroke-dashoffset:0;}}`}</style>
       </svg>}
       {table.length===0 && <div className={`absolute inset-0 flex items-center justify-center pointer-events-none text-xs ${dragCard? (canAttackDragged? 'text-emerald-300':'text-red-400'):'opacity-40'}`}>{dragCard? (canAttackDragged? 'Атакуйте':'Нельзя атаковать'):'Пустой стол'}</div>}
     </div>
