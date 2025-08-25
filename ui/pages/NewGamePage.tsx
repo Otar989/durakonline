@@ -28,6 +28,8 @@ import Modal from '../components/Modal';
 import Sidebar from '../components/Sidebar';
 import GameLayout from '../components/GameLayout';
 import { useNetStatus } from '../hooks/useNetStatus';
+import { useWallet, usePurchasePremium } from '../hooks/useWallet';
+import MultiOpponents from '../components/MultiOpponents';
 
 // Live drag announcer
 const DragLive: React.FC = ()=> {
@@ -67,6 +69,12 @@ export const NewGamePage: React.FC<{ onRestart?: ()=>void; initialNick?: string;
   const [gameEnded,setGameEnded] = useState<{ winner?:string|null; loser?:string|null }|null>(null);
   const { state: localState, start: startLocal, play: playLocal } = useLocalGame();
   const { snapshot, socketState, startGame, playMove, requestSync } = useSocketGame(roomId, nick);
+  // device id для wallet (повторно используем client_id)
+  const [deviceId,setDeviceId] = useState('');
+  useEffect(()=>{ try { const id = localStorage.getItem('durak_client_id'); if(id) setDeviceId(id); } catch{} },[]);
+  const wallet = useWallet(deviceId);
+  const purchasePremium = usePurchasePremium(deviceId);
+  const isPremium = wallet.premiumUntil && new Date(wallet.premiumUntil) > new Date();
   const { toasts, push } = useToasts();
   const { play: playSound, sound, toggleSound, volume, setVolume, theme, setTheme, ensureAudioUnlocked } = useSettings();
   // Разблокируем аудио по первому жесту пользователя и запускаем ambient один раз
@@ -297,6 +305,7 @@ export const NewGamePage: React.FC<{ onRestart?: ()=>void; initialNick?: string;
   const accuseMoves = useMemo(()=> (moves as Move[]).filter(m=> m.type==='ACCUSE') as Extract<Move,{type:'ACCUSE'}>[], [moves]);
   const tableNode = activeState ? (
     <div>
+  {activeState.players.length>2 && <MultiOpponents meId={myId||''} players={activeState.players.map(p=> ({ id:p.id, nick:p.nick, handCount:p.hand.length, role: p.id===activeState.attacker? 'attacker': p.id===activeState.defender? 'defender':'idle', isOffline:(p as any).offline }))} />}
       <TableBoard table={activeState.table} trumpSuit={activeState.trump.s} translationHint={!!canTranslate}
         onDefend={(target, card)=>{
           const def = (moves as Move[]).find((m): m is Extract<Move,{type:'DEFEND'}>=> m.type==='DEFEND' && m.card.r===card.r && m.card.s===card.s && m.target.r===target.r && m.target.s===target.s);
@@ -367,6 +376,16 @@ export const NewGamePage: React.FC<{ onRestart?: ()=>void; initialNick?: string;
         <div className="flex items-center gap-4 flex-wrap">
           <h1 className="text-2xl font-semibold">Дурак Онлайн</h1>
           <div className="ml-auto flex gap-2 items-center text-xs">
+            {wallet && !wallet.loading && <div className="flex items-center gap-1 bg-white/5 px-2 py-1 rounded relative" aria-label={`Монеты: ${wallet.coins}`}>
+              <span className="tabular-nums font-medium">{wallet.coins}</span>
+              <span className="text-[10px] opacity-70">💰</span>
+              {wallet.rewardFlash && <span className="absolute -top-3 right-0 text-[10px] text-emerald-300 animate-bounce">+{wallet.rewardFlash}</span>}
+            </div>}
+            <button disabled={wallet.loading} onClick={async()=>{ if(isPremium){ push('Премиум активен','info'); return; } const res = await purchasePremium(7); if(res.ok){ push('Премиум на 7 дней активирован','success'); wallet.reload(); } else if(res.error==='insufficient_funds'){ push('Недостаточно монет','warn'); } else { push('Не удалось купить','warn'); } }} className={`px-2 py-1 rounded bg-white/10 hover:bg-white/20 text-[11px] ${isPremium? 'ring-1 ring-amber-400/60': ''}`}>{isPremium? '⭐ Premium':'Купить ⭐'}</button>
+            <button disabled={wallet.loading || !wallet.claimAvailable} onClick={async()=>{
+              const res = await wallet.claimDaily();
+              if(res.ok){ push(`Daily бонус: +${res.reward}`,'success'); } else { if(res.error==='already_claimed'){ push('Уже получено сегодня','info'); } else { push('Не удалось daily','warn'); } }
+            }} className="px-2 py-1 rounded bg-white/10 hover:bg-white/20 disabled:opacity-40" title={wallet.claimAvailable? 'Получить ежедневный бонус':'Недоступно'}>Daily</button>
             <label className="flex items-center gap-1 bg-white/5 px-2 py-1 rounded"><span>Ник</span><input value={nick} onChange={e=> setNick(e.target.value)} className="bg-transparent outline-none w-24" /></label>
             <label className="flex items-center gap-1 bg-white/5 px-2 py-1 rounded cursor-pointer"><span>Режим</span>
               <select value={mode} onChange={e=> {
@@ -436,6 +455,10 @@ export const NewGamePage: React.FC<{ onRestart?: ()=>void; initialNick?: string;
     <div className="text-center space-y-3">
       {gameEnded?.winner && <p className="text-sm">Победил: <b>{gameEnded.winner}</b>{gameEnded.loser? ` — Дурак: ${gameEnded.loser}`:''}</p>}
       {!gameEnded?.winner && <p className="text-sm">Обе руки пусты.</p>}
+      {wallet && !wallet.loading && <div className="text-xs opacity-80 space-y-1">
+        <div>Баланс: {wallet.coins}💰 (daily стрик: {wallet.dailyStreak}) {isPremium && <span className="ml-2 px-2 py-0.5 rounded bg-amber-400/20 text-amber-300 text-[10px]">⭐ Premium до {new Date(wallet.premiumUntil!).toLocaleDateString()}</span>}</div>
+        {isPremium && <div className="text-[10px] opacity-60">Бонус к рейтингу/монетам активен</div>}
+      </div>}
       <div className="flex justify-center gap-2">
         <button className="btn" onClick={()=>{ setGameEnded(null); startUnified(); }}>Новая</button>
         {onRestart && <button className="px-4 py-2 rounded bg-white/10 hover:bg-white/20 text-sm" onClick={()=>{ setGameEnded(null); onRestart(); }}>Сброс</button>}
